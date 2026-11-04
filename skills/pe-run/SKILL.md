@@ -12,6 +12,8 @@ independent reviewer.
 
 `forge` below is `$PE_FORGE/bin/forge` (bootstrap also puts it on PATH).
 
+> **Agent names:** installed as a plugin, every agent is prefixed with the plugin name: spawn `pe-forge:pe-hw`, `pe-forge:pe-reviewer`, `pe-forge:schematic-reviewer` and so on (subagent_type). This file uses the short names.
+
 ## 1. Orient (every time)
 1. `forge status`: phases, modules, next action. `forge watch --show`: the owner's manual edits (Rule 5).
 2. Read `CLAUDE.md`, `project.toml` and the open rows of `01_Program/Master_Plan.md` (D / E / S / V).

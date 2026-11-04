@@ -8,6 +8,8 @@ description: Run a decision council in a pe-forge project - 2 to 5 role agents w
 You (the main session) are the **chair**: you frame, run the rounds, check disputed facts and write the record.
 You do not vote. **The owner decides.**
 
+> **Agent names:** installed as a plugin, every agent is prefixed with the plugin name: spawn `pe-forge:pe-hw`, `pe-forge:pe-reviewer`, `pe-forge:schematic-reviewer` and so on (subagent_type). This file uses the short names.
+
 ## 0. Frame (before spawning)
 ≤ 10 lines: the question; the options including "defer"; constraints (decided architecture in CLAUDE.md,
 requirements, dates); established facts with file paths. Pick 2–3 members (all only for a re-baseline):

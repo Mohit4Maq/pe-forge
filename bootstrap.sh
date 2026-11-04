@@ -31,9 +31,9 @@ if [[ ! -x "$HERE/.venv/bin/pwrlab-mcp" ]]; then
   say "building .venv with pwrlab"
   "$PY" -m venv "$HERE/.venv"
   "$HERE/.venv/bin/python" -m pip install -q --upgrade pip
-  "$HERE/.venv/bin/python" -m pip install -q -e "$HERE/vendor/pwrlab" pymupdf
+  "$HERE/.venv/bin/python" -m pip install -q -e "$HERE/vendor/pwrlab" pymupdf pytest
 fi
-"$PY" -c 'import fitz' 2>/dev/null || "$PY" -m pip install -q --user pymupdf 2>/dev/null || warn "PyMuPDF not installed for $PY: schematic renders and text checks need it (pip install pymupdf)"
+"$HERE/.venv/bin/python" -c "import fitz" 2>/dev/null || warn "PyMuPDF missing in .venv: schematic renders and text checks need it"
 
 # 3. forge on PATH
 mkdir -p "$HOME/.local/bin"

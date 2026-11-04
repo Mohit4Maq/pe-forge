@@ -1,4 +1,5 @@
 #!/bin/sh
-# pe-forge CLI wrapper: finds its own repo and runs the stdlib-only forge package.
-here=$(cd "$(dirname "$0")/.." && pwd)
-exec python3 "$here/forge/__main__.py" "$@"
+# pe-forge CLI wrapper: runs the stdlib-only forge package, preferring the repo's venv (has PyMuPDF + pwrlab).
+here=$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)
+py=python3; [ -x "$here/.venv/bin/python" ] && py="$here/.venv/bin/python"
+exec "$py" "$here/forge/__main__.py" "$@"

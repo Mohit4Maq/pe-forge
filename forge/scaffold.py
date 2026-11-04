@@ -119,7 +119,9 @@ def main(argv):
         raise SystemExit("--name or answers.name is required")
     if os.path.exists(os.path.join(dst, "project.toml")) and "--force" not in argv:
         raise SystemExit(f"{dst} already holds a pe-forge project")
-    shutil.copytree(config.TEMPLATE, dst, dirs_exist_ok=True)
+    shutil.copytree(config.TEMPLATE, dst, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".gitkeep"))
+    for key, rel in config.DEFAULT_PATHS.items():   # every standard folder exists, whatever git kept of the template
+        os.makedirs(os.path.join(dst, rel if not os.path.splitext(rel)[1] else os.path.dirname(rel)), exist_ok=True)
     toml, slug = project_toml(a)
     open(os.path.join(dst, "project.toml"), "w").write(toml)
     subs = {"NAME": a["name"], "DATE": dt.date.today().isoformat(), "OWNER": a.get("owner", "The owner"),

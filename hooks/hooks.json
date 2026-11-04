@@ -1,0 +1,11 @@
+{
+  "description": "pe-forge: report the user's manual edits each turn (Rule 5) and block finishing while superseded terms remain (Rule 4). Both are silent outside a pe-forge project.",
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event SessionStart", "timeout": 30}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event UserPromptSubmit", "timeout": 30}]}],
+    "Stop": [{"hooks": [
+      {"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" consistency --hook", "timeout": 60},
+      {"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --mark", "timeout": 30}
+    ]}]
+  }
+}

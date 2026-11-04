@@ -1,0 +1,49 @@
+{
+  "id": "three-level-ttype",
+  "title": "Three-level T-type inverter, two independent hardware references",
+  "publisher": "Texas Instruments / STMicroelectronics",
+  "document": "TIDUE53J (TIDA-01606) and UM3564",
+  "url": "https://www.ti.com/lit/pdf/tidue53 ; https://www.st.com/resource/en/user_manual/um3564.pdf",
+  "table": "TIDA-01606 Table 1-1 Key System Specifications; UM3564 Table 1 Electrical characteristics",
+  "retrieved_utc": "2026-09-13",
+  "extraction": "pdftotext -layout from the publicly downloadable PDFs (see url); specification tables transcribed verbatim",
+
+  "references": {
+    "tida_01606": {
+      "title": "11-kW, Bidirectional Three-Phase Three-Level (T-type) Inverter and PFC",
+      "document": "TIDUE53J, MARCH 2018 - REVISED FEBRUARY 2025",
+      "output_power_W": 11000,
+      "output_voltage_Vll_rms": 400,
+      "output_frequency_Hz": [50, 60],
+      "output_current_Arms_max": 16,
+      "dc_nominal_V": 800,
+      "dc_range_V": [600, 900],
+      "switching_frequency_Hz": [50000, 90000],
+      "efficiency_pct": 98.6,
+      "thd_pct_limit": 3.0,
+      "thd_condition": "< 3% at 11 kW",
+      "devices": "SiC MOSFETs with TI SiC gate drivers"
+    },
+    "st_um3564": {
+      "title": "50 kW T-type DC/AC inverter reference design",
+      "document": "UM3564",
+      "output_power_W": 50000,
+      "output_voltage_Vll_rms": [310, 380, 476],
+      "output_current_Arms_max": 76,
+      "dc_range_V": [650, 800, 850],
+      "efficiency_pct_at_800V": 98.89,
+      "efficiency_pct_at_650V": 99.10,
+      "thd_pct_limit": 3.0,
+      "thd_condition": "< 3% at full load, rated at 800 VDC",
+      "power_factor": 0.99,
+      "devices": "ST 1200 V 9.5 mOhm and 750 V 6 mOhm T-type SiC"
+    }
+  },
+
+  "caveats": {
+    "efficiency": "Both references give efficiency as a PEAK or single figure, and both curves live in FIGURES (TIDA Figure 2-x; UM3564 Figure 47) that text extraction cannot recover as per-point data. Only the headline numbers are usable here.",
+    "device_library": "pwrlab's device library is REPRESENTATIVE, not the parts these designs use. An efficiency comparison therefore tests the loss MODEL and its order of magnitude, not a specific part's datasheet.",
+    "unmodelled_loss": "The model accounts for device conduction and switching loss only. Magnetics (core and copper), gate-drive power, control power, EMI filter loss and busbar resistance are all absent, so the model must be OPTIMISTIC on efficiency by construction.",
+    "switching_frequency": "TIDA-01606 runs at 50-90 kHz. Simulating a three-phase leg at 50 kHz with a 50 Hz fundamental costs mf=1000 carrier cycles per run; the criteria below are evaluated on a frequency sweep and its trend rather than at a single unaffordable point."
+  }
+}

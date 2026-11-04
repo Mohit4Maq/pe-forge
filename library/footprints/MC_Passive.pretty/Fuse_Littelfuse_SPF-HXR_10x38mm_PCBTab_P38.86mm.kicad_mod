@@ -1,0 +1,243 @@
+(footprint "Fuse_Littelfuse_SPF-HXR_10x38mm_PCBTab_P38.86mm"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "Littelfuse SPF ...HXR 1000 Vdc midget 10x38 mm fuse with PCB tabs; tab pitch 38.86 mm, slot 1.02 x 3.56 mm per Littelfuse SPF datasheet Rev 4-I-091417 (Mounting hole detail)")
+	(tags "fuse midget 10x38 SPF HXR PCB tab Littelfuse 1000V")
+	(property "Reference" "REF**"
+		(at 19.43 -6.355 0)
+		(layer "F.SilkS")
+		(uuid "60eb7671-4699-4cb4-b8ed-aa9a5cec39dc")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Fuse_Littelfuse_SPF-HXR_10x38mm_PCBTab_P38.86mm"
+		(at 19.43 6.355 0)
+		(layer "F.Fab")
+		(uuid "0d536e2d-fa1b-462c-bc6e-00cecdb6bb48")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "fedb1e3c-0f49-4eec-aef3-2c12ae0b7715")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "87e6eca1-d749-4554-896b-b430adafd4a3")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start 0.26 -5.275)
+		(end 0.26 -2.6)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "a7e6756b-e62f-4af7-a303-cf69ec0b9692")
+	)
+	(fp_line
+		(start 0.26 -5.275)
+		(end 38.6 -5.275)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "accbaca0-dcf7-4edc-ab04-c02c27d1d615")
+	)
+	(fp_line
+		(start 0.26 2.6)
+		(end 0.26 5.275)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "ade86075-4990-44f1-a7d5-140c199e8ed3")
+	)
+	(fp_line
+		(start 0.26 5.275)
+		(end 38.6 5.275)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "624e91f7-7bde-467c-994c-1f03e00517fd")
+	)
+	(fp_line
+		(start 38.6 -5.275)
+		(end 38.6 -2.6)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "da5a2fc8-0085-4fdd-b6ec-deea2cffb266")
+	)
+	(fp_line
+		(start 38.6 2.6)
+		(end 38.6 5.275)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "5085473f-5556-492c-bcb2-f4aba5899698")
+	)
+	(fp_line
+		(start -1.26 -5.405)
+		(end 40.12 -5.405)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "e1b49214-1d4c-417f-ac3d-60e1c156d196")
+	)
+	(fp_line
+		(start -1.26 5.405)
+		(end -1.26 -5.405)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "67e3c600-7f78-485f-8ad2-6db24450c10c")
+	)
+	(fp_line
+		(start 40.12 -5.405)
+		(end 40.12 5.405)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "7dc5ad00-16d5-431d-b1e2-4ef90e897171")
+	)
+	(fp_line
+		(start 40.12 5.405)
+		(end -1.26 5.405)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "62a8a757-c7b7-4f69-abd5-5cd6f425d9cb")
+	)
+	(fp_line
+		(start 0.38 -5.155)
+		(end 38.48 -5.155)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "15408e00-ca18-4f58-b409-2689fe666703")
+	)
+	(fp_line
+		(start 0.38 5.155)
+		(end 0.38 -5.155)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "aa8b5dad-b51a-4fde-9bb4-41744842d769")
+	)
+	(fp_line
+		(start 9.98 -5.155)
+		(end 9.98 5.155)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "20ab3def-9e70-487e-b2fe-0af313c8c966")
+	)
+	(fp_line
+		(start 28.88 -5.155)
+		(end 28.88 5.155)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "490c9948-3257-43f3-aabd-29bed9403a4f")
+	)
+	(fp_line
+		(start 38.48 -5.155)
+		(end 38.48 5.155)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "7bb95114-9561-4c14-aa4c-d56a992db96b")
+	)
+	(fp_line
+		(start 38.48 5.155)
+		(end 0.38 5.155)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "22c76bb8-9751-4e23-92fd-edfd65fa351c")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 19.43 0 0)
+		(layer "F.Fab")
+		(uuid "ef4f1f50-2598-4d4c-b110-ab21de0d8a90")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole roundrect
+		(at 0 0)
+		(size 2.02 4.56)
+		(drill oval 1.02 3.56)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(roundrect_rratio 0.25)
+		(uuid "c6fa5296-9dd4-4fe4-b8ab-17351ab78625")
+	)
+	(pad "2" thru_hole oval
+		(at 38.86 0)
+		(size 2.02 4.56)
+		(drill oval 1.02 3.56)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "7c26dbdc-2e7e-4dea-af8d-7e42d40ce7d7")
+	)
+	(embedded_fonts no)
+)

@@ -1,0 +1,23 @@
+[project]
+name = "pwrlab"
+version = "0.1.0"
+description = "Power-electronics design, simulation and verification via LTspice"
+requires-python = ">=3.10"
+dependencies = [
+    "spicelib>=1.6",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+    "mcp>=2.0",
+]
+
+[project.scripts]
+pwrlab = "pwrlab.cli:main"
+pwrlab-mcp = "pwrlab.mcp_server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["pwrlab*"]

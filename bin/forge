@@ -1,0 +1,4 @@
+#!/bin/sh
+# pe-forge CLI wrapper: finds its own repo and runs the stdlib-only forge package.
+here=$(cd "$(dirname "$0")/.." && pwd)
+exec python3 "$here/forge/__main__.py" "$@"

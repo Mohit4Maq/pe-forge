@@ -1,0 +1,30 @@
+{
+  "baseline_suite_seconds": 126.8,
+  "dependencies": {
+    "matplotlib": "3.11.1",
+    "mcp": "2.2.0",
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "spicelib": "1.6.3"
+  },
+  "max_workers": 3,
+  "model_version": "28796a94dce7468f11d5deecc24cfd5d194727a7",
+  "platform": "Darwin 25.2.0 arm64",
+  "python": "3.12.2",
+  "simulator": {
+    "binary": {
+      "bytes": 41751,
+      "mtime": 1760643476,
+      "path": "/Applications/LTspice.app/Contents/SharedSupport/ltspice/LTspice/wine"
+    },
+    "command": [
+      "/Applications/LTspice.app/Contents/SharedSupport/ltspice/LTspice/wine",
+      "--enable-alt-loader=macdrv",
+      "--wait-children",
+      "--bottle=ltspice",
+      "C:\\Program Files\\ADI\\LTspice\\LTspice.exe"
+    ],
+    "env_override": null
+  },
+  "toolchain_hash": "a6dfa0861ec769b0"
+}

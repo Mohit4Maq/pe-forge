@@ -1,0 +1,121 @@
+(footprint "C_Rect_L26.5mm_W13.0mm_P22.50mm_WE_FTXH"
+	(version 20260206)
+	(generator "kicad-footprint-generator")
+	(layer "F.Cu")
+	(descr "Wurth WCAP-FTXH X2 box 890414026014CS: pitch 22.5 +/-0.5 mm, body L 26.0 x W 12.5 x H 22.0 (+/-0.4) mm, lead 0.8 +/-0.05 mm, recommended hole 1.1 mm (Wurth datasheet rev 001.000 2023-09-01). Outline widened to W 13.0 mm and drill set to 1.1 mm from KiCad C_Rect_L26.5mm_W11.5mm_P22.50mm_MKS4.")
+	(tags "C Rect film X2 Wurth WCAP-FTXH 890414026014CS pitch 22.50mm length 26.5mm width 13mm")
+	(property "Reference" "REF**"
+		(at 11.25 -7.75 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "C_Rect_L26.5mm_W13.0mm_P22.50mm_WE_FTXH"
+		(at 11.25 7.75 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "KiLib_Generator" "capacitor/THT/other"
+		(at 0 0 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -2.12 -6.62)
+		(end 24.62 -6.62)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -2.12 6.62)
+		(end -2.12 -6.62)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 24.62 -6.62)
+		(end 24.62 6.62)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 24.62 6.62)
+		(end -2.12 6.62)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_rect
+		(start -2.25 -6.75)
+		(end 24.75 6.75)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+	)
+	(fp_rect
+		(start -2 -6.5)
+		(end 24.5 6.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 11.25 0 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole circle
+		(at 0 0)
+		(size 2.4 2.4)
+		(drill 1.1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+	)
+	(pad "2" thru_hole circle
+		(at 22.5 0)
+		(size 2.4 2.4)
+		(drill 1.1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+	)
+	(embedded_fonts no)
+)

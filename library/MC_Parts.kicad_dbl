@@ -1,0 +1,2313 @@
+{
+    "meta": {
+        "version": 0
+    },
+    "name": "MC Parts",
+    "description": "MC_Lib parts database (SQLite via ODBC). Edit with tools/mclib.py.",
+    "source": {
+        "type": "odbc",
+        "dsn": "",
+        "username": "",
+        "password": "",
+        "timeout_seconds": 2,
+        "connection_string": "Driver=/opt/homebrew/lib/libsqlite3odbc.dylib;Database=${CWD}/database/mc_parts.sqlite"
+    },
+    "cache": {
+        "max_size": 1024,
+        "max_age": 10
+    },
+    "libraries": [
+        {
+            "name": "Resistors",
+            "table": "Resistors",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Capacitors",
+            "table": "Capacitors",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Magnetics",
+            "table": "Magnetics",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Diodes",
+            "table": "Diodes",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Transistors",
+            "table": "Transistors",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "ICs",
+            "table": "ICs",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Connectors",
+            "table": "Connectors",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Optoelectronics",
+            "table": "Optoelectronics",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Protection",
+            "table": "Protection",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Sensors",
+            "table": "Sensors",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Crystals",
+            "table": "Crystals",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        },
+        {
+            "name": "Mechanical",
+            "table": "Mechanical",
+            "key": "ID",
+            "symbols": "Symbols",
+            "footprints": "Footprints",
+            "fields": [
+                {
+                    "column": "Value",
+                    "name": "Value",
+                    "visible_on_add": true,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Datasheet",
+                    "name": "Datasheet",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "ID",
+                    "name": "MC_ID",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "MPN",
+                    "name": "MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Manufacturer",
+                    "name": "Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "DigiKey_PN",
+                    "name": "DigiKey_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_PN",
+                    "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Package",
+                    "name": "Package",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Tolerance",
+                    "name": "Tolerance",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Voltage_Rating",
+                    "name": "Voltage_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Current_Rating",
+                    "name": "Current_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Power_Rating",
+                    "name": "Power_Rating",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Dielectric",
+                    "name": "Dielectric",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "AEC_Q",
+                    "name": "AEC_Q",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_MPN",
+                    "name": "Alt_MPN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Alt_Manufacturer",
+                    "name": "Alt_Manufacturer",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Status",
+                    "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Stock",
+                    "name": "Mouser_Stock",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_1",
+                    "name": "Mouser_Price_1",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Mouser_Price_100",
+                    "name": "Mouser_Price_100",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Lifecycle",
+                    "name": "Lifecycle",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sourcing_Date",
+                    "name": "Sourcing_Date",
+                    "visible_on_add": false,
+                    "visible_in_chooser": true,
+                    "show_name": false,
+                    "inherit_properties": false
+                }
+            ],
+            "properties": {
+                "description": "Description",
+                "keywords": "Keywords",
+                "exclude_from_bom": "Exclude_BOM",
+                "exclude_from_board": "Exclude_Board"
+            }
+        }
+    ]
+}

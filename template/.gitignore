@@ -1,0 +1,10 @@
+*.raw
+*.log
+*.op.raw
+*-backups/
+*.lck
+fp-info-cache
+~*
+.DS_Store
+__pycache__/
+06_Simulations/**/work/

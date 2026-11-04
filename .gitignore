@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+*.forge_tmp
+*.pe-forge.bak
+vendor/pwrlab/work/
+*.raw
+*.log
+*.op.raw

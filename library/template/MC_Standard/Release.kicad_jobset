@@ -1,0 +1,105 @@
+{
+  "jobs": [
+    {
+      "id": "df88f587-8e15-4e7b-bb83-270f72feed9a",
+      "type": "sch_export_plot_pdf",
+      "description": "Schematic PDF",
+      "settings": {
+        "output_filename": "${PROJECTNAME}-schematic.pdf"
+      }
+    },
+    {
+      "id": "af644796-15d9-45b2-a676-63e8c8aad9a4",
+      "type": "sch_export_bom",
+      "description": "BOM grouped by MPN",
+      "settings": {
+        "output_filename": "${PROJECTNAME}-BOM.csv",
+        "bom_preset_name": "MC BOM (grouped by MPN)",
+        "bom_format_preset_name": "CSV"
+      }
+    },
+    {
+      "id": "6781aa70-43fb-47dd-bc92-7ed610d528d8",
+      "type": "pcb_export_gerbers",
+      "description": "Gerbers",
+      "settings": {
+        "output_filename": "gerbers",
+        "layers": [
+          "F.Cu",
+          "In1.Cu",
+          "In2.Cu",
+          "B.Cu",
+          "F.Paste",
+          "B.Paste",
+          "F.SilkS",
+          "B.SilkS",
+          "F.Mask",
+          "B.Mask",
+          "Edge.Cuts"
+        ]
+      }
+    },
+    {
+      "id": "3bf12ceb-cba7-4604-9afa-bd849a2326be",
+      "type": "pcb_export_drill",
+      "description": "Drill (Excellon)",
+      "settings": {
+        "output_filename": "gerbers/"
+      }
+    },
+    {
+      "id": "244ec908-99f7-4d68-aabe-191ca554b01f",
+      "type": "pcb_export_pos",
+      "description": "Pick and place",
+      "settings": {
+        "output_filename": "",
+        "format": "csv",
+        "units": "mm",
+        "side": "both"
+      }
+    },
+    {
+      "id": "c4c17717-8c63-49cb-a4aa-212f35e88e75",
+      "type": "pcb_export_3d",
+      "description": "STEP model",
+      "settings": {
+        "output_filename": "${PROJECTNAME}.step",
+        "format": "step"
+      }
+    }
+  ],
+  "meta": {
+    "version": 1
+  },
+  "outputs": [
+    {
+      "id": "d8744d4f-bc70-4fc3-80e3-96cb898b89fa",
+      "type": "folder",
+      "description": "Release folder",
+      "only": [
+        "df88f587-8e15-4e7b-bb83-270f72feed9a",
+        "af644796-15d9-45b2-a676-63e8c8aad9a4",
+        "6781aa70-43fb-47dd-bc92-7ed610d528d8",
+        "3bf12ceb-cba7-4604-9afa-bd849a2326be",
+        "244ec908-99f7-4d68-aabe-191ca554b01f",
+        "c4c17717-8c63-49cb-a4aa-212f35e88e75"
+      ],
+      "settings": {
+        "output_path": "release/${REVISION}"
+      }
+    },
+    {
+      "id": "6180a2bc-7979-414a-8a9e-b0e3c0f6ad3f",
+      "type": "archive",
+      "description": "Fab zip (Gerbers + drill)",
+      "only": [
+        "6781aa70-43fb-47dd-bc92-7ed610d528d8",
+        "3bf12ceb-cba7-4604-9afa-bd849a2326be"
+      ],
+      "settings": {
+        "output_path": "release/${PROJECTNAME}-${REVISION}-fab.zip",
+        "format": "zip"
+      }
+    }
+  ]
+}

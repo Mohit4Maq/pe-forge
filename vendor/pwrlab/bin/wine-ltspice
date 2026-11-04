@@ -1,0 +1,9 @@
+#!/bin/bash
+# Shim so spicelib / ltspice-mcp can drive LTspice 26 on macOS (CrossOver build).
+# The basename contains "wine" on purpose: spicelib's
+# LTspice.using_macos_native_sim() returns False when "wine" is in the exe path,
+# which selects the Wine code path (Z: netlist paths) instead of the native one.
+# The native stub (.../Contents/MacOS/LTspice) silently discards argv.
+SS="/Applications/LTspice.app/Contents/SharedSupport/ltspice"
+exec "$SS/LTspice/wine" --enable-alt-loader=macdrv --wait-children \
+     --bottle=ltspice 'C:\Program Files\ADI\LTspice\LTspice.exe' "$@"

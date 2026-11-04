@@ -1,0 +1,144 @@
+(footprint "C_Film_4Pin_L57.0mm_W45.0mm_P52.50x20.00mm_WIMA_DCP4"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "WIMA DC-LINK MKP 4, 4-pin, B45 x H65 x L57, RM 52.5, b 20.0, lead 1.2, position tol +-0.8 at wire exit, per WIMA DC-LINK MKP 4 datasheet 03.26 p.108-109 (e.g. DCP4L061159JD4KSSD). Pads 1+2 one terminal, 3+4 the other. Hole 1.6 mm chosen (no vendor land pattern).")
+	(tags "film capacitor DC-link WIMA DCP4 4-pin HV")
+	(property "Reference" "REF**"
+		(at 26.25 -14.2 0)
+		(layer "F.SilkS")
+		(uuid "85c2bb2b-da60-415d-af08-f6eced3bf0a0")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "C_Film_4Pin_L57.0mm_W45.0mm_P52.50x20.00mm_WIMA_DCP4"
+		(at 26.25 34.2 0)
+		(layer "F.Fab")
+		(uuid "01908c95-815d-4887-89a9-64dc224965e2")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "6fb89125-52ad-403f-a9ac-feb06f323903")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "17a56f13-9327-4eb5-b534-f41e4ed053da")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -2.8 0)
+		(end -2 0)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "418034bd-b7a5-4874-9e2e-e16d8cd43e04")
+	)
+	(fp_rect
+		(start -2.37 -12.62)
+		(end 54.87 32.62)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "946e5fcb-c49d-4a13-bb77-a958d32447d6")
+	)
+	(fp_rect
+		(start -2.75 -13)
+		(end 55.25 33)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "3543b1fc-9ae0-4d98-94b4-8db62316f38a")
+	)
+	(fp_rect
+		(start -2.25 -12.5)
+		(end 54.75 32.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "c779f48e-e786-43bb-9f44-bc7ecaba44fd")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 26.25 10 0)
+		(layer "F.Fab")
+		(uuid "a1312504-ae21-42a3-91c2-3edf44c046c4")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole roundrect
+		(at 0 0)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(roundrect_rratio 0.25)
+		(uuid "0a3d860c-4d13-423f-8ca5-ce38485509ce")
+	)
+	(pad "2" thru_hole circle
+		(at 0 20)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "d5179148-8d56-498f-8327-e89f901bbf2d")
+	)
+	(pad "3" thru_hole circle
+		(at 52.5 0)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "f8cbbd5b-4c49-441e-85cb-7f4aed655dc3")
+	)
+	(pad "4" thru_hole circle
+		(at 52.5 20)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "0d2a47b8-f067-4628-a73c-2bbb2582d9e0")
+	)
+	(embedded_fonts no)
+)

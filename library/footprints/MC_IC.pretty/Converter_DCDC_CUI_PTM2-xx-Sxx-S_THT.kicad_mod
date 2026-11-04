@@ -1,0 +1,249 @@
+(footprint "Converter_DCDC_CUI_PTM2-xx-Sxx-S_THT"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "CUI PTM2-S series 2 W isolated DC-DC, SIP-7 single output (pins 1,2,5,7), body 19.65 x 7.05 mm, pin row 1.27 mm from face, holes 1.1 mm, CUI PTM2-S datasheet rev 1.01 09/04/2024")
+	(tags "DCDC isolated SIP7 CUI PTM2")
+	(property "Reference" "REF**"
+		(at -2.25 -3.3 0)
+		(layer "F.SilkS")
+		(uuid "d60d413a-d3e9-44f8-875e-33cfacee33c0")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Converter_DCDC_CUI_PTM2-xx-Sxx-S_THT"
+		(at -2.25 18.9 0)
+		(layer "F.Fab")
+		(uuid "b27953e1-6fc3-4ff6-af1c-db640343fa7e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "0359e378-7cf5-400b-90a6-1271e3c55f6c")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "525f25ff-5736-4365-bc30-03c6c4ab4ee1")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -5.9 -2.12)
+		(end 1.39 -2.12)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "34974ea5-ea1f-418e-9566-0b4a513a9137")
+	)
+	(fp_line
+		(start -5.9 17.77)
+		(end -5.9 -2.12)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "65fd292d-cea2-44e8-9978-935f7b8cc5d8")
+	)
+	(fp_line
+		(start 1.39 -2.12)
+		(end 1.39 17.77)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "745246c9-35de-49b7-8805-a7c23e43d451")
+	)
+	(fp_line
+		(start 1.39 17.77)
+		(end -5.9 17.77)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "02b6057d-d7be-4fbb-90f9-576a4bb08060")
+	)
+	(fp_line
+		(start 1.67 -1)
+		(end 1.67 1)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "bae91e1c-7f69-401e-a1a9-6f6b9d727712")
+	)
+	(fp_line
+		(start -6.28 -2.5)
+		(end 1.77 -2.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "4182cd9a-93c6-4e44-a798-e99c640b05ac")
+	)
+	(fp_line
+		(start -6.28 18.15)
+		(end -6.28 -2.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "2de00ddf-3a44-4039-ac60-2841a11738fe")
+	)
+	(fp_line
+		(start 1.77 -2.5)
+		(end 1.77 18.15)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "a94d72d0-3a38-458e-bb8b-64ea7dbf3410")
+	)
+	(fp_line
+		(start 1.77 18.15)
+		(end -6.28 18.15)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "c7a3c2b6-9242-4c5a-841a-6b64709901e0")
+	)
+	(fp_line
+		(start -5.78 -2)
+		(end 0.27 -2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "58136fba-7816-40bd-b8fa-78a48da31b18")
+	)
+	(fp_line
+		(start -5.78 17.65)
+		(end -5.78 -2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "7398f47f-66f2-454d-9e08-8bda379972d4")
+	)
+	(fp_line
+		(start 0.27 -2)
+		(end 1.27 -1)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "c48e0f37-a59e-40d9-b643-69c0abb27296")
+	)
+	(fp_line
+		(start 1.27 -1)
+		(end 1.27 17.65)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "3332f43e-ffd1-4ffe-9883-c5bb005dadcd")
+	)
+	(fp_line
+		(start 1.27 17.65)
+		(end -5.78 17.65)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "0792ecf4-bc85-45cf-a5ac-7b9a9750f48f")
+	)
+	(fp_text user "${REFERENCE}"
+		(at -2.25 7.6 0)
+		(layer "F.Fab")
+		(uuid "6843e3d0-620e-4975-b26a-c148efc0a300")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 1.1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "adc0bf88-7f5a-4963-8e1f-3ca347be3b28")
+	)
+	(pad "2" thru_hole circle
+		(at 0 2.54)
+		(size 1.8 1.8)
+		(drill 1.1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "93e0a33d-c29b-4ce9-877c-f5027af26952")
+	)
+	(pad "5" thru_hole circle
+		(at 0 10.16)
+		(size 1.8 1.8)
+		(drill 1.1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "fe8d7cf8-b1f2-4480-868a-8d57311246a9")
+	)
+	(pad "7" thru_hole circle
+		(at 0 15.24)
+		(size 1.8 1.8)
+		(drill 1.1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "f9235ad7-965b-48d9-bf08-20e7bb487bcf")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Converter_DCDC.3dshapes/Converter_DCDC_TRACO_TMV-241xS_Single_THT.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

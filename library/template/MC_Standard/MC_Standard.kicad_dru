@@ -1,0 +1,16 @@
+(version 1)
+# MC_Standard custom rules. Starting points only: set values from your insulation
+# coordination (IEC 60664-1 / UL 2231 / IPC-2221B) for each product.
+# Nets are assigned to the HV class by name pattern (HV*, *_HV*) in Board Setup > Net Classes.
+
+(rule "HV to LV clearance"
+	(condition "A.hasNetclass('HV') && !B.hasNetclass('HV')")
+	(constraint clearance (min 2.5mm)))
+
+(rule "HV to LV creepage"
+	(condition "A.hasNetclass('HV') && !B.hasNetclass('HV')")
+	(constraint creepage (min 4mm)))
+
+(rule "HV no thermal-relief spokes under 0.3mm"
+	(condition "A.hasNetclass('HV')")
+	(constraint thermal_spoke_width (min 0.3mm)))

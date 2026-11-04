@@ -1,0 +1,6 @@
+{
+  "name": "pe-forge",
+  "description": "pe-forge: power-electronics project toolkit for Claude Code",
+  "owner": {"name": "Veltara Innovations"},
+  "plugins": [{"name": "pe-forge", "source": "./", "description": "Supervisor, phase skills, role agents, schematic drawing engine, pwrlab LTspice simulator and a KiCad parts library for power-electronics projects"}]
+}

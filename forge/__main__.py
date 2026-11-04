@@ -1,0 +1,83 @@
+"""pe-forge command line.
+
+  forge new <dir> --name NAME [--answers intake.json]   scaffold a project (P0)
+  forge status                                          phases, modules, next action
+  forge gate check|pass|fail G<n> [--module M-xx] [--note TEXT]
+  forge phase start P<n> [--module M-xx]
+  forge module add NAME [--purpose TEXT] [--depends M-01,M-02] | list | start M-xx | done M-xx
+  forge vmodel build|check|impact|diff|cr|sync ...
+  forge link [--apply]              ID registry + wiki links
+  forge consistency [--hook]        superseded-term check (Rule 5)
+  forge watch --mark|--report|--show [--event E]   manual-edit watch (Rule 6)
+  forge meter [--json]              token budget GREEN / AMBER / RED
+  forge schdraw check|apply|pins|new ...           agent schematic drawing
+  forge bom check [file]            BoM completeness (alternates, price, stock)
+  forge doctor                      check the toolchain
+  forge kicad-setup [--apply]       register the library, MC_LIB path and ODBC driver in KiCad 10
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from forge import config  # noqa: E402
+
+
+def need():
+    return config.Project()
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(__doc__)
+        return 0
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "new":
+        from forge import scaffold
+        return scaffold.main(rest)
+    if cmd == "doctor":
+        from forge import doctor
+        return doctor.main(rest)
+    if cmd == "kicad-setup":
+        from forge import kicad_setup
+        return kicad_setup.main(rest)
+    if cmd == "schdraw":
+        from forge import schdraw
+        return schdraw.main(rest)
+    if cmd in ("watch", "consistency") and config.find_root() is None:
+        return 0   # hooks outside a forge project: silent no-op
+    prj = need()
+    if cmd == "status":
+        from forge import cli_state
+        return cli_state.status(prj)
+    if cmd in ("gate", "phase", "module"):
+        from forge import cli_state
+        return getattr(cli_state, cmd)(prj, rest)
+    if cmd == "vmodel":
+        from forge import vmodel
+        return vmodel.main(prj, rest)
+    if cmd == "link":
+        from forge import linkids
+        return linkids.main(prj, rest)
+    if cmd == "consistency":
+        from forge import consistency
+        return consistency.main(prj, rest)
+    if cmd == "watch":
+        from forge import watch
+        return watch.main(prj, rest)
+    if cmd == "meter":
+        from forge import meter
+        return meter.main(prj, rest)
+    if cmd == "bom":
+        from forge import gates
+        f = rest[1] if len(rest) > 1 else prj.p("bom_csv")
+        res = gates.bom_ok(f)
+        for ok, msg in res:
+            print(("PASS " if ok else "FAIL ") + msg)
+        return 0 if all(ok for ok, _ in res) else 1
+    print(__doc__)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]) or 0)

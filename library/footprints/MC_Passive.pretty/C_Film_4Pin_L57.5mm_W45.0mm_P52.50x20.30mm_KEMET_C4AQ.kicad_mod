@@ -1,0 +1,144 @@
+(footprint "C_Film_4Pin_L57.5mm_W45.0mm_P52.50x20.30mm_KEMET_C4AQ"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "KEMET C4AQ size EB 4-pin DC-link film cap (e.g. C4AQCEW6130A3BJ). S 52.5, S1 20.3 (+-0.4), lead 1.2+-0.05, body L57.5 x T45 x H65 per KEMET F3114_C4AQ 5/5/2025 dimension table. Pads 1+2 = terminal A, 3+4 = terminal B. Hole 1.6 mm chosen (no vendor land pattern). HV: creepage rules apply by net class (HV_*), not by pad name.")
+	(tags "film capacitor DC-link C4AQ KEMET 4-pin HV")
+	(property "Reference" "REF**"
+		(at 26.25 -14.3 0)
+		(layer "F.SilkS")
+		(uuid "701cc330-17da-4cc4-b45e-8d5d795674dc")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "C_Film_4Pin_L57.5mm_W45.0mm_P52.50x20.30mm_KEMET_C4AQ"
+		(at 26.25 34.6 0)
+		(layer "F.Fab")
+		(uuid "5e32e273-c302-4b24-b1cc-aac3e1b81584")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ede4c815-c892-4f1f-9f27-5fd3f3182d93")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "bca35fba-6f62-45e4-a690-ac080c3d12d4")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -2.8 0)
+		(end -2 0)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "d1dd9bf1-134c-470a-b3bd-cffaae4b3750")
+	)
+	(fp_rect
+		(start -2.62 -12.47)
+		(end 55.12 32.77)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "0188f74e-c755-4821-8b4e-5ec8db889494")
+	)
+	(fp_rect
+		(start -3.4 -13.1)
+		(end 55.9 33.4)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "132f74db-3aa8-4f6e-acdb-5a06a6f907b7")
+	)
+	(fp_rect
+		(start -2.5 -12.35)
+		(end 55 32.65)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "4d4f3eae-daec-4a0e-965f-a61bc9e68f3e")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 26.25 10.15 0)
+		(layer "F.Fab")
+		(uuid "9514d8d3-da60-41e7-a22f-7d40382014f8")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole roundrect
+		(at 0 0)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(roundrect_rratio 0.25)
+		(uuid "bfb95ac5-c6cb-47a3-a7de-9229dd7b25ad")
+	)
+	(pad "2" thru_hole circle
+		(at 0 20.3)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "83d8b8c4-bf03-44fd-8278-461fb40284bd")
+	)
+	(pad "3" thru_hole circle
+		(at 52.5 0)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "2277cd3d-ebad-4bd2-aeba-07f43b7bbe5c")
+	)
+	(pad "4" thru_hole circle
+		(at 52.5 20.3)
+		(size 3.2 3.2)
+		(drill 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "39719a24-89bc-4242-a3bf-be2d13060984")
+	)
+	(embedded_fonts no)
+)

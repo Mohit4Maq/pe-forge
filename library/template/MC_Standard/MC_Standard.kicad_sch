@@ -1,0 +1,22 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "74b691b6-b61a-4a06-ad13-2cb851b812ba")
+	(paper "A3")
+	(title_block
+		(title "${PROJECTNAME}")
+		(date "${RELEASE_DATE}")
+		(rev "${REVISION}")
+		(company "${COMPANY}")
+		(comment 1 "Designer: ${DESIGNER}")
+		(comment 2 "PCB P/N: ${PCB_PN}")
+	)
+	(lib_symbols)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

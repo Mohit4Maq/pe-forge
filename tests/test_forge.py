@@ -669,5 +669,71 @@ class Ledger(unittest.TestCase):
         self.assertIn("OVERRIDE: owner test", open(os.path.join(self.dir, "01_Program/QC/QC_Register.md")).read())
 
 
+class ChangeControl(unittest.TestCase):
+    """WP6: design files locked after G6 need an approved change request."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-cr-")
+        self.dir = new_project("Ccl", self.tmp)
+        forge("module", "add", "Power", cwd=self.dir)
+        self.bom = os.path.join(self.dir, "modules/M-01_Power/BOM.csv")
+        open(self.bom, "w").write("Ref,Value\nR1,10k\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def baseline(self):
+        st = os.path.join(self.dir, ".forge/state.json")
+        s = json.load(open(st))
+        s["modules"][0]["phases"]["P6"].update(status="passed", date="2026-11-07")
+        json.dump(s, open(st, "w"))
+
+    def guard(self, path):
+        r = forge("cr", "guard", "--hook", cwd=self.dir, check=False,
+                  stdin=json.dumps({"tool_name": "Edit", "tool_input": {"file_path": path}, "cwd": self.dir}))
+        self.assertEqual(r.returncode, 0)
+        return json.loads(r.stdout)["hookSpecificOutput"] if r.stdout.strip().startswith('{"hook') else None
+
+    def test_not_locked_before_g6(self):
+        self.assertIsNone(self.guard(self.bom))
+
+    def test_locked_after_g6_until_cr_approved(self):
+        self.baseline()
+        d = self.guard(self.bom)
+        self.assertEqual(d["permissionDecision"], "deny")
+        self.assertIn("forge cr new", d["permissionDecisionReason"])
+        self.assertIsNone(self.guard(os.path.join(self.dir, "00_Inbox/notes.md")))     # other files stay free
+        forge("cr", "new", "R1 to 4.7k", "--modules", "M-01", "--files", "modules/M-01_Power/BOM.csv",
+              "--reason", "review finding", cwd=self.dir)
+        r = forge("cr", "approve", "CR-001", cwd=self.dir, check=False)              # no TTY: agent context
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("owner only", r.stdout + r.stderr)
+        self.assertEqual(self.guard(self.bom)["permissionDecision"], "deny")        # draft does not unlock
+        forge("cr", "approve", "CR-001", "--i-am-the-owner", cwd=self.dir)
+        self.assertIsNone(self.guard(self.bom))
+        self.assertEqual(self.guard(os.path.join(self.mod_dir(), "Design_Booklet.md"))["permissionDecision"], "deny")
+
+    def mod_dir(self):
+        return os.path.join(self.dir, "modules/M-01_Power")
+
+    def test_off_disables_the_guard(self):
+        self.baseline()
+        pt = os.path.join(self.dir, "project.toml")
+        txt = open(pt).read()
+        self.assertIn('change_control = "enforce"', txt)
+        open(pt, "w").write(txt.replace('change_control = "enforce"', 'change_control = "off"'))
+        self.assertIsNone(self.guard(self.bom))
+
+    def test_txn_verify_catches_shell_edits_of_locked_files(self):
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-qm", "base", "--no-verify")       # the stub BoM is incomplete on purpose
+        self.baseline()
+        forge("txn", "begin", "edit", "--allow-dirty", cwd=self.dir)
+        open(self.bom, "a").write("R2,1k\n")
+        r = forge("txn", "verify", cwd=self.dir, check=False)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("FAIL change_control", r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

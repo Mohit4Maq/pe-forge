@@ -16,6 +16,7 @@
                                     one deterministic check: ERC, DRC, consistency, V-model, BoM, drift,
                                     library checks (no model, no network; CI and pre-commit safe)
   forge hooks install [--chain] | --uninstall   git pre-commit hook running forge check (fast subset)
+  forge cr new|validate|approve|close|reject|list|status|guard ...   change requests after baseline (G6 / G7)
   forge ledger record|check [--hook] | show | clear --reason T   sync obligations (hooks; Stop blocks while open)
   forge drift [--json] [--module M-xx]  BoM / brief / booklet against the drawn schematic {doc, claim, actual}
   forge txn begin "<what>" [--allow-dirty] | status | verify | commit [-m MSG] | close | rollback [--reason T]
@@ -56,6 +57,8 @@ def main(argv):
         return schdraw.main(rest)
     if cmd in ("watch", "consistency", "ledger") and config.find_root() is None:
         return 0   # hooks outside a forge project: silent no-op
+    if cmd == "cr" and rest[:1] == ["guard"] and config.find_root() is None:
+        return 0   # hooks outside a forge project: silent no-op
     prj = need()
     if cmd == "status":
         from forge import cli_state
@@ -81,6 +84,9 @@ def main(argv):
     if cmd == "check":
         from forge import check
         return check.main(prj, rest)
+    if cmd == "cr":
+        from forge import changes
+        return changes.main(prj, rest)
     if cmd == "ledger":
         from forge import ledger
         return ledger.main(prj, rest)

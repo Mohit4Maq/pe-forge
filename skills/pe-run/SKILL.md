@@ -91,7 +91,17 @@ BoM / brief / booklet edit, the V-model after a requirement edit, a dated revisi
 module past G6. The Stop hook re-runs them and blocks finishing while one fails. Fix the cause; never clear the
 ledger yourself (`forge ledger clear --reason` is the owner's escape hatch and is logged in the QC register).
 
-## 8. Failure handling
+## 8. Change control after baseline
+Once a module passes G6 its sheet, BoM, booklet, brief and calculations are locked; once the board passes G7 every
+KiCad file is. An edit to a locked file is denied until an **approved** change request covers it:
+1. `forge cr new "<what and why>" --modules M-02 --files "<globs>" [--requirements SYS-..]`, fill in the CR file
+   (`01_Program/Changes/CR-NNN.md`), `forge cr validate CR-NNN`.
+2. Ask the owner to approve it (multiple choice, with the impact). **Only the owner runs `forge cr approve`.**
+   Never pass `--i-am-the-owner`, never edit a CR's status yourself.
+3. Make the change in a transaction (§4.6), re-run the affected gate checks, then `forge cr close CR-NNN`.
+`project.toml [process] change_control` = enforce (full) / warn (lite) / off.
+
+## 9. Failure handling
 - A tool that is missing (`forge doctor`) disables only its features: say so and offer the manual path.
 - If a step fails twice the same way, stop and ask the owner with what you tried and the evidence.
 - Never report work as done that a gate has not passed; call it "done, pending gate G<n>".

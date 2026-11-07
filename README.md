@@ -123,8 +123,12 @@ Design edits that span several files run as transactions (`forge txn begin / ver
 rollback restores the tree byte for byte, including your own uncommitted work from before the transaction, and
 keeps the failed attempt as a named `git stash` entry. `forge schdraw apply` always runs inside one.
 
+After a module passes G6 (and the board G7) its design files are under change control: edits are refused
+until you approve a change request (`forge cr new / validate`, then you run `forge cr approve`). Agents cannot
+approve one.
+
 Profiles: `full` (all of the above) or `lite` (one reviewer per gate, same automated checks) for small
-low-voltage boards.
+low-voltage boards. Lite projects get warnings instead of blocks from change control (`process.change_control`).
 
 ## Command line
 

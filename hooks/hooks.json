@@ -1,12 +1,67 @@
 {
-  "description": "pe-forge: report the user's manual edits each turn (Rule 5); record sync obligations after each edit and block finishing while any is open (ERC, DRC, drift, BoM, V-model, changelog, superseded terms). All are silent outside a pe-forge project.",
+  "description": "pe-forge: report the user's manual edits each turn (Rule 5); record sync obligations after each edit and block finishing while any is open (ERC, DRC, drift, BoM, V-model, changelog, superseded terms). Edits to a baselined module (G6) or board (G7) need an approved change request. All are silent outside a pe-forge project.",
   "hooks": {
-    "SessionStart": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event SessionStart", "timeout": 30}]}],
-    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event UserPromptSubmit", "timeout": 30}]}],
-    "PostToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash", "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" ledger record --hook", "timeout": 20}]}],
-    "Stop": [{"hooks": [
-      {"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" ledger check --hook", "timeout": 180},
-      {"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --mark", "timeout": 30}
-    ]}]
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event SessionStart",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event UserPromptSubmit",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" cr guard --hook",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" ledger record --hook",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" ledger check --hook",
+            "timeout": 180
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --mark",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

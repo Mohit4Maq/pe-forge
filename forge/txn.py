@@ -191,6 +191,12 @@ def verify(prj, quiet=False):
     only = ["consistency"] + [c for exts, c in SCOPE if any(f.endswith(exts) for f in files)]
     only = list(dict.fromkeys(only))
     res = check.run(prj, only)
+    from . import changes
+    bad = changes.violations(prj, files)
+    if bad:
+        res["ok"] = False
+        res["checks"]["change_control"] = check.result("fail", [check.finding(
+            "an approved CR covers this baselined file", why + " and no approved CR lists it", rel) for rel, why in bad])
     t["touched"] = files
     t["verifies"].append({"at": _now(), "tree": tree, "ok": res["ok"],
                           "status": {k: v["status"] for k, v in res["checks"].items()}})

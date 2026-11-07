@@ -852,7 +852,7 @@ turns on every schematic task.
 | WP3 | Transactions with rollback | `feat/wp03-txn` | done | schdraw apply closes its txn without committing (commit rule stays with the owner); same-stem .kicad_pro rule for text variables |
 | WP4 | Structured drift | `feat/wp04-drift` | done | module sheet from brief frontmatter `kicad_sheet`; shared tables.py (aliases, value normaliser) for WP8 |
 | WP5 | Obligations ledger hooks | `feat/wp05-ledger` | done | replaces the consistency Stop hook (alias kept); user edits advisory once, then blocking |
-| WP6 | Change-gated edits after baseline | `feat/wp06-change-control` | todo | |
+| WP6 | Change-gated edits after baseline | `feat/wp06-change-control` | done | lock check runs at txn verify (begin has no file list); shell edits caught there; lite = warn |
 | WP7 | Fab release gate | `feat/wp07-fab-gate` | todo | |
 | WP8 | JLCPCB export, LCSC, spares | `feat/wp08-jlc-export` | todo | |
 | WP9 | `forge explain` | `feat/wp09-explain` | todo | |

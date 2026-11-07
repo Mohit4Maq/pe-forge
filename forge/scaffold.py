@@ -53,6 +53,7 @@ def project_toml(a):
             "type": a.get("type", "other"), "created": dt.date.today().isoformat()}
     proc = {"profile": a.get("profile", "full"), "schematic_mode": a.get("schematic_mode", "ask"),
             "reviews": a.get("reviews", "gate"), "parallel_modules": False,
+            "change_control": a.get("change_control", "warn" if a.get("profile") == "lite" else "enforce"),
             "region": a.get("region", ""), "distributors": a.get("distributors", ["mouser", "digikey"])}
     if proc["profile"] not in PROFILES or proc["schematic_mode"] not in MODES:
         raise SystemExit(f"profile must be one of {PROFILES}, schematic_mode one of {MODES}")

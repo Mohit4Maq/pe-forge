@@ -7,7 +7,7 @@
 #   2. builds .venv and installs pwrlab (vendor/pwrlab) + PyMuPDF
 #   3. links bin/forge into ~/.local/bin
 #   4. sets PE_FORGE (and MC_LIB if unset) in ~/.claude/settings.json "env"
-#   5. registers the pwrlab MCP server (user scope) unless one named "pwrlab" exists
+#   5. registers the pwrlab and forge MCP servers (user scope) unless they exist
 #   6. adds this repo as a Claude Code plugin marketplace and installs the pe-forge plugin
 #   7. optionally registers the parts library in KiCad (forge kicad-setup --apply)
 set -euo pipefail
@@ -63,6 +63,11 @@ if command -v claude >/dev/null; then
     say "MCP server 'pwrlab' already registered: kept"
   elif ask "Register the pwrlab MCP server (user scope)?"; then
     claude mcp add pwrlab -s user -- "$HERE/.venv/bin/pwrlab-mcp" && say "pwrlab MCP registered"
+  fi
+  if claude mcp get forge >/dev/null 2>&1; then
+    say "MCP server 'forge' already registered: kept"
+  elif ask "Register the forge MCP server (user scope; outcome-level tools for any MCP host)?"; then
+    claude mcp add forge -s user -- "$HERE/bin/forge-mcp" && say "forge MCP registered"
   fi
   if ask "Install the pe-forge Claude Code plugin from this folder?"; then
     claude plugin marketplace add "$HERE" 2>/dev/null || true

@@ -923,5 +923,60 @@ class Explain(unittest.TestCase):
         self.assertIn("VOUT", r.stdout)
 
 
+class McpTools(unittest.TestCase):
+    """WP10: the outcome-level tools behind forge-mcp (no MCP package needed to test them)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from forge import mcp_tools
+        cls.T = mcp_tools
+        cls.tmp = tempfile.mkdtemp(prefix="pe-forge-mcp-")
+        cls.dir = new_project("Mcp", cls.tmp)
+        os.environ["MC_LIB"] = ENV["MC_LIB"]
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, True)
+
+    def test_check_matches_cli(self):
+        r = self.T.forge_check(self.dir)
+        cli = json.loads(forge("check", "--json", cwd=self.dir, check=False).stdout)
+        self.assertEqual(set(r), {"usable", "verdict", "checks", "warnings", "report"})
+        self.assertEqual({k: v["status"] for k, v in r["report"]["checks"].items()},
+                         {k: v["status"] for k, v in cli["checks"].items()})
+        self.assertEqual(r["usable"], cli["ok"])
+
+    def test_paths_outside_project_refused(self):
+        r = self.T.forge_explain(self.dir, "GND", sheet="../../etc/hosts")
+        self.assertFalse(r["usable"])
+        self.assertIn("outside the project", r["verdict"])
+        r = self.T.forge_schdraw_check(self.dir, {"sheet": "../../etc/x.kicad_sch"})
+        self.assertIn("refused", r["verdict"])
+        self.assertIn("not inside a pe-forge project", self.T.forge_status("/")["verdict"])
+
+    def test_no_generic_write_or_owner_tools(self):
+        names = [f.__name__ for f in self.T.TOOLS]
+        for bad in ("write", "edit", "file", "approve", "pass", "delete", "shell", "run"):
+            self.assertFalse([n for n in names if bad in n.split("_")], bad)
+        self.assertEqual(len(names), 9)
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_apply_on_baselined_module_needs_cr(self):
+        forge("module", "add", "Power", cwd=self.dir)
+        sheet = "08_PCB/mcp/power.kicad_sch"
+        forge("schdraw", "new", os.path.join(self.dir, sheet), "--title", "t")
+        mod = os.path.join(self.dir, "modules/M-01_Power")
+        open(os.path.join(mod, "Sheet_Brief.md"), "w").write(f"---\nmodule: M-01\nkicad_sheet: {sheet}\n---\n# b\n")
+        st = os.path.join(self.dir, ".forge/state.json")
+        s = json.load(open(st))
+        s["modules"][0]["phases"]["P6"]["status"] = "passed"
+        json.dump(s, open(st, "w"))
+        spec = dict(json.load(open(os.path.join(FIX, "input_protection.json"))), sheet=sheet)
+        self.assertTrue(self.T.forge_schdraw_check(self.dir, spec)["usable"])
+        r = self.T.forge_schdraw_apply(self.dir, spec)
+        self.assertFalse(r["usable"])
+        self.assertIn("forge cr new", r["output"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

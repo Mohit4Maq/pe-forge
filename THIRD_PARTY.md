@@ -9,7 +9,7 @@ their own licences:
 | LTspice | simulation engine behind pwrlab | Analog Devices freeware licence (not redistributable) | analog.com/ltspice |
 | Wine (Linux) | runs LTspice on Linux | LGPL-2.1 | winehq.org |
 | ngspice (optional) | fallback analog checks | BSD-3-Clause | ngspice.sourceforge.io |
-| spicelib, numpy, pandas, matplotlib, mcp | pwrlab Python deps (pip) | see each package | PyPI |
+| spicelib, numpy, pandas, matplotlib, mcp | pwrlab Python deps (pip); mcp also runs forge-mcp | see each package | PyPI |
 | PyMuPDF (optional) | renders, text-placement checks | AGPL-3.0 / commercial | PyPI |
 | SQLite ODBC driver | KiCad database library | BSD-style | ch-werner.de/sqliteodbc |
 | Claude Code | runs the skills and agents | Anthropic terms | claude.com/claude-code |

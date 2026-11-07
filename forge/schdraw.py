@@ -579,13 +579,14 @@ def pdf_lines(cli, sch, workdir):
 
 
 def part_of_symbol(t, b, sh, reach=5.08):
-    """A pin name or number a symbol draws itself, inside that symbol's area (body plus pin length)."""
+    """The symbol (ref) that draws this text itself as a pin name or number inside its area (body plus pin length),
+    or None."""
     for ref, own in sh.own.items():
         box = sh.boxes.get(ref)
         if box and t in own and b[0] >= box[0] - reach and b[2] <= box[2] + reach and b[1] >= box[1] - reach \
                 and b[3] <= box[3] + reach:
-            return True
-    return False
+            return ref
+    return None
 
 
 def text_check(text, sheet_path, sh, wires, workdir):
@@ -607,13 +608,15 @@ def text_check(text, sheet_path, sh, wires, workdir):
     base, _ = pdf_lines(cli, base_sch, os.path.dirname(base_sch))
     key = lambda t, b: (t, round(b[0]), round(b[1]))
     frame = {key(t, b) for t, b, _ in base or []}
-    drawn, seen = [], set()
+    drawn, seen, pin_text = [], set(), []
     for t, b, h in lines:
         k2 = (t, round(b[0], 1), round(b[1], 1))
         if key(t, b) in frame or t.startswith(("Sheet", "File:")) or k2 in seen:
             continue
         seen.add(k2)
-        if part_of_symbol(t, b, sh):
+        owner = part_of_symbol(t, b, sh)
+        if owner:          # a symbol's own pin name / number: fine on its own body, still collides with other text
+            pin_text.append((t, b, owner))
             continue
         drawn.append((t, b, h))
     E, W = [], []
@@ -625,6 +628,9 @@ def text_check(text, sheet_path, sh, wires, workdir):
         for t2, b2, _ in drawn[i + 1:]:
             if overlap(b1, b2, 0.1):
                 E.append(f"S13 text overlap: '{t1}' and '{t2}' near x {b1[0]:.1f} y {b1[1]:.1f}")
+        for t2, b2, owner in pin_text:
+            if overlap(b1, b2, 0.1):
+                E.append(f"S13 text overlap: '{t1}' and pin text '{t2}' of {owner} near x {b1[0]:.1f} y {b1[1]:.1f}")
         for ref, body in sh.boxes.items():
             if overlap(b1, body, 0.3):
                 E.append(f"S13 '{t1}' sits on the body of {ref}")

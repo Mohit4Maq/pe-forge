@@ -25,7 +25,17 @@ project.toml
   min_hole_mm = 0.2              # thermal-via footprints use 0.2 mm
   hole_footprint = "MountingHole:MountingHole_3.2mm_M3"
   hole_inset_mm = 3.5            # hole centres from each corner; 0 or absent = no holes
+  fiducials = [[6, 25], [44, 46]]   # board-only fiducials (mm from the origin), Fiducial:Fiducial_1mm_Mask2mm
+  marking = [{ t = "BUCK48TO12 REV A", x = 25, y = 2, size = 1.0 }]   # silkscreen text (re-runs replace it)
 
+  forge pcb zones <zones.json>
+      Copper pours as data: [{"name", "layer" (F.Cu / In1.Cu / ...), "net", "rect": [x1, y1, x2, y2] or "pts":
+      [[x, y], ...], "priority": n}], mm from the board origin. Pours named forge:<name> are replaced on a re-run;
+      pours drawn by hand are kept. All zones are filled afterwards.
+  forge pcb route <routes.json>
+      Tracks and vias as data: {"tracks": [{"net", "layer", "w", "pts": [[x, y], ...]}], "vias": [{"net", "at":
+      [x, y], "d": 0.6, "drill": 0.3}]}. They go in the board group "forge_route", which a re-run replaces; hand
+      routing outside the group is never touched. Zones are re-filled and DRC reports unconnected items.
   forge pcb rules [--json]
       The layout rules the board is reviewed against: every row whose first cell is an L-number (L-01, L-02, ...)
       in the layout spec (project.toml paths.layout_spec).
@@ -65,7 +75,7 @@ def lib_dirs():
             if d.endswith(".pretty"):
                 out[d[:-7]] = os.path.join(stock, d)
     env = dict(os.environ)
-    for base in sorted(glob_kicad_prefs(), reverse=True):
+    for base in reversed(glob_kicad_prefs()):         # newest version first (sorted by number: 10.0 > 9.0)
         try:
             common = json.load(open(os.path.join(base, "kicad_common.json")))
             env = dict((common.get("environment", {}).get("vars") or {}), **env)
@@ -119,6 +129,7 @@ def components(text):
 
 SYNC = r'''
 import json, sys, pcbnew
+KEEP = []      # items removed from the board: KiCad 10 frees them (dangling pointers) if Python drops them
 spec = json.load(open(sys.argv[1]))
 b = pcbnew.LoadBoard(spec["board"])
 mm = pcbnew.FromMM
@@ -130,6 +141,7 @@ def net(name):
             ni = pcbnew.NETINFO_ITEM(b, name); b.Add(ni)
         nets[name] = ni
     return nets[name]
+live = {c["path"] for c in spec["comps"]}
 by_path, by_ref = {}, {}
 for f in b.GetFootprints():
     p = f.GetPath().AsString()
@@ -145,8 +157,10 @@ k = 0
 for c in spec["comps"]:
     lib, _, name = c["fpid"].partition(":")
     f = by_path.get(c["path"])
-    if f is None and c["ref"] in by_ref and not by_ref[c["ref"]].GetPath().AsString():
-        f = by_ref[c["ref"]]                  # placed by hand from the library: adopt it by reference
+    if f is None and c["ref"] in by_ref and by_ref[c["ref"]].GetPath().AsString() not in live:
+        # no footprint carries this symbol's id, but one has its reference and a link to a symbol that no longer
+        # exists (sheet redrawn, symbol replaced) or no link (placed by hand): adopt it, keeping its position
+        f = by_ref[c["ref"]]
     want_new = f is None or f.GetFPIDAsString() != c["fpid"]
     if want_new:
         d = spec["libs"].get(lib)
@@ -159,7 +173,7 @@ for c in spec["comps"]:
         if f is not None:                     # footprint changed: keep where it was
             nf.SetPosition(f.GetPosition()); nf.SetOrientation(f.GetOrientation())
             if f.IsFlipped(): nf.Flip(nf.GetPosition(), False)
-            b.Remove(f); report["swapped"].append(c["ref"])
+            KEEP.append(f); b.Remove(f); report["swapped"].append(c["ref"])
         else:
             nf.SetPosition(pcbnew.VECTOR2I(sx + mm(12) * (k % 6), sy + mm(12) * (k // 6))); k += 1
             report["added"].append(c["ref"])
@@ -186,7 +200,7 @@ for f in list(b.GetFootprints()):
     if f.GetPath().AsString() in seen or not f.GetPath().AsString():
         continue                               # board-only items (holes, logos) carry no symbol link
     if spec["prune"]:
-        report["removed"].append(f.GetReference()); b.Remove(f)
+        report["removed"].append(f.GetReference()); KEEP.append(f); b.Remove(f)
     else:
         report["orphans"].append(f.GetReference())
 if not spec["dry"]:
@@ -224,13 +238,14 @@ def sync(sch, board, prune=False, dry=False):
 
 SETUP = r'''
 import json, sys, pcbnew
+KEEP = []      # items removed from the board: KiCad 10 frees them (dangling pointers) if Python drops them
 s = json.load(open(sys.argv[1]))
 b = pcbnew.LoadBoard(s["board"])
 mm = pcbnew.FromMM
 X0, Y0 = s["origin"]; W, H = s["outline"]
 for d in list(b.GetDrawings()):
     if d.GetLayer() == pcbnew.Edge_Cuts:
-        b.Remove(d)
+        KEEP.append(d); b.Remove(d)
 r = pcbnew.PCB_SHAPE(b); r.SetShape(pcbnew.SHAPE_T_RECT); r.SetLayer(pcbnew.Edge_Cuts); r.SetWidth(mm(0.1))
 r.SetStart(pcbnew.VECTOR2I(mm(X0), mm(Y0))); r.SetEnd(pcbnew.VECTOR2I(mm(X0 + W), mm(Y0 + H))); b.Add(r)
 have = {f.GetReference(): f for f in b.GetFootprints()}
@@ -241,6 +256,21 @@ if s["hole_dir"] and s["inset"]:
         if f is None:
             f = pcbnew.FootprintLoad(s["hole_dir"], s["hole_name"]); f.SetReference(f"H{i}"); b.Add(f)
         f.SetPosition(pcbnew.VECTOR2I(mm(X0 + hx), mm(Y0 + hy)))
+if s["fid_dir"]:
+    for i, (fx, fy) in enumerate(s["fiducials"], 1):
+        ref = f"FID{i}"
+        f = have.get(ref)
+        if f is None:
+            f = pcbnew.FootprintLoad(s["fid_dir"], s["fid_name"]); f.SetReference(ref); b.Add(f)
+        f.SetPosition(pcbnew.VECTOR2I(mm(X0 + fx), mm(Y0 + fy)))
+for d in list(b.GetDrawings()):                     # board marking text written by a previous setup
+    if isinstance(d, pcbnew.PCB_TEXT) and d.GetText().startswith(tuple(s["mark_keys"])):
+        KEEP.append(d); b.Remove(d)
+for m in s["marking"]:
+    tx = pcbnew.PCB_TEXT(b); tx.SetText(m["t"]); tx.SetLayer(b.GetLayerID(m.get("layer", "F.SilkS")))
+    tx.SetPosition(pcbnew.VECTOR2I(mm(X0 + m["x"]), mm(Y0 + m["y"]))); sz = mm(m.get("size", 1.0))
+    tx.SetTextSize(pcbnew.VECTOR2I(sz, sz)); tx.SetTextThickness(int(sz * 0.15)); tx.SetTextAngleDegrees(m.get("rot", 0))
+    b.Add(tx)
 for f in b.GetFootprints():
     if not f.GetPath().AsString():                  # board-only parts: holes, logos, fiducials
         f.SetBoardOnly(True); f.SetExcludedFromBOM(True); f.SetExcludedFromPosFiles(True)
@@ -255,6 +285,7 @@ print("OK")
 
 PLACE = r'''
 import json, sys, pcbnew
+KEEP = []      # items removed from the board: KiCad 10 frees them (dangling pointers) if Python drops them
 s = json.load(open(sys.argv[1]))
 b = pcbnew.LoadBoard(s["board"])
 mm = pcbnew.FromMM
@@ -271,6 +302,88 @@ if not s["dry"]:
 print("REPORT" + json.dumps({"placed": done, "missing": missing,
       "unplaced": sorted(r for r, f in refs.items() if r not in s["place"] and f.GetPath().AsString())}))
 '''
+
+
+ZONES = r'''
+import json, sys, pcbnew
+KEEP = []      # items removed from the board: KiCad 10 frees them (dangling pointers) if Python drops them
+s = json.load(open(sys.argv[1]))
+b = pcbnew.LoadBoard(s["board"])
+mm = pcbnew.FromMM
+X0, Y0 = s["origin"]
+for z in list(b.Zones()):
+    if z.GetZoneName().startswith("forge:"):
+        KEEP.append(z); b.Remove(z)
+missing = []
+for d in s["zones"]:
+    lay = b.GetLayerID(d["layer"])
+    ni = b.FindNet(d["net"])
+    if ni is None:
+        missing.append(d["net"]); continue
+    z = pcbnew.ZONE(b)
+    z.SetLayer(lay); z.SetNet(ni); z.SetZoneName("forge:" + d["name"]); z.SetAssignedPriority(d.get("priority", 0))
+    pts = d.get("pts") or [[d["rect"][0], d["rect"][1]], [d["rect"][2], d["rect"][1]], [d["rect"][2], d["rect"][3]], [d["rect"][0], d["rect"][3]]]
+    ol = z.Outline(); ol.NewOutline()
+    for x, y in pts:
+        ol.Append(mm(X0 + x), mm(Y0 + y))
+    z.SetMinThickness(mm(d.get("min_width", 0.25)))
+    if d.get("solid"):
+        z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+    b.Add(z)
+pcbnew.ZONE_FILLER(b).Fill(b.Zones())
+b.Save(s["board"])
+print("REPORT" + json.dumps({"zones": len(s["zones"]) - len(missing), "missing_nets": missing}))
+'''
+
+ROUTE = r'''
+import json, sys, pcbnew
+KEEP = []      # items removed from the board: KiCad 10 frees them (dangling pointers) if Python drops them
+s = json.load(open(sys.argv[1]))
+b = pcbnew.LoadBoard(s["board"])
+mm = pcbnew.FromMM
+X0, Y0 = s["origin"]
+P = lambda xy: pcbnew.VECTOR2I(mm(X0 + xy[0]), mm(Y0 + xy[1]))
+for g in list(b.Groups()):
+    if g.GetName() == "forge_route":
+        for it in list(g.GetItems()):
+            KEEP.append(it); b.Remove(it)
+        KEEP.append(g); b.Remove(g)
+g = pcbnew.PCB_GROUP(b); g.SetName("forge_route"); b.Add(g)
+missing, n_t, n_v = [], 0, 0
+for t in s["route"].get("tracks", []):
+    ni = b.FindNet(t["net"])
+    if ni is None:
+        missing.append(t["net"]); continue
+    for a, c in zip(t["pts"], t["pts"][1:]):
+        tr = pcbnew.PCB_TRACK(b); tr.SetStart(P(a)); tr.SetEnd(P(c)); tr.SetWidth(mm(t.get("w", 0.25)))
+        tr.SetLayer(b.GetLayerID(t.get("layer", "F.Cu"))); tr.SetNet(ni); b.Add(tr); g.AddItem(tr); n_t += 1
+for v in s["route"].get("vias", []):
+    ni = b.FindNet(v["net"])
+    if ni is None:
+        missing.append(v["net"]); continue
+    via = pcbnew.PCB_VIA(b); via.SetPosition(P(v["at"])); via.SetWidth(mm(v.get("d", 0.6))); via.SetDrill(mm(v.get("drill", 0.3)))
+    via.SetNet(ni); b.Add(via); g.AddItem(via); n_v += 1
+pcbnew.ZONE_FILLER(b).Fill(b.Zones())
+b.Save(s["board"])
+print("REPORT" + json.dumps({"tracks": n_t, "vias": n_v, "missing_nets": sorted(set(missing))}))
+'''
+
+
+def _data_cmd(prj, board, script, key, path):
+    board_only(board)
+    cfg = prj.cfg.get("pcb", {})
+    data = json.load(open(path))
+    out, err = _run(script, {"board": os.path.abspath(board), "origin": cfg.get("origin_mm", [100, 100]), key: data})
+    m = re.search(r"REPORT(\{.*\})", out)
+    if not m:
+        raise SystemExit("pcbnew failed: " + (err or out)[-800:])
+    rep = json.loads(m.group(1))
+    r = kicad.drc(board, parity=True)
+    rep["drc_errors"] = [f"{v['type']}: {v['description']} [{', '.join(i['description'][:40] for i in v['items'])}]"
+                         for v in r.violations]
+    rep["unconnected"] = len(r.unconnected)
+    rep["parity"] = len(r.parity)
+    return rep
 
 
 def stackup_block(copper_oz, thickness):
@@ -328,7 +441,11 @@ def setup(prj, board):
     board_only(board)
     oz = cfg.get("copper_oz", [1, 1])
     lib, _, name = cfg.get("hole_footprint", "MountingHole:MountingHole_3.2mm_M3").partition(":")
-    spec = {"board": os.path.abspath(board), "outline": cfg["outline_mm"], "origin": cfg.get("origin_mm", [100, 100]),
+    flib, _, fname = cfg.get("fiducial_footprint", "Fiducial:Fiducial_1mm_Mask2mm").partition(":")
+    marking = cfg.get("marking", [])
+    spec = {"fiducials": cfg.get("fiducials", []), "fid_dir": lib_dirs().get(flib) if cfg.get("fiducials") else None,
+            "fid_name": fname, "marking": marking, "mark_keys": [m["t"] for m in marking],
+            "board": os.path.abspath(board), "outline": cfg["outline_mm"], "origin": cfg.get("origin_mm", [100, 100]),
             "layers": len(oz), "min_hole": cfg.get("min_hole_mm", 0.2), "thickness": cfg.get("thickness_mm", 1.6),
             "hole_dir": lib_dirs().get(lib), "hole_name": name, "inset": cfg.get("hole_inset_mm", 0)}
     out, err = _run(SETUP, spec)
@@ -502,7 +619,7 @@ def main(prj, argv):
         print(json.dumps(rs, indent=1) if "--json" in argv else
               "\n".join(f"{i}  {txt}" for i, txt in rs) or f"no L-rules in {prj.paths['layout_spec']}")
         return 0 if rs else 1
-    if not argv or argv[0] not in ("sync", "setup", "place", "review-new", "review-status"):
+    if not argv or argv[0] not in ("sync", "setup", "place", "zones", "route", "review-new", "review-status"):
         print(__doc__)
         return 1
     from . import check
@@ -512,6 +629,16 @@ def main(prj, argv):
         if not pcbs:
             raise SystemExit("no board file under 08_PCB")
         board = pcbs[0]
+    if argv[0] in ("zones", "route"):
+        if len(argv) < 2:
+            raise SystemExit(f"forge pcb {argv[0]} <{argv[0]}.json>")
+        rep = _data_cmd(prj, board, ZONES if argv[0] == "zones" else ROUTE, argv[0], argv[1])
+        what = f"{rep['zones']} pour(s)" if argv[0] == "zones" else f"{rep['tracks']} track segment(s), {rep['vias']} via(s)"
+        print(f"{what} written and zones filled" + (f"; nets not on the board: {', '.join(rep['missing_nets'])}" if rep["missing_nets"] else ""))
+        print(f"  DRC: {len(rep['drc_errors'])} error(s), {rep['unconnected']} unconnected, parity {rep['parity']}")
+        for e in rep["drc_errors"][:25]:
+            print("   ", e)
+        return 0 if not rep["drc_errors"] and not rep["missing_nets"] else 1
     if argv[0] == "review-new":
         if len(argv) < 2:
             raise SystemExit("forge pcb review-new <placement|routing|release>")

@@ -204,7 +204,15 @@ def instance(p, t, r, libblk, project, path):
     side = p.get('side')
     two = len(pins) == 2
     horiz = two and len({round(xform(px, py, x, y, rot, mir)[1], 2) for _, _, px, py in pins}) == 1
-    if two and horiz and side not in ('R', 'L', 'B', 'A', 'D'):
+    if len(pins) == 1 and side is None:
+        # one-pin part (test point, fiducial): the pin is the connection, the body sits off it; text beside the
+        # body, reading left to right
+        up = rot != 180                              # body above the pin (rot 0), below it (rot 180)
+        by = y - 3.05 if up else y + 3.05
+        fa = 0 if rot in (0, 180) else 90
+        jj = 'right' if rot == 180 else 'left'      # KiCad flips rot-180 text to stay readable and swaps the justify
+        ra, va = (x + 1.524, by - 0.635, fa, jj), (x + 1.524, by + 1.27, fa, jj)
+    elif two and horiz and side not in ('R', 'L', 'B', 'A', 'D'):
         # horizontal 2-pin part (diode, inductor, rotated R / C): reference above, value below, reading left to right
         fa = 0 if rot in (0, 180) else 90
         ra, va = (x, y - 3.05, fa, None), (x, y + 3.05, fa, None)
@@ -213,7 +221,7 @@ def instance(p, t, r, libblk, project, path):
         # one-sided 2-pin part (connector: both pins on one side of the body): both fields above it, centred
         top = min(xform(px, py, x, y, rot, mir)[1] for _, _, px, py in pins)
         fa = 0 if rot in (0, 180) else 90
-        ra, va = (x, top - 5.08, fa, None), (x, top - 2.54, fa, None)
+        ra, va = (x, top - 6.35, fa, None), (x, top - 3.81, fa, None)      # clear of the pin numbers
     elif two and not r['Symbols'].startswith('MC_Generic:') and side is None:
         # vertical 2-pin part from any library (Zener, TVS, ...): text right of the body, reading left to right;
         # on a rot-90/270 symbol a field angle of 90 reads horizontal
@@ -247,7 +255,7 @@ def instance(p, t, r, libblk, project, path):
          '\t\t(in_pos_files yes)', f'\t\t(dnp {"yes" if p.get("dnp") else "no"})', f'\t\t(uuid "{U()}")']
     txt = '\n'.join(o) + '\n'
     txt += prop('Reference', p['ref'], f'{ra[0]:g} {ra[1]:g} {ra[2]}', False, '\t\t', j(ra))
-    txt += prop('Value', r['Value'], f'{va[0]:g} {va[1]:g} {va[2]}', False, '\t\t', j(va))
+    txt += prop('Value', r['Value'], f'{va[0]:g} {va[1]:g} {va[2]}', bool(p.get('hide_value')), '\t\t', j(va))
     for pn, v in (('Footprint', fp), ('Datasheet', r.get('Datasheet') or ''), ('Description', r.get('Description') or '')):
         txt += prop(pn, v, f'{x:g} {y:g} 0', True, '\t\t')
     for f in FIELDS: txt += prop(f, fv(r, f), f'{x:g} {y:g} 0', True, '\t\t')

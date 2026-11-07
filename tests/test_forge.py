@@ -1944,6 +1944,27 @@ class PcbSync(unittest.TestCase):
         self.assertNotIn("added:", r.stdout)                 # second run updates in place
         self.assertIn("parity: 0 issue(s)", r.stdout)
 
+    def test_newest_kicad_prefs_by_version_number(self):
+        sys.path.insert(0, REPO)
+        from forge import pcb
+        tmp = tempfile.mkdtemp(prefix="pe-forge-prefs-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        for v in ("9.0", "10.0"):
+            os.makedirs(os.path.join(tmp, "kicad", v))
+        old = pcb.glob_kicad_prefs
+        try:
+            pcb.glob_kicad_prefs = lambda: sorted([os.path.join(tmp, "kicad", v) for v in ("9.0", "10.0")],
+                                                  key=lambda p: tuple(int(x) for x in os.path.basename(p).split(".")))
+            open(os.path.join(tmp, "kicad", "10.0", "fp-lib-table"), "w").write(
+                '(fp_lib_table\n  (lib (name "NEWLIB") (type "KiCad") (uri "/x/NEWLIB.pretty") (options "") (descr ""))\n)\n')
+            open(os.path.join(tmp, "kicad", "9.0", "fp-lib-table"), "w").write(
+                '(fp_lib_table\n  (lib (name "OLDLIB") (type "KiCad") (uri "/x/OLDLIB.pretty") (options "") (descr ""))\n)\n')
+            d = pcb.lib_dirs()
+            self.assertIn("NEWLIB", d)                   # 10.0 is newer than 9.0 (numbers, not text)
+            self.assertNotIn("OLDLIB", d)
+        finally:
+            pcb.glob_kicad_prefs = old
+
     def test_stackup_block_thickness(self):
         sys.path.insert(0, REPO)
         from forge import pcb

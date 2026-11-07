@@ -500,5 +500,103 @@ class Transactions(unittest.TestCase):
         self.assertNotEqual(self.read("08_PCB/txn/demo.kicad_sch"), before)
 
 
+class ValueNormaliser(unittest.TestCase):
+    """WP4 AC4.3: equivalent spellings never drift; different values always do."""
+
+    def test_table(self):
+        from forge.tables import same_value
+        same = [("4u7", "4.7u"), ("4u7", "4.7 uF"), ("4.7µF", "4u7"), ("10k", "10 kΩ"), ("10K", "10000"),
+                ("10k", "10 k"), ("2R2", "2.2 Ω"), ("100n", "0.1u"), ("100nF 50V", "100n 50 V"), ("1", "1Ω"),
+                ("B360B", "b360b"), ("Ihold≥3A", "Ihold>=3A"), ("0R", "0"), ("1M", "1 MΩ"), ("22p", "22 pF")]
+        diff = [("10k", "4.7k"), ("10u", "10n"), ("1M", "1m"), ("4.7uF", "4.7uH"), ("100n 50V", "100n 25V")]
+        for a, b in same:
+            self.assertTrue(same_value(a, b), (a, b))
+        for a, b in diff:
+            self.assertFalse(same_value(a, b), (a, b))
+
+    def test_refs_and_aliases(self):
+        from forge import tables
+        self.assertEqual(tables.refs("C1, C2 C5-C7"), ["C1", "C2", "C5", "C6", "C7"])
+        self.assertEqual(tables.key_of("Designator"), "ref")
+        self.assertEqual(tables.key_of("MPN (primary)"), "mpn")
+        self.assertEqual(tables.key_of("Pins (Ref.pin)"), "pins")
+
+
+BOM_HDR = open(os.path.join(REPO, "template/04_Hardware/BOM/WIP_BOM.csv")).readline().strip().split(",")
+PARTS = {"C1": "10µF", "C2": "10 uF", "D1": "B360B", "J1": "MSTBA_2,5/2-G-5,08", "R1": "1", "R2": "1 Ω"}
+
+
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class Drift(unittest.TestCase):
+    """WP4: forge drift."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-drift-")
+        self.dir = new_project("Drf", self.tmp)
+        forge("module", "add", "Power", cwd=self.dir)
+        self.mod = os.path.join(self.dir, "modules/M-01_Power")
+        self.sheet = os.path.join(self.dir, "08_PCB/drf/drf.kicad_sch")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def bom(self, **change):
+        with open(os.path.join(self.mod, "BOM.csv"), "w", newline="") as fh:
+            w = csv.DictWriter(fh, BOM_HDR)
+            w.writeheader()
+            for ref, val in PARTS.items():
+                w.writerow(dict(dict.fromkeys(BOM_HDR, "x"), Ref=ref, Value=change.get(ref, val), DNP="",
+                                MPN="", Module="M-01"))
+
+    def brief(self, netlist, sheet="08_PCB/drf/drf.kicad_sch"):
+        rows = "\n".join(f"| {n} | power | {', '.join(p)} | |" for n, p in netlist.items())
+        open(os.path.join(self.mod, "Sheet_Brief.md"), "w").write(
+            f"---\ntype: sheet-brief\nmodule: M-01\nkicad_sheet: {sheet}\n---\n# brief\n\n"
+            "## Netlist\n| Net | Class | Pins (Ref.pin) | Notes |\n|---|---|---|---|\n" + rows + "\n")
+
+    def drift(self, *a):
+        return forge("drift", *a, cwd=self.dir, check=False)
+
+    def test_bom_value_change_is_reported(self):
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), self.sheet)
+        self.bom()
+        r = self.drift()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.bom(R1="10k")
+        r = self.drift("--json")
+        self.assertEqual(r.returncode, 1)
+        f = json.loads(r.stdout)["findings"]
+        self.assertEqual(len(f), 1, f)
+        self.assertEqual(f[0]["doc"], "modules/M-01_Power/BOM.csv")
+        self.assertEqual(f[0]["claim"], "R1 = 10k")
+        self.assertEqual(f[0]["actual"], "R1 = 1 in drf.kicad_sch")
+        self.assertEqual(forge("check", "--only", "drift", cwd=self.dir, check=False).returncode, 1)
+
+    def test_brief_netlist_catches_a_short_on_a_user_drawn_sheet(self):
+        net = json.load(open(os.path.join(FIX, "short_circuit.json")))["netlist"]
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), self.sheet)
+        self.brief(net)
+        self.assertEqual(self.drift().returncode, 0, self.drift().stdout)
+        shutil.copy(os.path.join(KFIX, "short_circuit.kicad_sch"), self.sheet)
+        r = self.drift()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("modules/M-01_Power/Sheet_Brief.md: net VIN joins", r.stdout)
+
+    def test_empty_sheet_is_bootstrap_until_g6(self):
+        self.bom()
+        r = self.drift()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertNotIn("WARN", r.stdout)
+        st = os.path.join(self.dir, ".forge/state.json")
+        s = json.load(open(st))
+        s["modules"][0]["phases"]["P6"]["status"] = "passed"
+        json.dump(s, open(st, "w"))
+        r = self.drift()
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("WARN modules/M-01_Power/BOM.csv", r.stdout)
+        d = json.loads(forge("check", "--only", "drift", "--json", cwd=self.dir, check=False).stdout)
+        self.assertEqual(d["checks"]["drift"]["status"], "warn")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

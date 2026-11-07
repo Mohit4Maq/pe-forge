@@ -2,6 +2,7 @@
 type: sheet-brief
 sheet: S-xx
 module: M-xx
+kicad_sheet: 08_PCB/<project>/<sheet>.kicad_sch
 draw_mode: user | agent
 rev: 0.1
 status: draft

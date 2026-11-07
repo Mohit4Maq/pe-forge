@@ -16,6 +16,7 @@
                                     one deterministic check: ERC, DRC, consistency, V-model, BoM, drift,
                                     library checks (no model, no network; CI and pre-commit safe)
   forge hooks install [--chain] | --uninstall   git pre-commit hook running forge check (fast subset)
+  forge drift [--json] [--module M-xx]  BoM / brief / booklet against the drawn schematic {doc, claim, actual}
   forge txn begin "<what>" [--allow-dirty] | status | verify | commit [-m MSG] | close | rollback [--reason T]
                                     transactional design edits: verify before commit, lossless rollback
   forge doctor                      check the toolchain
@@ -79,6 +80,9 @@ def main(argv):
     if cmd == "check":
         from forge import check
         return check.main(prj, rest)
+    if cmd == "drift":
+        from forge import drift
+        return drift.main(prj, rest)
     if cmd == "txn":
         from forge import txn
         return txn.main(prj, rest)

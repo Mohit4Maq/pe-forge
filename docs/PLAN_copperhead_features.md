@@ -850,7 +850,7 @@ turns on every schematic task.
 | WP1 | Shared KiCad CLI layer, JSON reports | `feat/wp01-kicad-json` | done | ERC JSON positions are 100 mm units in KiCad 10.0.6; old G6 regex missed KiCad 10 wording (now fixed) |
 | WP2 | `forge check`, pre-commit, CI | `feat/wp02-forge-check` | done | empty sheet or board = skip ("no schematic yet"); gates G6/G7 call the same sub-checks and treat skip as not passed |
 | WP3 | Transactions with rollback | `feat/wp03-txn` | done | schdraw apply closes its txn without committing (commit rule stays with the owner); same-stem .kicad_pro rule for text variables |
-| WP4 | Structured drift | `feat/wp04-drift` | todo | |
+| WP4 | Structured drift | `feat/wp04-drift` | done | module sheet from brief frontmatter `kicad_sheet`; shared tables.py (aliases, value normaliser) for WP8 |
 | WP5 | Obligations ledger hooks | `feat/wp05-ledger` | todo | |
 | WP6 | Change-gated edits after baseline | `feat/wp06-change-control` | todo | |
 | WP7 | Fab release gate | `feat/wp07-fab-gate` | todo | |

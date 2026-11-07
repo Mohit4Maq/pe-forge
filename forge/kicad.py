@@ -233,3 +233,63 @@ def netlist(sch, out=None):
     if not os.path.exists(out):
         return None
     return parse_netlist(open(out).read())
+
+
+# ------------------------------------------------------------------ components + nets in one export
+def parse_sexpr(text):
+    tokens = re.findall(r'"(?:[^"\\]|\\.)*"|[()]|[^\s()"]+', text)
+    stack, cur = [], []
+    for t in tokens:
+        if t == "(":
+            stack.append(cur)
+            cur = []
+        elif t == ")":
+            done, cur = cur, stack.pop()
+            cur.append(done)
+        else:
+            cur.append(t[1:-1].replace('\\"', '"').replace("\\\\", "\\") if t.startswith('"') else t)
+    return cur[0] if cur else []
+
+
+def _get(node, key):
+    return next((c for c in node if isinstance(c, list) and c and c[0] == key), None)
+
+
+def _val(node, key, default=""):
+    n = _get(node or [], key)
+    return n[1] if n and len(n) > 1 and isinstance(n[1], str) else default
+
+
+def parse_design(text):
+    """(components, nets) from a kicadsexpr netlist.
+    components: {ref: {ref, value, footprint, fields{}, dnp, in_bom, sheetfile, sheet}}; nets: {name: {"REF.PIN"}}"""
+    tree = parse_sexpr(text)
+    comps = {}
+    for c in (_get(tree, "components") or [])[1:]:
+        fields = {}
+        for f in (_get(c, "fields") or [])[1:]:
+            fields[_val(f, "name")] = next((x for x in f[1:] if isinstance(x, str)), "")
+        props = {_val(p, "name"): _val(p, "value") for p in c if isinstance(p, list) and p and p[0] == "property"}
+        ref = _val(c, "ref")
+        comps[ref] = {"ref": ref, "value": _val(c, "value"), "footprint": _val(c, "footprint") or fields.get("Footprint", ""),
+                      "fields": fields, "dnp": "dnp" in props, "in_bom": "exclude_from_bom" not in props,
+                      "sheetfile": props.get("Sheetfile", ""), "sheet": _val(_get(c, "sheetpath"), "names", "/")}
+    nets = {}
+    for n in (_get(tree, "nets") or [])[1:]:
+        pins = {f"{_val(nd, 'ref')}.{_val(nd, 'pin')}" for nd in n if isinstance(nd, list) and nd and nd[0] == "node"}
+        nets[_val(n, "name").lstrip("/")] = {p for p in pins if not p.startswith("#")}
+    return comps, nets
+
+
+def design(sch, out=None):
+    """(components, nets) of a schematic (its whole hierarchy) from KiCad's netlist export, or None."""
+    cli = find_cli()
+    if not cli:
+        return None
+    out = out or _out(sch, None, ".design.net")
+    if os.path.exists(out):
+        os.remove(out)
+    subprocess.run([cli, "sch", "export", "netlist", "--format", "kicadsexpr", "-o", out, sch], capture_output=True)
+    if not os.path.exists(out):
+        return None
+    return parse_design(open(out).read())

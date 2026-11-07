@@ -37,8 +37,10 @@ apply`. The owner reviews the rendered PNG and the sheet in KiCad; their edits a
 
 ## Step 5: verify the sheet
 1. `kicad-cli sch erc` (0 errors), `$MC_LIB/tools/sch_check.py` (library discipline, net naming, decoupling).
-2. Netlist vs brief: `kicad-cli sch export netlist` compared with the brief's netlist table (agent mode does this
-   inside `schdraw check`; in user mode the supervisor runs the same comparison).
+2. Netlist vs brief: `forge drift --module M-xx` compares KiCad's own netlist with the brief's netlist table, and
+   the BoM, brief and booklet parts tables (value, MPN, MC_ID, footprint, DNP) with the drawn parts. Same contract
+   in both modes (agent mode also runs it inside `schdraw check`). Put the sheet path in the brief's frontmatter
+   (`kicad_sheet:`) so the module is compared against its own sheet.
 3. Look at the rendered sheet (`kicad-cli sch export svg` → PNG): readability per the style guide.
 4. Reviews in parallel: `schematic-reviewer` (datasheet-backed), `power-reviewer` (power stages),
    `pe-reviewer` (cold, against booklet and requirements); `pe-compliance` for insulation, protection, HV.

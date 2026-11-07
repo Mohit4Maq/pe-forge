@@ -115,6 +115,10 @@ written down.
 6. Schematic discipline (above). 7. One master plan. 8. Big decisions go to the council. 9. V-model traceability
    and standards checks for every requirement. 10. Never without you: spending, orders, messages, git push.
 
+`forge drift` holds the documents to the drawing: every BoM line, brief and booklet parts row and brief netlist
+is compared with the schematic KiCad exports, and each disagreement is reported as `{doc, claim, actual}` (for
+example `BOM.csv: R5 = 10k, actual R5 = 4.7k in power.kicad_sch`). Values compare by meaning (`4u7` = `4.7 µF`).
+
 Design edits that span several files run as transactions (`forge txn begin / verify / commit / rollback`): a
 rollback restores the tree byte for byte, including your own uncommitted work from before the transaction, and
 keeps the failed attempt as a named `git stash` entry. `forge schdraw apply` always runs inside one.

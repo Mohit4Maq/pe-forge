@@ -654,10 +654,11 @@ def main(argv):
     # second, independent check: KiCad's own netlist of the dry copy against the brief
     kn = kc.netlist(dry)
     if kn is not None:
-        for net, pins in spec.get("netlist", {}).items():
-            grp = next((g for g in kn.values() if set(pins) & g), set())
-            if set(pins) - grp or grp - set(pins):
-                E.append(f"K1 KiCad netlist disagrees on {net}: expected {sorted(pins)}, KiCad has {sorted(grp)}")
+        from forge import drift
+        E += [f"K1 KiCad netlist disagrees on {net}: {claim}; {actual}"
+              for net, claim, actual in drift.netlist_mismatch(spec.get("netlist", {}), kn.values())]
+    else:
+        E.append("K1 KiCad netlist export failed on the dry copy")
     erc = os.path.join(scratch, "erc.json")
     rep = kc.erc(dry, out=erc)
     ercs = [f"{v['type']}: {v['description']}" + "".join(f" @{i['ref'] or i['description']}" for i in v["items"][:2])
@@ -714,10 +715,9 @@ def post_apply_check(sheet, spec, before):
     kn = kc.netlist(root)
     if kn is None:
         return E + ["real-project netlist export failed"]
-    for net, pins in spec.get("netlist", {}).items():
-        grp = next((g for g in kn.values() if set(pins) & g), set())
-        if set(pins) - grp or grp - set(pins):
-            E.append(f"real-project K1 {net}: expected {sorted(pins)}, KiCad has {sorted(grp)}")
+    from forge import drift
+    E += [f"real-project K1 {net}: {claim}; {actual}"
+          for net, claim, actual in drift.netlist_mismatch(spec.get("netlist", {}), kn.values())]
     return E
 
 

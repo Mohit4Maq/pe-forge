@@ -54,3 +54,9 @@ Wrap every change that touches more than one design file in `forge txn begin "<w
 `forge schdraw apply` does this itself: it opens a transaction, writes the sheet, re-checks the real project
 (no new ERC errors on the top sheet, KiCad netlist matches the brief) and rolls back on failure. On success it
 closes the transaction without committing; commit under the project's commit rule.
+
+## Design lookup
+Use `forge explain` instead of reading `.kicad_sch` s-expressions or netlists by hand: `forge explain U1` (value,
+MPN, footprint, every pin -> net, BoM rows, brief / booklet mentions), `forge explain VIN` (every REF.PIN on a net),
+`forge explain U1.7` or `U1.VCC` (one pin), `forge explain --pins <MC_ID>` (a library part's pins and units before
+you place it). Add `--json` for structured output. It is deterministic and costs no tokens beyond its output.

@@ -146,6 +146,8 @@ forge module add NAME [--depends M-01]     forge gate check|pass G<n> [--module 
 forge vmodel build|check|impact|diff|cr|sync   forge link [--apply]   forge consistency
 forge schdraw check|apply|pins|new         forge bom check   forge doctor   forge kicad-setup [--apply]
 forge check [--json] [--strict] [--fab] [--only erc,drc,...]   forge hooks install [--chain] | --uninstall
+forge drift [--module M-xx]   forge explain U1 | NET | U1.7 | --pins MC_ID   forge txn begin|verify|commit|rollback
+forge cr new|validate|approve|close   forge ledger show|clear   forge fab manifest
 ```
 
 `forge check` is one deterministic command (no model, no network, seconds) over the whole project: ERC, DRC with

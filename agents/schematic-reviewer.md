@@ -36,3 +36,9 @@ Rank findings: **Critical** (won't work or will be damaged) / **Major** (likely 
 compliance) / **Minor** / **Suggestion**. For each: refs and nets, what is wrong, evidence (datasheet
 section or calculation), and the fix (value, part, or connection). End with what you could not verify.
 Never invent MPNs or datasheet numbers. Say "not verified" instead.
+
+## Design lookup
+Use `forge explain` instead of reading `.kicad_sch` s-expressions or netlists by hand: `forge explain U1` (value,
+MPN, footprint, every pin -> net, BoM rows, brief / booklet mentions), `forge explain VIN` (every REF.PIN on a net),
+`forge explain U1.7` or `U1.VCC` (one pin), `forge explain --pins <MC_ID>` (a library part's pins and units before
+you place it). Add `--json` for structured output. It is deterministic and costs no tokens beyond its output.

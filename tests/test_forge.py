@@ -872,5 +872,56 @@ class JlcExport(unittest.TestCase):
         self.assertIn("LCSC_PN", s1)
 
 
+class ExplainLookup(unittest.TestCase):
+    """WP9: the lookup rules, without KiCad."""
+
+    def test_pin_name_needs_ref_when_repeated(self):
+        from forge.explain import Lookup
+        comps = {"U1": {"pins": {"1": {"name": "VCC", "net": "P5V", "type": "power_in"}}},
+                 "U2": {"pins": {"1": {"name": "VCC", "net": "P5V", "type": "power_in"},
+                                 "2": {"name": "EN", "net": "EN", "type": "input"}}}}
+        L = Lookup(comps, {"P5V": {"U1.1", "U2.1"}, "EN": {"U2.2"}})
+        kind, data = L.resolve("VCC")
+        self.assertEqual(kind, "ambiguous")
+        self.assertEqual(L.resolve("U2.VCC")[0], "pin")
+        self.assertEqual(L.resolve("EN")[0], "net")          # a net name wins over a pin name
+
+
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class Explain(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-explain-")
+        self.dir = new_project("Exp", self.tmp)
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), os.path.join(self.dir, "08_PCB/exp/exp.kicad_sch"))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def ex(self, *a):
+        return forge("explain", *a, cwd=self.dir, check=False)
+
+    def test_net(self):
+        r = self.ex("GND", "--json")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        d = json.loads(r.stdout)
+        self.assertEqual((d["ok"], d["kind"]), (True, "net"))
+        self.assertEqual(sorted(p["pin"] for p in d["pins"]), ["C1.2", "C2.2", "J1.2", "R2.2"])
+
+    def test_pin_and_part(self):
+        self.assertIn("-> net VOUT", self.ex("D1.1").stdout)
+        self.assertIn("-> net VOUT", self.ex("D1.K").stdout)
+        os.makedirs(os.path.join(self.dir, "04_Hardware/Design_Booklets"), exist_ok=True)
+        open(os.path.join(self.dir, "04_Hardware/Design_Booklets/B.md"), "w").write("# b\n\nD1 blocks reverse input.\n")
+        out = self.ex("D1").stdout
+        self.assertIn("pin    2 A", out)
+        self.assertIn("04_Hardware/Design_Booklets/B.md:3", out)
+
+    def test_unknown_suggests(self):
+        r = self.ex("VOTU")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("did you mean", r.stdout)
+        self.assertIn("VOUT", r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

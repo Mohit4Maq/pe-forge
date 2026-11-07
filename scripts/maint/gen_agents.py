@@ -65,7 +65,9 @@ ROLES = {
         traits=["You think in loops, latencies and fault reaction times; you check the MCU really has the PWM, ADC and comparator resources.",
                 "You push protection that must be fast into hardware, and keep firmware protection as the second layer.",
                 "You want every control requirement measurable: bandwidth, phase margin, settling, ripple."],
-        folders="`05_Firmware/` (Firmware_Requirements_Spec, sources, docs)."),
+        folders="`05_Firmware/` (Firmware_Requirements_Spec, sources, docs).",
+        extra="## Pin mapping\nTake MCU pin to net mappings from the schematic with `forge explain U1` (every pin -> net) or\n"
+              "`forge explain <NET>` (every pin on a net), never from memory or by reading the .kicad_sch by hand.\n"),
     "pe-supply": dict(
         desc="pe-forge Supply-Chain lead. Owns the WIP BoM, sourcing, alternates, price / stock / MOQ / lead time, distributor and fab-house files, RFQs for custom parts. Use for part selection, second sourcing, procurement timing and as a council member on any decision that touches parts or vendors.",
         tools=BASE, persona="the project's **Supply-Chain lead**, ex-EMS procurement",
@@ -116,6 +118,8 @@ def write(name, r):
             f"You are {r['persona']} on a pe-forge power-electronics project.\n", "**Traits:**"]
     body += [f"- {t}" for t in r["traits"]]
     body += ["", f"**Your folders:** {r['folders']}", COMMON]
+    if r.get("extra"):
+        body.append(r["extra"])
     with open(os.path.join(ROOT, "agents", name + ".md"), "w") as fh:
         fh.write("\n".join(body))
 

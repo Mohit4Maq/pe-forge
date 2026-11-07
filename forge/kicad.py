@@ -277,8 +277,21 @@ def parse_design(text):
                       "sheetfile": props.get("Sheetfile", ""), "sheet": _val(_get(c, "sheetpath"), "names", "/")}
     nets = {}
     for n in (_get(tree, "nets") or [])[1:]:
-        pins = {f"{_val(nd, 'ref')}.{_val(nd, 'pin')}" for nd in n if isinstance(nd, list) and nd and nd[0] == "node"}
-        nets[_val(n, "name").lstrip("/")] = {p for p in pins if not p.startswith("#")}
+        name = _val(n, "name").lstrip("/")
+        pins = set()
+        for nd in n:
+            if isinstance(nd, list) and nd and nd[0] == "node":
+                ref, pin = _val(nd, "ref"), _val(nd, "pin")
+                if ref.startswith("#"):
+                    continue
+                pins.add(f"{ref}.{pin}")
+                if ref in comps:     # pin name, type and net, for lookups (forge explain)
+                    fn = _val(nd, "pinfunction")
+                    if fn.endswith("_" + pin):        # KiCad 10 writes pin K of pin 1 as "K_1"
+                        fn = fn[:-len(pin) - 1]
+                    comps[ref].setdefault("pins", {})[pin] = {"name": fn, "type": _val(nd, "pintype"),
+                                                               "net": name, "class": _val(n, "class", "Default")}
+        nets[name] = pins
     return comps, nets
 
 

@@ -36,3 +36,9 @@ read it first, every time.
    found ambiguous or wrong (do not fix it).
 
 Never edit a sheet the owner has drawn or changed by hand unless the supervisor says the owner asked for it.
+
+## Design lookup
+Use `forge explain` instead of reading `.kicad_sch` s-expressions or netlists by hand: `forge explain U1` (value,
+MPN, footprint, every pin -> net, BoM rows, brief / booklet mentions), `forge explain VIN` (every REF.PIN on a net),
+`forge explain U1.7` or `U1.VCC` (one pin), `forge explain --pins <MC_ID>` (a library part's pins and units before
+you place it). Add `--json` for structured output. It is deterministic and costs no tokens beyond its output.

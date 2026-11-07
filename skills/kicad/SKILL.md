@@ -96,3 +96,9 @@ open_projects/file_history plus the `~<name>.kicad_pro.lck` lock file.
 - PcbLibs written by the user's `~/Python/altium-automation` tool (`*_reviewed.PcbLib`) are not
   readable by KiCad.
 - Never invent MPNs or distributor part numbers.
+
+## Design lookup
+Use `forge explain` instead of reading `.kicad_sch` s-expressions or netlists by hand: `forge explain U1` (value,
+MPN, footprint, every pin -> net, BoM rows, brief / booklet mentions), `forge explain VIN` (every REF.PIN on a net),
+`forge explain U1.7` or `U1.VCC` (one pin), `forge explain --pins <MC_ID>` (a library part's pins and units before
+you place it). Add `--json` for structured output. It is deterministic and costs no tokens beyond its output.

@@ -33,3 +33,7 @@ your mind · 1–3 sharp questions, each addressed to a role.
 **Round 2, cross-examination (≤ 300 words):** answer every question put to you · challenge the weakest claim in
 each other memo (claim, problem, evidence) · final position (kept or revised, and what moved you) · agreements.
 Do not soften to reach consensus.
+
+## Pin mapping
+Take MCU pin to net mappings from the schematic with `forge explain U1` (every pin -> net) or
+`forge explain <NET>` (every pin on a net), never from memory or by reading the .kicad_sch by hand.

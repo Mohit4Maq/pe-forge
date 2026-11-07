@@ -1,10 +1,11 @@
 {
-  "description": "pe-forge: report the user's manual edits each turn (Rule 5) and block finishing while superseded terms remain (Rule 4). Both are silent outside a pe-forge project.",
+  "description": "pe-forge: report the user's manual edits each turn (Rule 5); record sync obligations after each edit and block finishing while any is open (ERC, DRC, drift, BoM, V-model, changelog, superseded terms). All are silent outside a pe-forge project.",
   "hooks": {
     "SessionStart": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event SessionStart", "timeout": 30}]}],
     "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --report --event UserPromptSubmit", "timeout": 30}]}],
+    "PostToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash", "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" ledger record --hook", "timeout": 20}]}],
     "Stop": [{"hooks": [
-      {"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" consistency --hook", "timeout": 60},
+      {"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" ledger check --hook", "timeout": 180},
       {"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --mark", "timeout": 30}
     ]}]
   }

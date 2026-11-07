@@ -598,5 +598,76 @@ class Drift(unittest.TestCase):
         self.assertEqual(d["checks"]["drift"]["status"], "warn")
 
 
+class Ledger(unittest.TestCase):
+    """WP5: obligations recorded by PostToolUse, enforced at Stop."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-ledger-")
+        self.dir = new_project("Led", self.tmp)
+        self.sheet = os.path.join(self.dir, "08_PCB/led/led.kicad_sch")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def hook(self, sub, payload):
+        return forge("ledger", sub, "--hook", cwd=self.dir, check=False, stdin=json.dumps(payload))
+
+    def write(self, fixture):
+        self.hook("record", {"tool_name": "Read", "tool_input": {}})      # baseline snapshot
+        shutil.copy(os.path.join(KFIX, fixture), self.sheet)
+        return self.hook("record", {"tool_name": "Write", "tool_input": {"file_path": self.sheet}, "cwd": self.dir})
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_erc_error_blocks_stop_until_fixed(self):
+        self.write("short_circuit.kicad_sch")
+        r = self.hook("check", {"stop_hook_active": False})
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("open: erc:08_PCB/led/led.kicad_sch", r.stderr)
+        r = self.hook("check", {"stop_hook_active": True})          # no loop: never blocks twice in a row
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("still open", json.loads(r.stdout)["systemMessage"])
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), self.sheet)
+        self.hook("record", {"tool_name": "Write", "tool_input": {"file_path": self.sheet}, "cwd": self.dir})
+        r = self.hook("check", {"stop_hook_active": False})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        d = json.load(open(os.path.join(self.dir, ".forge/ledger.json")))
+        self.assertEqual(d["open"], [])
+        erc = [o for o in d["closed"] if o["kind"] == "erc"]
+        self.assertTrue(erc and erc[-1]["closed_at"])
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_user_edit_is_advice_first_then_blocking(self):
+        self.hook("record", {"tool_name": "Read", "tool_input": {}})
+        self.hook("check", {})                                      # baseline at a Stop
+        shutil.copy(os.path.join(KFIX, "short_circuit.kicad_sch"), self.sheet)   # nobody recorded this edit
+        r = self.hook("check", {})
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("outside Claude", json.loads(r.stdout)["systemMessage"])
+        r = self.hook("check", {})
+        self.assertEqual(r.returncode, 2)
+
+    def test_superseded_term_blocks_like_the_old_hook(self):
+        with open(os.path.join(self.dir, ".forge/superseded_terms.csv"), "a") as fh:
+            fh.write("LM5146,LM5148,2026-11-04,test\n")
+        open(os.path.join(self.dir, "04_Hardware/n.md"), "w").write("# n\nuse LM5146\n")
+        self.assertEqual(self.hook("check", {}).returncode, 2)
+        self.assertEqual(forge("consistency", "--hook", cwd=self.dir, check=False, stdin="{}").returncode, 2)
+
+    def test_silent_outside_project(self):
+        empty = tempfile.mkdtemp()
+        for sub in ("record", "check"):
+            r = forge("ledger", sub, "--hook", cwd=empty, check=False, stdin="{}")
+            self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
+        shutil.rmtree(empty)
+
+    def test_clear_is_logged(self):
+        self.hook("record", {"tool_name": "Read", "tool_input": {}})
+        open(os.path.join(self.dir, "02_Requirements/x.md"), "w").write("x\n")
+        self.hook("record", {"tool_name": "Write", "tool_input": {"file_path": os.path.join(self.dir, "02_Requirements/x.md")}})
+        self.assertIn("vmodel:project", forge("ledger", "show", cwd=self.dir).stdout)
+        forge("ledger", "clear", "--reason", "owner test", cwd=self.dir)
+        self.assertIn("OVERRIDE: owner test", open(os.path.join(self.dir, "01_Program/QC/QC_Register.md")).read())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

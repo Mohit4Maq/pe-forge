@@ -35,7 +35,7 @@ split into modules, and each module is designed and verified as a small project 
 | `vendor/pwrlab` | LTspice simulator + MCP server: buck, DAB, H-bridge, T-type / NPC, totem-pole PFC; every result cross-checked against closed form, with timestep, steady-state and power-balance checks |
 | `library/` | KiCad 10 parts library: SQLite database library (~570 parts with stock / price fields), symbols, footprints, project template with a release job, library and check tools |
 | `skills/kicad*`, `falstad-circuit` | KiCad work, live co-pilot, part placement, interactive Falstad circuits |
-| `hooks/` | Reports your manual edits every turn; blocks finishing while superseded parts or values are still mentioned |
+| `hooks/` | Reports your manual edits every turn; after each edit records what must be re-checked (ERC, DRC, drift, BoM, V-model, changelog) and blocks finishing while any obligation is open or a superseded part or value is still mentioned (`forge ledger show`) |
 
 ## Install
 

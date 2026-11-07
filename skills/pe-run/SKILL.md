@@ -85,7 +85,13 @@ Run phases in chunks; before each chunk run `forge meter`: GREEN continue, AMBER
 stop, RED stop. Never without the owner: spending, orders, messages, git push, passing a gate with an override,
 closing a D-xx, changing decided architecture. Collect those in a short brief with recommendations.
 
-## 7. Failure handling
+## 7. Obligations (hooks)
+Every edit opens obligations (`forge ledger show`): ERC after a sheet edit, DRC after a board edit, drift after a
+BoM / brief / booklet edit, the V-model after a requirement edit, a dated revision line after any change to a
+module past G6. The Stop hook re-runs them and blocks finishing while one fails. Fix the cause; never clear the
+ledger yourself (`forge ledger clear --reason` is the owner's escape hatch and is logged in the QC register).
+
+## 8. Failure handling
 - A tool that is missing (`forge doctor`) disables only its features: say so and offer the manual path.
 - If a step fails twice the same way, stop and ask the owner with what you tried and the evidence.
 - Never report work as done that a gate has not passed; call it "done, pending gate G<n>".

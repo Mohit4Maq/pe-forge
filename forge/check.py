@@ -12,7 +12,8 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   drift        BoM / brief / booklet vs schematic (forge drift)
   sch_lib      library/tools/sch_check.py: parts against MC_Parts, nets, decoupling, text variables
   pcb_extra    library/tools/pcb_check.py: layout checks DRC does not do (needs KiCad's pcbnew)
-  fab          release readiness (only with --fab)
+  fab          release readiness (only with --fab): routing, schematic/board match, BoM ready, outputs fresh
+               (content hashes) and complete, power layout rules, release docs. See forge/fab.py
 
 Exit 0 when nothing failed; --strict also fails on warnings and on checks skipped because a tool is missing.
 A skipped check is reported as skipped with its reason, never as passed. The result is cached in

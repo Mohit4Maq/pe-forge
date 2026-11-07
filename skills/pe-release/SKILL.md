@@ -17,6 +17,10 @@ description: Phase P8 of a pe-forge project - the manufacturing release - ERC / 
    torque), BoM cost at the build quantity, known issues and deviations, the gate records.
 5. **Validation**: `pe-validation` writes or updates `13_Validation/DVP_and_R.md` (bring-up order with safe
    limits, every requirement → test procedure → pass criterion) and the bring-up checklist.
-6. **Review** (T4: irreversible): `pe-reviewer` + `pe-validation` + `pe-compliance`. Then `forge gate pass G8`.
-7. **Tag** `<slug>-rev<REV>` (annotated) after the owner approves. Ordering boards and parts is the owner's
+6. **Fab gate**: `forge check --fab --strict` must pass (gate G8 runs it): routing complete, schematic = board,
+   every placed part Active with MPN, manufacturer and alternate, outputs fresh (the release manifest's hashes of
+   board, sheets and BoM still match; any edit after `./release.sh` means re-run it), Gerbers / drill / CPL
+   complete, power layout rules, release notes / DVP&R / layout spec filled in.
+7. **Review** (T4: irreversible): `pe-reviewer` + `pe-validation` + `pe-compliance`. Then `forge gate pass G8`.
+8. **Tag** `<slug>-rev<REV>` (annotated) after the owner approves. Ordering boards and parts is the owner's
    decision: hand them the pack and the quotes, never order.

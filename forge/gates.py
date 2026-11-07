@@ -136,6 +136,14 @@ def check(prj, gate, mod=None):
             bad = [f for f in r["findings"] if f["claim"].startswith(("no ", kind))]
             res.append((r["status"] != "fail", f"{kind} ({r['reason']}): {len(bad)} error(s)"
                         + "".join(f"; {f['location']}: {f['actual']}" for f in bad[:3])))
+    if gate == "G8":           # the fab release gate, strict: NRND parts and unrun power checks fail too
+        from . import check as fc
+        r = fc.c_fab(prj, {"strict": True})
+        if r["status"] == "skip":
+            res.append((False, f"fab release gate: skipped ({r['reason']})"))
+        for name, part in (r.get("parts") or {}).items():
+            first = "; ".join(f"{f['location']}: {f['claim']}, {f['actual']}" for f in part["findings"][:2])
+            res.append((part["status"] in ("pass", "skip"), f"fab {name}: {part['status']}" + (f" ({first})" if first else "")))
     hits = consistency.scan(prj)
     res.append((not hits, f"consistency: {len(hits)} live mention(s) of superseded terms"))
     from .phases import GATE_REVIEWERS

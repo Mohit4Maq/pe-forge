@@ -273,6 +273,7 @@ def parse_design(text):
         ref = _val(c, "ref")
         comps[ref] = {"ref": ref, "value": _val(c, "value"), "footprint": _val(c, "footprint") or fields.get("Footprint", ""),
                       "fields": fields, "dnp": "dnp" in props, "in_bom": "exclude_from_bom" not in props,
+                      "board_excluded": "exclude_from_board" in props,
                       "sheetfile": props.get("Sheetfile", ""), "sheet": _val(_get(c, "sheetpath"), "names", "/")}
     nets = {}
     for n in (_get(tree, "nets") or [])[1:]:

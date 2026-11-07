@@ -735,5 +735,67 @@ class ChangeControl(unittest.TestCase):
         self.assertIn("FAIL change_control", r.stdout)
 
 
+GERBERS = ["F_Cu.gtl", "In1_Cu.g1", "In2_Cu.g2", "B_Cu.gbl", "F_Mask.gts", "B_Mask.gbs", "F_Paste.gtp",
+           "F_Silkscreen.gto", "B_Silkscreen.gbo", "Edge_Cuts.gm1"]
+
+
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class FabGate(unittest.TestCase):
+    """WP7: forge check --fab."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-fab-")
+        self.dir = new_project("Fab", self.tmp)
+        self.k = os.path.join(self.dir, "08_PCB/fab")
+        shutil.copy(os.path.join(KFIX, "broken.kicad_pcb"), os.path.join(self.k, "fab.kicad_pcb"))
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), os.path.join(self.k, "fab.kicad_sch"))
+        g = os.path.join(self.k, "release/A/gerbers")
+        os.makedirs(g)
+        for n in GERBERS:
+            open(os.path.join(g, f"fab-{n}"), "w").write("G04 test*\n")
+        open(os.path.join(g, "fab.drl"), "w").write("M48\n")
+        open(os.path.join(self.k, "release/A/fab-pos.csv"), "w").write("Ref,Val,Package,PosX,PosY,Rot,Side\n")
+        forge("fab", "manifest", self.k, cwd=self.dir)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def fab(self, *a):
+        r = forge("check", "--only", "fab", "--json", *a, cwd=self.dir, check=False)
+        return json.loads(r.stdout)["checks"]["fab"]
+
+    def test_parts_and_fresh_outputs(self):
+        f = self.fab()
+        self.assertEqual(set(f["parts"]), {"routing", "sch_pcb_match", "bom_ready", "outputs_fresh",
+                                           "outputs_complete", "power_rules", "docs"})
+        self.assertEqual(f["parts"]["outputs_fresh"]["status"], "pass", f["parts"]["outputs_fresh"])
+        self.assertEqual(f["parts"]["outputs_complete"]["status"], "pass", f["parts"]["outputs_complete"])
+        self.assertEqual(f["parts"]["sch_pcb_match"]["status"], "fail")      # parts not placed on the board yet
+        self.assertEqual(f["parts"]["docs"]["status"], "fail")
+
+    def test_board_edit_after_release_is_stale(self):
+        open(os.path.join(self.k, "fab.kicad_pcb"), "a").write("\n")
+        p = self.fab()["parts"]["outputs_fresh"]
+        self.assertEqual(p["status"], "fail")
+        self.assertTrue(any(x["location"] == "fab.kicad_pcb" and "re-run ./release.sh" in x["actual"] for x in p["findings"]))
+
+    def test_missing_gerber_layer_named(self):
+        os.remove(os.path.join(self.k, "release/A/gerbers/fab-F_Mask.gts"))
+        p = self.fab()["parts"]["outputs_complete"]
+        self.assertEqual(p["status"], "fail")
+        self.assertIn("Gerber for F.Mask", [x["claim"] for x in p["findings"]])
+
+    def test_seed_fails_nrnd_warns_then_fails_strict(self):
+        self.assertIn("status Seed", json.dumps(self.fab()["parts"]["bom_ready"]))
+        sch = os.path.join(self.k, "fab.kicad_sch")
+        t = open(sch).read().replace('(property "Status" "Seed"', '(property "Status" "Active"')
+        t = t.replace('(property "Alt_MPN" ""', '(property "Alt_MPN" "ALT-1"')
+        head, tail = t.rsplit('(property "Status" "Active"', 1)      # the last one is a placed part, not lib_symbols
+        t = head + '(property "Status" "NRND"' + tail
+        open(sch, "w").write(t)
+        self.assertEqual(self.fab()["parts"]["bom_ready"]["status"], "warn")
+        self.assertEqual(self.fab("--strict")["parts"]["bom_ready"]["status"], "fail")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -29,4 +29,8 @@ $MC_LIB/tools/bom.py $name.kicad_sch -o release/bom --boards ${BOARDS:-1} || fai
 if (( fail && !force )); then echo "Release blocked. Fix the above or rerun with --force."; exit 1; fi
 $K jobset run -f Release.kicad_jobset $name.kicad_pro > release/reports/jobset.log 2>&1 \
   || { echo "jobset failed, see release/reports/jobset.log"; exit 1; }
+# release manifest: SHA-256 of the board, sheets, BoM and every output, for the fab gate (forge check --fab)
+FORGE=${PE_FORGE:+$PE_FORGE/bin/forge}; FORGE=${FORGE:-$(command -v forge)}
+if [[ -n "$FORGE" ]]; then "$FORGE" fab manifest . || echo "warning: release manifest not written"
+else echo "warning: forge not found (set PE_FORGE): no release manifest, the fab gate will ask for one"; fi
 echo "Release outputs written to $(pwd)/release"

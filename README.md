@@ -119,6 +119,11 @@ written down.
 is compared with the schematic KiCad exports, and each disagreement is reported as `{doc, claim, actual}` (for
 example `BOM.csv: R5 = 10k, actual R5 = 4.7k in power.kicad_sch`). Values compare by meaning (`4u7` = `4.7 µF`).
 
+`forge check --fab --strict` answers "can I order this board today?": routing complete, schematic and board
+match, every placed part released with an alternate, the outputs still match the design by content hash, every
+Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8
+runs it.
+
 Design edits that span several files run as transactions (`forge txn begin / verify / commit / rollback`): a
 rollback restores the tree byte for byte, including your own uncommitted work from before the transaction, and
 keeps the failed attempt as a named `git stash` entry. `forge schdraw apply` always runs inside one.

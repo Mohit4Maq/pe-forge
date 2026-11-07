@@ -85,6 +85,7 @@ class Sheet:
 
     def __init__(self, text, parts):
         self.pins, self.boxes, self.pin_xy, self.libs = collections.defaultdict(list), {}, {}, {}
+        self.own = collections.defaultdict(set)      # texts a symbol draws itself: its pin names and numbers
         syms, libs = sp.existing(text)
         self.libs.update(libs)
         for ref, lib, x, y, rot, mir, un in syms:
@@ -104,6 +105,7 @@ class Sheet:
             xy = sp.xform(px, py, x, y, rot, mir)
             self.pin_xy[f"{ref}.{n}"] = xy
             self.pins[xy].append(f"{ref}.{n}")
+            self.own[ref] |= {n, nm} - {"", "~"}
         if not power:
             b = sheet_bbox(graphics_bbox(blk, unit), x, y, rot, mir)
             if b:
@@ -157,7 +159,7 @@ def expand(spec, sh):
     ncs = [sh.at(x) for x in spec.get("no_connect", [])]
     for f in spec.get("flags", []):
         f = f if isinstance(f, dict) else {"at": f}
-        a = sh.at(f["at"])
+        a = (f["x"], f["y"]) if "at" not in f else sh.at(f["at"])      # a pin, or a point on a drawn wire
         d = f.get("dir", "U")
         dx, dy, _ = DIRS[d]
         L = f.get("len", 2.54)
@@ -561,6 +563,16 @@ def pdf_lines(cli, sch, workdir):
     return out, (pg.rect.width * k, pg.rect.height * k)
 
 
+def part_of_symbol(t, b, sh, reach=5.08):
+    """A pin name or number a symbol draws itself, inside that symbol's area (body plus pin length)."""
+    for ref, own in sh.own.items():
+        box = sh.boxes.get(ref)
+        if box and t in own and b[0] >= box[0] - reach and b[2] <= box[2] + reach and b[1] >= box[1] - reach \
+                and b[3] <= box[3] + reach:
+            return True
+    return False
+
+
 def text_check(text, sheet_path, sh, wires, workdir):
     """S13-S16 on the text KiCad really renders (PDF export), minus the frame / title block of an empty sheet."""
     cli = kc.find_cli()
@@ -569,8 +581,11 @@ def text_check(text, sheet_path, sh, wires, workdir):
         return ["S13 could not export a PDF to check text placement"], []
     paper = re.search(r'\(paper "([^"]+)"\)', text).group(1)
     tb = re.search(r"\n\t\(title_block.*?\n\t\)", text, re.S)
-    base_sch = os.path.join(workdir, "frame_only", "frame.kicad_sch")
+    base_sch = os.path.join(workdir, "frame_only", os.path.basename(sheet_path))     # same name: same ${PROJECTNAME}
     os.makedirs(os.path.dirname(base_sch), exist_ok=True)
+    pro = os.path.splitext(sheet_path)[0] + ".kicad_pro"     # the title block's variables resolve as on the real sheet
+    if os.path.exists(pro):
+        shutil.copy(pro, os.path.splitext(base_sch)[0] + ".kicad_pro")
     empty = EMPTY.format(uuid=U(), paper=paper, title="x")
     empty = re.sub(r"\n\t\(title_block.*?\n\t\)", lambda _m: tb.group(0) if tb else "", empty, count=1, flags=re.S)
     open(base_sch, "w").write(empty)
@@ -583,6 +598,8 @@ def text_check(text, sheet_path, sh, wires, workdir):
         if key(t, b) in frame or t.startswith(("Sheet", "File:")) or k2 in seen:
             continue
         seen.add(k2)
+        if part_of_symbol(t, b, sh):
+            continue
         drawn.append((t, b, h))
     E, W = [], []
     for i, (t1, b1, h1) in enumerate(drawn):
@@ -609,7 +626,11 @@ def text_check(text, sheet_path, sh, wires, workdir):
         cands = [b for t, b, _ in drawn if t == want]
         if not cands:
             continue
-        d = min(max(max(b[0] - anchor[0], anchor[0] - b[2], 0), max(b[1] - anchor[1], anchor[1] - b[3], 0)) for b in cands)
+        body = sh.boxes.get(owner)
+        if body:     # distance from the symbol's edge, not its origin (a large IC's fields sit well off-centre)
+            d = min(max(max(b[0] - body[2], body[0] - b[2], 0), max(b[1] - body[3], body[1] - b[3], 0)) for b in cands)
+        else:
+            d = min(max(max(b[0] - anchor[0], anchor[0] - b[2], 0), max(b[1] - anchor[1], anchor[1] - b[3], 0)) for b in cands)
         if d > 8.89:
             E.append(f"S14 {name} is drawn {d:.1f} mm from {owner} (keep fields next to the symbol, ≤ 8.89 mm)")
     return E, W

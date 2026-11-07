@@ -1,9 +1,18 @@
 {
   "name": "pe-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Power-electronics product development with Claude Code: a supervisor that takes a project from idea through market survey, literature, requirements, topology, BoM, verified simulation, datasheet-checked schematics (drawn by you or by agents), PCB and manufacturing files.",
-  "author": {"name": "Veltara Innovations"},
+  "author": {
+    "name": "Veltara Innovations"
+  },
   "homepage": "https://github.com/Mohit4Maq/pe-forge",
   "license": "MIT",
-  "keywords": ["power-electronics", "kicad", "ltspice", "hardware", "pcb", "simulation"]
+  "keywords": [
+    "power-electronics",
+    "kicad",
+    "ltspice",
+    "hardware",
+    "pcb",
+    "simulation"
+  ]
 }

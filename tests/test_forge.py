@@ -2000,6 +2000,14 @@ class PcbSync(unittest.TestCase):
         self.assertIn("courtyard overlap", r.stdout)
         r = forge("pcb", "sync", cwd=d)
         self.assertIn("parity: 0 issue(s)", r.stdout)       # holes are marked board-only
+        pro = os.path.join(d, "08_PCB/pl/pl.kicad_pro")
+        j = json.load(open(pro))
+        j["net_settings"]["classes"].append(dict(j["net_settings"]["classes"][0], name="ES2", clearance=0.6))
+        json.dump(j, open(pro, "w"), indent=2)
+        forge("pcb", "setup", cwd=d)
+        forge("pcb", "sync", cwd=d)
+        names = [c["name"] for c in json.load(open(pro))["net_settings"]["classes"]]
+        self.assertIn("ES2", names)                           # KiCad's save must not reset the owner's classes
 
     @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
     def test_review_against_every_rule_and_board_hash(self):
@@ -2024,13 +2032,60 @@ class PcbSync(unittest.TestCase):
         r = forge("pcb", "review-status", cwd=d, check=False)
         self.assertIn("rules FAIL: L-02", r.stdout)
         t = open(form).read()
-        open(form, "w").write(t.replace("| FAIL | L2 split under U1 |", "| PASS | solid |"))
+        open(form, "w").write(t.replace("| FAIL | L2 split under U1 |", "| PASS | solid |").replace("verdict: READY", "verdict: READY WITH FIXES"))
+        r = forge("pcb", "review-status", cwd=d, check=False)
+        self.assertIn("fix the findings and review again", r.stdout)   # with fixes is not a pass
+        t = open(form).read()
+        open(form, "w").write(t.replace("verdict: READY WITH FIXES", "verdict: READY"))
         r = forge("pcb", "review-status", cwd=d, check=False)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         board = os.path.join(d, "08_PCB/rv/rv.kicad_pcb")
         open(board, "a").write("\n")                       # any later board change makes the review stale
         r = forge("pcb", "review-status", cwd=d, check=False)
         self.assertIn("the board changed after the review", r.stdout)
+
+
+class Protection(unittest.TestCase):
+    """PROT-1..4: surge clamp sized against the system and every protected pin's absolute maximum."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, REPO)
+        from forge import insulation, protection
+        cls.I, cls.P = insulation, protection
+
+    def run_(self, clamp, absmax, cfg):
+        comps = {"D2": ("TVS", "TVS-1", "PRT-1"), "U1": ("BUCK", "IC-1", "IC-1"), "C1": ("1u", "C1U", "CAP-1")}
+        nets = {"/VIN": ("Default", [("D2", "1", "K"), ("U1", "3", "VIN"), ("C1", "1", "")]),
+                "GND": ("Default", [("D2", "2", "A"), ("U1", "1", "GND"), ("C1", "2", "")])}
+        parts, ns = self.I.parse(netlist_text(comps, nets))
+        db = {"PRT-1": {"Clamp_V": clamp}, "IC-1": {"Abs_Max_V": absmax}}
+        return self.P.analyse(parts, ns, cfg, db, {"vin_V": [36, 63]})
+
+    def test_clamp_over_abs_max_is_prot2_and_infeasible_is_prot3(self):
+        f, info = self.run_("VRWM=64; VBR_max=78.6; VC=103@5.9A", "VIN=85; EN=VIN+0.3", {"margin": 0.9})
+        self.assertEqual(info["v_operating_max"], 63)          # from [specs] vin_V when not set
+        self.assertEqual(len(f["PROT-2"]), 1)
+        self.assertIn("103.0 V", f["PROT-2"][0]["actual"])
+        self.assertIn("76.5 V", f["PROT-2"][0]["claim"])
+        self.assertEqual(len(f["PROT-3"]), 1)                  # 76.5 / 63 = 1.21: no standard TVS fits
+
+    def test_good_sizing_passes(self):
+        f, _ = self.run_("VRWM=64; VBR_max=78.6; VC=103@5.9A", "VIN=120", {"margin": 0.9})
+        self.assertEqual(f["PROT-2"] + f["PROT-3"] + f["PROT-1"], [])
+
+    def test_standoff_below_operating_is_prot1(self):
+        f, _ = self.run_("VRWM=58; VBR_max=71; VC=93.6@6.4A", "VIN=120", {"v_operating_max": 63})
+        self.assertEqual(len(f["PROT-1"]), 1)
+
+    def test_surge_current_interpolates_and_missing_data_is_reported(self):
+        cd = self.P.clamp_data("VRWM=64; VBR_max=78.6; VC=103@5.9A; VC2=133.9@29.5A")
+        self.assertAlmostEqual(self.P.v_clamp(cd, 0.0), 78.6)
+        self.assertAlmostEqual(self.P.v_clamp(cd, 5.9), 103.0)
+        self.assertTrue(103.0 < self.P.v_clamp(cd, 10.0) < 133.9)
+        f, info = self.run_("VRWM=64; VBR_max=78.6; VC=103@5.9A", "", {"margin": 0.9})
+        self.assertEqual([x["ref"] for x in f["PROT-4"]], ["U1"])   # no Abs_Max_V: not checked, never a pass
+        self.assertEqual(f["PROT-2"], [])
 
 
 if __name__ == "__main__":

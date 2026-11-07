@@ -229,7 +229,8 @@ def sync(sch, board, prune=False, dry=False):
               open(spec, "w"))
     script = os.path.join(d, "sync.py")
     open(script, "w").write(SYNC)
-    r = subprocess.run([py, script, spec], capture_output=True, text=True)
+    with keep_project(board):
+        r = subprocess.run([py, script, spec], capture_output=True, text=True)
     m = re.search(r"REPORT(\{.*\})", r.stdout)
     if not m:
         raise SystemExit("pcbnew sync failed: " + (r.stderr or r.stdout)[-600:])
@@ -416,6 +417,23 @@ def write_stackup(board, copper_oz, thickness):
     open(board, "w").write(t)
 
 
+def keep_project(board):
+    """Context manager: KiCad's Python rewrites <board>.kicad_pro (net classes, patterns, rules) when it saves the
+    board; the project file is the owner's, so it is put back byte for byte afterwards."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def cm():
+        pro = os.path.splitext(board)[0] + ".kicad_pro"
+        saved = open(pro, "rb").read() if os.path.exists(pro) else None
+        try:
+            yield
+        finally:
+            if saved is not None:
+                open(pro, "wb").write(saved)
+    return cm()
+
+
 def _run(script, spec):
     py = kicad.find_python()
     if not py:
@@ -424,7 +442,8 @@ def _run(script, spec):
     sp, sc = os.path.join(d, "spec.json"), os.path.join(d, "run.py")
     json.dump(spec, open(sp, "w"))
     open(sc, "w").write(script)
-    r = subprocess.run([py, sc, sp], capture_output=True, text=True)
+    with keep_project(spec["board"]):
+        r = subprocess.run([py, sc, sp], capture_output=True, text=True)
     return r.stdout, r.stderr
 
 
@@ -587,8 +606,8 @@ def review_status(prj, board):
         probs.append("the board changed after the review: review again")
     m = re.search(r"^verdict:\s*(.+)$", t, re.M)
     v = (m.group(1).strip() if m else "OPEN").upper()
-    if not v.startswith("READY"):
-        probs.append(f"review verdict {v}")
+    if v != "READY":           # READY WITH FIXES needs the fixes and a fresh review before a gate
+        probs.append(f"review verdict {v}" + (": fix the findings and review again" if v.startswith("READY") else ""))
     return not probs, probs, os.path.relpath(f, prj.root)
 
 

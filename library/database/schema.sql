@@ -19,6 +19,8 @@
 --   Iso_Rating        set on parts that separate insulation domains (isolators, isolated DC-DC, Y-caps,
 --                     safety transformers), e.g. 'reinforced 5.7 kVrms (UL 1577)'; forge insulation cuts here
 --   Iso_Creepage_mm   package creepage across the barrier from the datasheet, e.g. '8.0'
+--   Abs_Max_V         absolute-maximum voltage per pin name from the datasheet, e.g. 'VIN=85; SW=85; FB=5.5'
+--   Clamp_V           surge clamps (TVS): 'VRWM=64; VBR_max=78.6; VC=103@5.9A' (forge protection)
 --   schema_version lives in table _meta (key, value); `mclib.py init` upgrades older databases in place
 
 CREATE TABLE IF NOT EXISTS _template (
@@ -55,6 +57,8 @@ CREATE TABLE IF NOT EXISTS _template (
     Verified_Pads    TEXT NOT NULL DEFAULT '',
     Iso_Rating       TEXT NOT NULL DEFAULT '',
     Iso_Creepage_mm  TEXT NOT NULL DEFAULT '',
+    Abs_Max_V        TEXT NOT NULL DEFAULT '',
+    Clamp_V          TEXT NOT NULL DEFAULT '',
     Lifecycle        TEXT NOT NULL DEFAULT '',
     Sourcing_Date    TEXT NOT NULL DEFAULT '',
     Alt_MPN          TEXT NOT NULL DEFAULT '',

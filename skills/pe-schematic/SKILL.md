@@ -48,12 +48,14 @@ lists each recommendation with its page, and a deviation carries a reason and th
    (the `.kicad_dru` enforces every `[[insulation.rule]]`). An INS-1 net gets an `HV_` name; an INS-2 path is a
    wiring error or an isolator missing its MC_Parts `Iso_Rating`. Never silence one with `allow_non_hv` without
    a reason in the comment.
-4. `forge schdraw lint <sheet>` (score and findings; advice on a user-drawn sheet, errors on an engine-drawn one),
+4. Surge protection: `forge protection` (0 PROT-1/2/3). Fill `Abs_Max_V` for every active part on a protected net
+   and `Clamp_V` for every TVS from their datasheets, and the system sizing in `[protection]`.
+5. `forge schdraw lint <sheet>` (score and findings; advice on a user-drawn sheet, errors on an engine-drawn one),
    then look at the rendered sheet (`kicad-cli sch export svg` → PNG): readability per the style guide.
-5. Reviews in parallel: `schematic-reviewer` (datasheet-backed), `power-reviewer` (power stages),
+6. Reviews in parallel: `schematic-reviewer` (datasheet-backed), `power-reviewer` (power stages),
    `pe-reviewer` (cold, against booklet and requirements); `pe-compliance` for insulation, protection, HV.
-6. `forge evidence sync` (copies every placed part's datasheet into `04_Hardware/Datasheets/`), then sync the BoM from the schematic (`$MC_LIB/tools/bom.py`) into the module BoM; propagate changes (Rule 4).
-7. Gate G6 for the module.
+7. `forge evidence sync` (copies every placed part's datasheet into `04_Hardware/Datasheets/`), then sync the BoM from the schematic (`$MC_LIB/tools/bom.py`) into the module BoM; propagate changes (Rule 4).
+8. Gate G6 for the module.
 
 ## Changing design files safely
 

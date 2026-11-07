@@ -56,6 +56,9 @@ INSULATION_EXAMPLE = """# Insulation checks (forge insulation; forge check runs 
 # barrier_creepage_mm = 10.0            # reinforced barrier on the board (INS-3)
 # islands = ["HV_DCP", "HV_DCN"]        # every HV net in exactly one (NET-4)
 # barriers = []                         # extra barrier parts by MPN, besides MC_Parts Iso_Rating
+# [protection]                          # surge clamps (forge protection): peak <= margin x abs max
+# v_operating_max = 63                  # default: [specs] vin_V maximum
+# margin = 0.9                          # e.g. the requirement's 90 % of the IC absolute maximum
 # [[insulation.rule]]                   # CLS-2: the .kicad_dru must flag copper closer than this
 # a = "HV"
 # b = "!HV"

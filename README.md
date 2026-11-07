@@ -190,6 +190,12 @@ Set both up in `project.toml` `[insulation]`; new projects get a commented examp
 G6 runs the schematic checks, and G7 and G8 also need the rules proof. A check that isn't set up says so: it never
 passes silently.
 
+`forge protection` sizes every surge clamp (TVS) against the system and the parts it protects. Its standoff must
+cover the maximum operating voltage, and its clamp voltage at the design surge current must stay within the
+margin of every protected pin's absolute maximum. The values come from the parts DB (`Clamp_V`, `Abs_Max_V`,
+copied from the datasheets) and project.toml `[protection]`. When no standard TVS can meet both limits, it says
+so. Gate G6 refuses a failing schematic.
+
 `forge check --fab --strict` answers "can I order this board today?": routing complete, schematic and board
 match, every placed part released with an alternate, the outputs still match the design by content hash, every
 Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8

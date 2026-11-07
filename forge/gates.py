@@ -143,6 +143,10 @@ def check(prj, gate, mod=None):
             bad = [f for f in r["findings"] if f["claim"].startswith(("no ", kind))]
             res.append((r["status"] != "fail", f"{kind} ({r['reason']}): {len(bad)} error(s)"
                         + "".join(f"; {f['location']}: {f['actual']}" for f in bad[:3])))
+        from . import protection          # surge clamps vs the system and every protected pin (PROT-1..3)
+        pr = protection.as_check(prj, {})
+        res.append((pr["status"] != "fail", f"protection ({pr['reason'] or pr['status']}): {pr['status']}"
+                    + "".join(f"; {f['claim']}: {f['actual']}" for f in pr["findings"][:2] if f["claim"].startswith("PROT-"))))
         from . import insulation          # INS-0/1/2, NET-4 at G6; the .kicad_dru proof (CLS-2) too at G7
         res += insulation.gate_items(prj, rules=gate == "G7")
         if gate == "G7":

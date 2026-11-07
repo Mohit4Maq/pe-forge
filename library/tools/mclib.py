@@ -75,7 +75,7 @@ def columns() -> list[str]:
     return re.findall(r"^\s+(\w+)\s+TEXT", body, re.M)
 
 
-SCHEMA_VERSION = 5      # 2: LCSC_PN, JLC_Rotation; 3: Sim_Model, Sim_Pins; 4: Verified_*; 5: Iso_Rating, Iso_Creepage_mm
+SCHEMA_VERSION = 6      # 2: LCSC_PN, JLC_Rotation; 3: Sim_Model, Sim_Pins; 4: Verified_*; 5: Iso_*; 6: Abs_Max_V, Clamp_V
 
 
 def init_db() -> None:

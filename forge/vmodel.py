@@ -295,9 +295,9 @@ def build(m):
 
 
 # ---------------------------------------------------------------- check
-def check(m, quiet=False):
-    err, warn = [], []
-    say = (lambda *a, **k: None) if quiet else print
+def problems(m):
+    """Error strings of the V-model check (no printing). Used by `forge check` and `check()`."""
+    err = []
     idx = doc_index()
     seen = set()
     for r in m.tr:
@@ -321,6 +321,12 @@ def check(m, quiet=False):
     for v in m.ver.values():
         if v['procedure'] not in idx:
             err.append('%s: procedure [[%s]] not found' % (v['id'], v['procedure']))
+    return err
+
+
+def check(m, quiet=False):
+    say = (lambda *a, **k: None) if quiet else print
+    err = problems(m)
     unc = [s for s in m.sys if not m.children[s]]
     new = [r['id'] for r in m.tr if 'NEW' in split(r['frs'])]
     say('SYS rows: %d · derived: %d · verification items: %d' % (len(m.sys), len(m.tr), len(m.ver)))

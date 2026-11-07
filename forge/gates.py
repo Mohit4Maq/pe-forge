@@ -126,12 +126,16 @@ def check(prj, gate, mod=None):
     if gate == "G5":
         base = os.path.join(prj.root, mod["dir"], "Simulations") if mod else prj.p("sim_results")
         res += sims_ok(glob.glob(os.path.join(base, "*.md")))
-    if gate in ("G6", "G7"):
-        ext = "*.kicad_sch" if gate == "G6" else "*.kicad_pcb"
-        roots = [f for f in glob.glob(os.path.join(prj.p("pcb"), "**", ext), recursive=True)
-                 if os.path.basename(f)[:-len(ext) + 1] == os.path.basename(os.path.dirname(f))]
-        for f in roots or glob.glob(os.path.join(prj.p("pcb"), "**", ext), recursive=True)[:1]:
-            res.append(kicad("erc" if gate == "G6" else "drc", f))
+    if gate in ("G6", "G7"):   # the same sub-check `forge check` runs, so the two never disagree
+        from . import check as fc
+        r = (fc.c_erc if gate == "G6" else fc.c_drc)(prj, {})
+        kind = "ERC" if gate == "G6" else "DRC"
+        if r["status"] == "skip":
+            res.append((False, f"{kind}: skipped ({r['reason']}): nothing to check yet is not a pass"))
+        else:
+            bad = [f for f in r["findings"] if f["claim"].startswith(("no ", kind))]
+            res.append((r["status"] != "fail", f"{kind} ({r['reason']}): {len(bad)} error(s)"
+                        + "".join(f"; {f['location']}: {f['actual']}" for f in bad[:3])))
     hits = consistency.scan(prj)
     res.append((not hits, f"consistency: {len(hits)} live mention(s) of superseded terms"))
     from .phases import GATE_REVIEWERS

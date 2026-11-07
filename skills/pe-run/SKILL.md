@@ -61,7 +61,9 @@ Add `pe-compliance` to any gate whose work touches insulation, protection, store
 5. Keep `Master_Plan.md` current in the same commit as the work (Rule 7).
 
 ## 5. Running a gate
-1. `forge gate check G<n> [--module M-xx]`. Fix every FAIL that is yours before calling reviewers.
+1. `forge check` (the whole project: ERC, DRC, consistency, V-model, BoM, drift, library checks; deterministic,
+   seconds) then `forge gate check G<n> [--module M-xx]`, which uses the same sub-checks. Fix every FAIL that is
+   yours before calling reviewers. A SKIP is not a pass: say why it was skipped.
 2. Write a chair self-check into the deliverable: Rule 1 anchors, stress vs rating, protection, open items.
 3. Spawn the gate reviewers **in parallel**, each cold: give the file list, the claims and the requirements, and
    the QC register path. Never trim the scope to steer the tier. Each reviewer writes its report to

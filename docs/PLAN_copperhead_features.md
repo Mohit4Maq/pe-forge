@@ -848,7 +848,7 @@ turns on every schematic task.
 | WP | Title | Branch | Status | Notes |
 |---|---|---|---|---|
 | WP1 | Shared KiCad CLI layer, JSON reports | `feat/wp01-kicad-json` | done | ERC JSON positions are 100 mm units in KiCad 10.0.6; old G6 regex missed KiCad 10 wording (now fixed) |
-| WP2 | `forge check`, pre-commit, CI | `feat/wp02-forge-check` | todo | |
+| WP2 | `forge check`, pre-commit, CI | `feat/wp02-forge-check` | done | empty sheet or board = skip ("no schematic yet"); gates G6/G7 call the same sub-checks and treat skip as not passed |
 | WP3 | Transactions with rollback | `feat/wp03-txn` | todo | |
 | WP4 | Structured drift | `feat/wp04-drift` | todo | |
 | WP5 | Obligations ledger hooks | `feat/wp05-ledger` | todo | |

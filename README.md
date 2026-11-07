@@ -125,7 +125,14 @@ forge new <dir> --answers intake.json      forge status
 forge module add NAME [--depends M-01]     forge gate check|pass G<n> [--module M-xx]
 forge vmodel build|check|impact|diff|cr|sync   forge link [--apply]   forge consistency
 forge schdraw check|apply|pins|new         forge bom check   forge doctor   forge kicad-setup [--apply]
+forge check [--json] [--strict] [--fab] [--only erc,drc,...]   forge hooks install [--chain] | --uninstall
 ```
+
+`forge check` is one deterministic command (no model, no network, seconds) over the whole project: ERC, DRC with
+schematic parity, superseded terms, V-model links, BoM completeness, drift and the library checks. Each part
+reports pass / warn / fail / skip; a skipped check says why and is never counted as passed. New projects get a
+git pre-commit hook that runs the fast subset, and a GitHub Actions workflow (`.github/workflows/forge-check.yml`)
+that installs KiCad 10 and uploads the JSON report.
 
 ## Status and limits
 

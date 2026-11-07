@@ -8,3 +8,5 @@ fp-info-cache
 .DS_Store
 __pycache__/
 06_Simulations/**/work/
+.forge/cache/
+.forge/runs/

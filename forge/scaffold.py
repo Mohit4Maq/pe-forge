@@ -10,7 +10,9 @@ intake.json (all optional except name / summary):
  "corners": {"vin_V": [36, 60], "f_sw_kHz": [100, 200], "ambient_C": [-20, 60], "load_pct": [10, 100]},
  "standards": ["IEC 62368-1", "CISPR 32 class B"], "volume": "1k/yr", "target_cost_usd": 40,
  "profile": "full", "schematic_mode": "ask", "reviews": "gate", "region": "IN",
- "distributors": ["mouser", "digikey", "lcsc"], "answers": {"question": "answer", ...}}
+ "distributors": ["mouser", "digikey", "lcsc"], "precommit_hook": true, "answers": {"question": "answer", ...}}
+precommit_hook (default true): install the `forge check` git pre-commit hook. The CI workflow
+.github/workflows/forge-check.yml is always copied (it does nothing until the project is pushed to GitHub).
 """
 import datetime as dt
 import json
@@ -149,5 +151,13 @@ def main(argv):
     state.save(prj, st)
     if not os.path.isdir(os.path.join(dst, ".git")):
         subprocess.run(["git", "init", "-q", "-b", "main", dst], check=False)
-    print(f"created {a['name']} at {dst}\n  KiCad project: 08_PCB/{slug}/\n  next: /pe-run (or `forge status`)")
+    if a.get("precommit_hook", True):
+        from . import check
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            check.hooks(prj, ["install"])
+    print(f"created {a['name']} at {dst}\n  KiCad project: 08_PCB/{slug}/"
+          + ("\n  git pre-commit hook: forge check (remove with `forge hooks --uninstall`)" if a.get("precommit_hook", True) else "")
+          + "\n  next: /pe-run (or `forge status`)")
     return 0

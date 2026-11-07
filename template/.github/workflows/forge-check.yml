@@ -1,0 +1,31 @@
+# pe-forge deterministic check on every push and pull request (no model calls, no secrets needed).
+# Installs KiCad 10 and pe-forge, runs `forge check --json`, uploads the report.
+name: forge-check
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install KiCad 10
+        run: |
+          sudo add-apt-repository -y ppa:kicad/kicad-10.0-releases
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends kicad
+      - name: Install pe-forge
+        # Pin a released tag or commit instead of the default branch for reproducible results.
+        run: git clone --depth 1 https://github.com/Mohit4Maq/pe-forge.git "$RUNNER_TEMP/pe-forge"
+      - name: forge check
+        run: |
+          export MC_LIB="${MC_LIB:-$RUNNER_TEMP/pe-forge/library}"
+          "$RUNNER_TEMP/pe-forge/bin/forge" check --json > forge-check.json || status=$?
+          python3 -c "import json; d = json.load(open('forge-check.json')); print({k: v['status'] for k, v in d['checks'].items()})"
+          exit ${status:-0}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: forge-check
+          path: forge-check.json

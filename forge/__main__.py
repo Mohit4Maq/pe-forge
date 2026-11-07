@@ -12,6 +12,10 @@
   forge meter [--json]              token budget GREEN / AMBER / RED
   forge schdraw check|apply|pins|new ...           agent schematic drawing
   forge bom check [file]            BoM completeness (alternates, price, stock)
+  forge check [--json] [--strict] [--fab] [--only a,b] [--module M-xx]
+                                    one deterministic check: ERC, DRC, consistency, V-model, BoM, drift,
+                                    library checks (no model, no network; CI and pre-commit safe)
+  forge hooks install [--chain] | --uninstall   git pre-commit hook running forge check (fast subset)
   forge doctor                      check the toolchain
   forge kicad-setup [--apply]       register the library, MC_LIB path and ODBC driver in KiCad 10
 
@@ -70,6 +74,12 @@ def main(argv):
     if cmd == "meter":
         from forge import meter
         return meter.main(prj, rest)
+    if cmd == "check":
+        from forge import check
+        return check.main(prj, rest)
+    if cmd == "hooks":
+        from forge import check
+        return check.hooks(prj, rest)
     if cmd == "bom":
         from forge import gates
         f = rest[1] if len(rest) > 1 else prj.p("bom_csv")

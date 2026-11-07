@@ -228,10 +228,11 @@ class KicadReports(unittest.TestCase):
             json.dump({"name": "Stub", "summary": "s", "owner": "T"}, open(ans, "w"))
             prj = os.path.join(tmp, "p")
             forge("new", prj, "--answers", ans)
+            shutil.copy(os.path.join(KFIX, "short_circuit.kicad_sch"), os.path.join(prj, "08_PCB/stub/stub.kicad_sch"))
             env = dict(ENV, KICAD_CLI=stub)
             r = subprocess.run(FORGE + ["gate", "check", "G6"], cwd=prj, capture_output=True, text=True, env=env)
             self.assertEqual(r.returncode, 1)
-            self.assertRegex(r.stdout, r"FAIL ERC \S+\.kicad_sch: kicad-cli produced no report")
+            self.assertRegex(r.stdout, r"FAIL ERC .*08_PCB/stub/stub\.kicad_sch: kicad-cli produced no report")
             old = os.environ.get("KICAD_CLI")
             os.environ["KICAD_CLI"] = stub
             try:
@@ -264,6 +265,107 @@ class KicadLive(unittest.TestCase):
         self.assertTrue(r.ok, r.lines())
         nets = fk.netlist(os.path.join(KFIX, "input_protection.kicad_sch"))
         self.assertTrue(nets and any("J1.1" in p for p in nets.values()))
+
+
+def new_project(name, tmp, **extra):
+    ans = os.path.join(tmp, name + ".json")
+    json.dump(dict({"name": name, "summary": "s", "owner": "T"}, **extra), open(ans, "w"))
+    d = os.path.join(tmp, name)
+    forge("new", d, "--answers", ans)
+    return d
+
+
+def git(d, *a):
+    return subprocess.run(["git", "-C", d, "-c", "user.name=T", "-c", "user.email=t@example.invalid", *a],
+                          capture_output=True, text=True, env=ENV)
+
+
+class ForgeCheck(unittest.TestCase):
+    """WP2: forge check, the pre-commit hook and the no-network contract."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-check-")
+        self.dir = new_project("Chk", self.tmp)
+        self.sheet = os.path.join(self.dir, "08_PCB/chk/chk.kicad_sch")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def check(self, *a):
+        return forge("check", *a, cwd=self.dir, check=False)
+
+    def test_fresh_project_passes_with_honest_skips(self):
+        r = self.check("--json")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        d = json.loads(r.stdout)
+        self.assertEqual(set(d), {"ok", "checks", "duration_s"})
+        self.assertEqual(d["checks"]["erc"]["status"], "skip")
+        self.assertIn("no schematic yet", d["checks"]["erc"]["reason"])
+        self.assertEqual(d["checks"]["drc"]["status"], "skip")
+        self.assertIn("no board yet", d["checks"]["drc"]["reason"])
+        for name, c in d["checks"].items():
+            self.assertIn(c["status"], ("pass", "warn", "fail", "skip"))
+            self.assertIsInstance(c["findings"], list)
+        txt = self.check().stdout
+        self.assertIn("SKIP erc: skipped (no schematic yet", txt)
+        self.assertNotIn("PASS erc", txt)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, ".forge/cache/check.json")))
+
+    def test_superseded_term_fails_with_file_and_line(self):
+        with open(os.path.join(self.dir, ".forge/superseded_terms.csv"), "a") as fh:
+            fh.write("LM5146,LM5148,2026-11-04,test\n")
+        open(os.path.join(self.dir, "04_Hardware/n.md"), "w").write("# n\nuse LM5146 here\n")
+        r = self.check("--only", "consistency")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("04_Hardware/n.md:2: 'LM5146' is superseded by 'LM5148'", r.stdout)
+
+    def test_no_network_or_model_imports(self):
+        code = ("import sys; sys.path.insert(0, %r)\n"
+                "import forge.check, forge.gates, forge.kicad, forge.vmodel, forge.consistency\n"
+                "for m in ('forge.drift', 'forge.fab'):\n"
+                "    try: __import__(m)\n"
+                "    except ImportError: pass\n"
+                "net = ('socket', 'ssl', 'http', 'urllib.request', 'requests', 'httpx', 'anthropic', 'openai', 'mcp')\n"
+                "bad = sorted(m for m in sys.modules if any(m == n or m.startswith(n + '.') for n in net))\n"
+                "print(','.join(bad))" % REPO)
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "")
+
+    def test_foreign_hook_not_overwritten(self):
+        hook = os.path.join(self.dir, ".git/hooks/pre-commit")
+        forge("hooks", "--uninstall", cwd=self.dir)
+        open(hook, "w").write("#!/bin/sh\necho mine\n")
+        self.assertEqual(forge("hooks", "install", cwd=self.dir, check=False).returncode, 1)
+        self.assertEqual(open(hook).read(), "#!/bin/sh\necho mine\n")
+        forge("hooks", "install", "--chain", cwd=self.dir)
+        self.assertIn("pe-forge-prev", open(hook).read())
+        forge("hooks", "--uninstall", cwd=self.dir)
+        self.assertEqual(open(hook).read(), "#!/bin/sh\necho mine\n")
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_short_fails_with_sheet_and_position(self):
+        shutil.copy(os.path.join(KFIX, "short_circuit.kicad_sch"), self.sheet)
+        r = self.check("--json")
+        self.assertEqual(r.returncode, 1)
+        d = json.loads(r.stdout)
+        self.assertLess(d["duration_s"], 60)
+        erc = d["checks"]["erc"]
+        self.assertEqual(erc["status"], "fail")
+        loc = erc["findings"][0]["location"]
+        self.assertRegex(loc, r"08_PCB/chk/chk\.kicad_sch sheet / @ \([\d.]+, [\d.]+\) mm")
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_precommit_hook_blocks_erc_error(self):
+        self.assertTrue(os.path.exists(os.path.join(self.dir, ".git/hooks/pre-commit")))   # installed by forge new
+        git(self.dir, "add", "-A")
+        r = git(self.dir, "commit", "-qm", "clean project")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        shutil.copy(os.path.join(KFIX, "short_circuit.kicad_sch"), self.sheet)
+        git(self.dir, "add", "-A")
+        r = git(self.dir, "commit", "-qm", "adds a short")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("FAIL erc", r.stdout + r.stderr)
 
 
 if __name__ == "__main__":

@@ -36,11 +36,13 @@ answered or that has an obvious default (state the default instead). Pick from t
 - Review rigour: **full** (independent review at every gate, tiers T1–T4, SVR on every simulation) · **lite**
   (one reviewer per gate, same automated checks; for small low-voltage boards).
 - Review cadence: at each gate (recommended) · after every design task.
+- Commit check: **install the `forge check` git pre-commit hook** (recommended: a commit with an ERC error, a
+  stale superseded term or a broken trace link is refused) · no hook. Answer key `precommit_hook`.
 
 ## 3. Create the project
 1. Write the answers to `<scratch>/intake.json` (schema in `forge new --help`: name, summary, owner, type,
    specs, corners, standards, volume, target_cost_usd, profile, schematic_mode, reviews, region, distributors,
-   answers{question: answer}). **Corners must hold both ends of every range** (input, output, load, f_sw,
+   precommit_hook, answers{question: answer}). **Corners must hold both ends of every range** (input, output, load, f_sw,
    ambient): every design is verified at both ends.
 2. `forge new <dir> --answers <scratch>/intake.json`.
 3. Fill `01_Program/Master_Plan.md` §1 and open the first items: E-01 market survey, E-02 literature, E-03

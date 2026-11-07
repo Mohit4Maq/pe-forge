@@ -117,6 +117,10 @@ placement, hot loop, SW node area, BOOT / FB placement, thermal pad and vias, gr
   brief / layout spec, each citing the datasheet revision, page and section.
 - Every review checks the design against those rules, one by one.
 - A deviation needs a stated reason and the owner's OK, recorded next to the rule; never a silent one.
+- **The datasheet is final.** Where a part's datasheet (land pattern, pin spacing, layout example, application
+  values) conflicts with a generic project rule (spacing table, net-class clearance, house style), the datasheet
+  wins for that part. Encode it as a rule scoped to that part (e.g. a `.kicad_dru` rule on
+  `memberOfFootprint('U1')`) and note it next to the generic rule, citing the datasheet page.
 
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |

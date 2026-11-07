@@ -4,6 +4,8 @@
 Colour: truecolor when $COLORTERM is truecolor / 24bit, else 256 colours; none with $NO_COLOR or [ui] color = false.
 Accent: MaqLabs red #d52b3d unless [ui] accent = "#RRGGBB" (project.toml, or ~/.config/pe-forge/ui.toml).
 Glyphs: [ui] glyphs = "ascii" swaps every symbol for plain ASCII.
+Marker: the bar starts with the MaqLabs mark "maq" (bold italic, accent colour); [ui] mark = "<text>" changes it,
+mark = "" removes it. The banner (`forge status --banner`) shows the MaqLabs wordmark; [ui] logo = false hides it.
 """
 import os
 import re
@@ -21,6 +23,16 @@ GLYPHS = {"mark": "◆", "hook": "▸", "ok": "✓", "fail": "✗", "active": "�
           "warn": "⚠", "dirty": "●", "sep": " · "}
 ASCII = {"mark": "*", "hook": ">", "ok": "ok", "fail": "x", "active": ">", "review": "?", "todo": ".", "skip": "-",
          "warn": "!", "dirty": "*", "sep": " | "}
+LOGO = [   # the MaqLabs wordmark ("maq Labs"), traced from the logo artwork into quadrant blocks (64 x 7)
+    "                                                 ▟█",
+    " ▄▄▄▄▄▄▄▄▄▖  ▗▄▄▄▄▄▖ ▗▄▄▄▄▄▄    ▗▄▖      ▗▄▄▄▄▄▄ ██ ▄▄▄   ▄▄▄▄▄▄",
+    " █▛  ██  ██ ▟█▘  ▐█▌▗█▌  ▗██    ██▘     ▗█▌  ▗█▛▗█▌   █▙ ██   ▝▀",
+    "▐█▌ ▐█▛  ██ █▛   ▟█▘▟█   ▐█▌   ▗██      ▟█   ▐█▌▐█▌  ▗█▌▐█▙▄▄▄▄▄",
+    "▐█  ▐█▌ ▐█▛▗█▌   ██ ██   ██▌   ▐█▌      ██   ▟█▘██   ▐█▌     ▐█▀",
+    "▀▀  ▀▀  ▝▀▘▝▀▀▀▘ ▀▀▝▀▀▀▀ ██    ▝▀▀▀▀▀▀▀▝▀▀▀▀ ▀▀ ▀▀▀▀▀▀▀ ▀▀▀▀▀▀▘",
+    "                        ▐█▛",
+]
+ASCII_LOGO = ["maq Labs"]
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -45,17 +57,19 @@ class Theme:
         self.truecolor = os.environ.get("COLORTERM", "").lower() in ("truecolor", "24bit")
         self.ascii = c.get("glyphs") == "ascii"
         self.accent = c.get("accent") if re.fullmatch(r"#[0-9a-fA-F]{6}", str(c.get("accent", ""))) else None
+        self.mark = str(c.get("mark", "maq"))
+        self.logo = c.get("logo", True) is not False
 
     def g(self, name):
         return (ASCII if self.ascii else GLYPHS)[name]
 
-    def paint(self, style, text, bold=False):
+    def paint(self, style, text, bold=False, italic=False):
         if not self.color or not text:
             return text
         hexv, c256 = PALETTE.get(style, (None, None))
         if style == "accent" and self.accent:
             hexv, c256 = self.accent, PALETTE["accent"][1]
-        codes = ["1"] if bold or style == "bright" else []
+        codes = (["1"] if bold or style == "bright" else []) + (["3"] if italic else [])
         if hexv:
             if self.truecolor:
                 r, gr, b = (int(hexv[i:i + 2], 16) for i in (1, 3, 5))
@@ -63,6 +77,22 @@ class Theme:
             else:
                 codes.append(f"38;5;{c256}")
         return f"\x1b[{';'.join(codes)}m{text}\x1b[0m" if codes else text
+
+
+def brand(theme):
+    """The bar's first segment prefix: the mark (bold italic accent) and an arrow, or '' when mark is empty."""
+    if not theme.mark:
+        return ""
+    return theme.paint("accent", theme.mark, bold=True, italic=True) + " " + theme.paint("accent", theme.g("hook")) + " "
+
+
+def banner(theme):
+    """The MaqLabs wordmark in the accent colour, then the tool name (ASCII: plain text)."""
+    rows = []
+    if theme.logo:
+        rows = [theme.paint("accent", r, bold=True) for r in (ASCII_LOGO if theme.ascii else LOGO)]
+    sep = "-" if theme.ascii else "·"
+    return rows + [theme.paint("dim", f"pe-forge  {sep}  power-electronics design, idea to manufacturing files")]
 
 
 def visible_len(s):

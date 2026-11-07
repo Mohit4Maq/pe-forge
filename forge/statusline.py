@@ -74,7 +74,7 @@ def segments(root, data, T, cfg):
     tools = os.path.join(root, prj.paths["tools_data"])
     st = state.load(prj)
     scope, pid, nxt = state.next_action(st)
-    S = [(1, T.paint("accent", f"{T.g('mark')} {prj.name}", bold=True))]
+    S = [(1, ui.brand(T) + T.paint("bright", prj.name))]
     mod = None if scope == "system" else state.module(st, scope)
     if pid in SHORT:
         S.append((2, T.paint("bright", f"{pid} {SHORT[pid]}")))

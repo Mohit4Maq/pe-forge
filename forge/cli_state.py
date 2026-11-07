@@ -9,9 +9,6 @@ def _opt(rest, name):
     return rest[rest.index(name) + 1] if name in rest else None
 
 
-MARK = ["█▀▀ █▀▀ ▄▄ █▀▀ █▀█ █▀█ █▀▀ █▀▀", "█▀▀ ██▄    █▀  █▄█ █▀▄ █▄█ ██▄", "▀              pe-forge"]
-
-
 def _theme():
     from . import ui
     return ui.Theme(color=ui.tty())
@@ -21,8 +18,10 @@ def status(prj, rest=()):
     st = S.load(prj)
     T = _theme()
     if "--banner" in rest:
-        for row in MARK:
-            print(T.paint("accent", row, bold=True))
+        from . import ui
+        cfg = prj.cfg.get("ui", {})
+        for row in ui.banner(ui.Theme(cfg, color=T.color)):
+            print(row)
     STY = {"passed": "ok", "active": "accent", "in-review": "warn"}
     paint_line = lambda s, line: T.paint(STY[s], line) if s in STY else line
     print(f"{prj.name}  ·  profile {prj.process.get('profile', 'full')}  ·  schematic mode "

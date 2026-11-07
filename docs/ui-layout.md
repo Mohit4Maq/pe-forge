@@ -26,7 +26,7 @@ has a top-level `bin/`**. pe-forge has one. Decide before publishing whether tha
 ## 2. The bar (line 1)
 
 ```
-◆ Buck48to12 · P6 Schematic · M-02 Power stage · G6 ? review · ⚠ 2 open: erc, drift · txn: swap Q3 · CR-007 · check ✓ 14:02 · meter AMBER · ctx 41% · Opus · feat/wp03 ●
+maq ▸ Buck48to12 · P6 Schematic · M-02 Power stage · G6 ? review · ⚠ 2 open: erc, drift · txn: swap Q3 · CR-007 · check ✓ 14:02 · meter AMBER · ctx 41% · Opus · feat/wp03 ●
 ```
 
 Segments, highest priority first. When the line is wider than the width, whole segments are dropped from the
@@ -34,7 +34,7 @@ bottom of this table (never cut in half). Missing source files drop their segmen
 
 | # | Segment | Example | Source | Colour |
 |---|---|---|---|---|
-| 1 | mark + project | `◆ Buck48to12` | `project.toml` name | accent, bold |
+| 1 | mark + project | `maq ▸ Buck48to12` | `[ui] mark` (default `maq`, the MaqLabs mark) + `project.toml` name | mark accent bold italic, name bright |
 | 2 | phase | `P6 Schematic` | `state.json` phase + short title from `phases.py` | bright |
 | 3 | module | `M-02 Power stage` | `state.json` active_module (name cut to 18 chars) | bright |
 | 4 | gate | `G6 ? review` / `G6 ✓` / `G6 open` | phase / module status (`cli_state.ICON` words) | ok when passed, warn when in review, dim otherwise |

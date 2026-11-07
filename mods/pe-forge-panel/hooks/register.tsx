@@ -195,8 +195,9 @@ export const register: Register = on => {
         </Box>
         <Box flexDirection="row" gap={1}>
           {tabs.map(([id, key, label]) => (
-            <Button key={`tab-${id}`} hotkey={key} label={id === t ? `[${label}]` : ` ${label} `}
-              onPress={() => void update($, tab, () => id)} />
+            <Button key={`tab-${id}`} hotkey={key} label={label} onPress={() => void update($, tab, () => id)}>
+              <Text color={id === t ? RED : undefined} bold={id === t} dimColor={id !== t}>{key} {label}</Text>
+            </Button>
           ))}
         </Box>
         {working ? <Text color={AMBER}>{working}</Text> : null}
@@ -251,9 +252,8 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
   const btn = (id: string) => {
     const [, color] = stageMark(nodes[id], current)
     return (
-      <Button key={`v-${id}`} label={id === chosen ? `[${label(id)}]` : label(id)}
-        onPress={() => void update($, stage, () => id)}>
-        <Text color={color} bold={id === current || id === chosen}>{id === chosen ? `[${label(id)}]` : label(id)}</Text>
+      <Button key={`v-${id}`} label={nodes[id].title} onPress={() => void update($, stage, () => id)}>
+        <Text color={color} bold={id === current || id === chosen} underline={id === chosen}>{label(id)}</Text>
       </Button>
     )
   }
@@ -261,9 +261,9 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
   return (
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="column">
-        <Text dimColor>{pad('  definition', V_W - 14)}verification</Text>
+        <Text dimColor>{pad('definition', V_W - 14)}verification</Text>
         {V_ROWS.map(([l, r], i) => {
-          const fill = Math.max(2, V_W - i * 4 - label(l).length - label(r).length - 4)
+          const fill = Math.max(2, V_W - i * 4 - (label(l).length + 4) - (label(r).length + 4) - 2)
           return (
             <Box key={`vr${i}`} flexDirection="row" marginLeft={i * 2}>
               {btn(l)}
@@ -273,7 +273,8 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
             </Box>
           )
         })}
-        <Text dimColor>{'  '}✓ done  ▶ now  ⚠ needs attention  · started  ○ not started   ·   {v.phase}: {v.next}</Text>
+        <Text dimColor>✓ done  ▶ now  ⚠ attention  · started  ○ not started</Text>
+        <Text dimColor>{v.phase}: {v.next}</Text>
       </Box>
       <Box flexDirection="column">
         <Text bold color={RED}>{s.title} <Text dimColor>· {s.level} {s.side === 'left' ? 'definition' : s.side === 'right' ? 'verification' : 'build / unit'} · {s.phases.join(', ')} · {s.id === current ? 'working here now' : s.status}</Text></Text>
@@ -284,12 +285,11 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
         {s.docs.length ? <Text dimColor>Docs: {s.docs.slice(0, 4).join(' · ')}</Text> : null}
       </Box>
       <Box flexDirection="row" gap={1}>
-        <Button label={`Ask Claude about ${s.title}`} hotkey="a"
-          onPress={() => void $.prompt.fill({ text: s.ask, mode: 'replace' })} />
-        <Button label="Ask now" hotkey="n" onPress={() => void $.prompt.submit({ text: s.ask })} />
-        {pair ? <Button label={`Go to ${pair.title}`} hotkey="p" onPress={() => void update($, stage, () => pair.id)} /> : null}
-        {s.docs.length ? <Button label="Open doc" hotkey="o" onPress={() => void openPath($, `${d.root}/${s.docs[0]}`)} /> : null}
-        <Button label="Back to now" hotkey="b" onPress={() => void update($, stage, () => current)} />
+        <Button label="a Ask Claude" hotkey="a" onPress={() => void $.prompt.fill({ text: s.ask, mode: 'replace' })} />
+        <Button label="n Ask now" hotkey="n" onPress={() => void $.prompt.submit({ text: s.ask })} />
+        {pair ? <Button label={`p ↔ ${pair.title.split(':')[0]}`} hotkey="p" onPress={() => void update($, stage, () => pair.id)} /> : null}
+        {s.docs.length ? <Button label="o Open doc" hotkey="o" onPress={() => void openPath($, `${d.root}/${s.docs[0]}`)} /> : null}
+        <Button label="b Now" hotkey="b" onPress={() => void update($, stage, () => current)} />
       </Box>
     </Box>
   )
@@ -337,9 +337,9 @@ async function simsTab($: any, d: PanelData, Box: any, Text: any, Button: any, S
         </Box>
       ) : null}
       <Box flexDirection="row" gap={1}>
-        {r.record ? <Button label="Open record" hotkey="o" onPress={() => void openPath($, `${d.root}/${r.record}`)} /> : null}
-        <Button label="Full report ↗" hotkey="r" onPress={() => void run($, 'Writing the report', ['report', '--open'])} />
-        <Button label="Refresh" hotkey="u" onPress={() => void refresh($)} />
+        {r.record ? <Button label="o Open record" hotkey="o" onPress={() => void openPath($, `${d.root}/${r.record}`)} /> : null}
+        <Button label="r Full report ↗" hotkey="r" onPress={() => void run($, 'Writing the report', ['report', '--open'])} />
+        <Button label="u Refresh" hotkey="u" onPress={() => void refresh($)} />
       </Box>
     </Box>
   )
@@ -425,8 +425,8 @@ function checksTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
       ) : null}
       {d.txn ? <Text color={AMBER}>Transaction open: {d.txn.what}</Text> : null}
       <Box flexDirection="row" gap={1}>
-        <Button label="Run forge check" hotkey="c" onPress={() => void run($, 'Running forge check', ['check'], 'checks')} />
-        <Button label="Full report ↗" hotkey="r" onPress={() => void run($, 'Writing the report', ['report', '--open'])} />
+        <Button label="c Run forge check" hotkey="c" onPress={() => void run($, 'Running forge check', ['check'], 'checks')} />
+        <Button label="r Full report ↗" hotkey="r" onPress={() => void run($, 'Writing the report', ['report', '--open'])} />
       </Box>
     </Box>
   )
@@ -459,7 +459,7 @@ function gatesTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
       ) : null}
       <Text>Next: {d.next}</Text>
       {gate ? (
-        <Button label={`Check ${gate}${args.includes('--module') ? ` (${d.scope})` : ''}`} hotkey="g"
+        <Button label={`g Check ${gate}${args.includes('--module') ? ` (${d.scope})` : ''}`} hotkey="g"
           onPress={() => void run($, `Checking ${gate}`, args, 'gates')} />
       ) : null}
     </Box>
@@ -487,8 +487,8 @@ function partsTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
         <Text dimColor>No work list yet.</Text>
       )}
       <Box flexDirection="row" gap={1}>
-        <Button label="Refresh work list" hotkey="t" onPress={() => void run($, 'Reading the board', ['evidence', 'todo', '--json'], 'parts')} />
-        <Button label="Copy datasheets into project" hotkey="s" onPress={() => void run($, 'Copying datasheets', ['evidence', 'sync'], 'parts')} />
+        <Button label="t Refresh work list" hotkey="t" onPress={() => void run($, 'Reading the board', ['evidence', 'todo', '--json'], 'parts')} />
+        <Button label="s Copy datasheets" hotkey="s" onPress={() => void run($, 'Copying datasheets', ['evidence', 'sync'], 'parts')} />
       </Box>
     </Box>
   )

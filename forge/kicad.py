@@ -168,11 +168,14 @@ def _has_project(path):
 
 
 def _out(path, out, suffix):
+    """The report / export file: `out` if given, else a unique temp file (two runs never share one)."""
     if out:
         return out
     d = os.path.join(tempfile.gettempdir(), "pe-forge-kicad")
     os.makedirs(d, exist_ok=True)
-    return os.path.join(d, os.path.basename(path) + suffix)
+    fd, p = tempfile.mkstemp(prefix=os.path.basename(path) + ".", suffix=suffix, dir=d)
+    os.close(fd)
+    return p
 
 
 def erc(sch, severity=("error",), out=None):
@@ -226,13 +229,17 @@ def netlist(sch, out=None):
     cli = find_cli()
     if not cli:
         return None
+    mine = out is None
     out = out or _out(sch, None, ".net")
     if os.path.exists(out):
         os.remove(out)
     subprocess.run([cli, "sch", "export", "netlist", "--format", "kicadsexpr", "-o", out, sch], capture_output=True)
     if not os.path.exists(out):
         return None
-    return parse_netlist(open(out).read())
+    text = open(out).read()
+    if mine:
+        os.remove(out)
+    return parse_netlist(text)
 
 
 # ------------------------------------------------------------------ components + nets in one export
@@ -303,10 +310,14 @@ def design(sch, out=None):
     cli = find_cli()
     if not cli:
         return None
+    mine = out is None
     out = out or _out(sch, None, ".design.net")
     if os.path.exists(out):
         os.remove(out)
     subprocess.run([cli, "sch", "export", "netlist", "--format", "kicadsexpr", "-o", out, sch], capture_output=True)
     if not os.path.exists(out):
         return None
-    return parse_design(open(out).read())
+    text = open(out).read()
+    if mine:
+        os.remove(out)
+    return parse_design(text)

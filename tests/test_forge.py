@@ -1132,6 +1132,47 @@ class SpiceAssert(unittest.TestCase):
         self.assertIn("result NOT RUN", msg)
 
     @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
+    def test_sub_sheet_edit_makes_the_record_stale(self):
+        for f in ("root.kicad_sch", "sub.kicad_sch"):
+            shutil.copy(os.path.join(KFIX, "hier", f), os.path.join(self.dir, "08_PCB/spc", f))
+        open(os.path.join(self.mod, "Sheet_Brief.md"), "w").write(
+            "---\nmodule: M-01\nkicad_sheet: 08_PCB/spc/root.kicad_sch\n---\n# b\n\n## Simulation\n"
+            "scope: sub/V+, sub/V-, GND\nignore: D1\nsource: sub/V+ = 12\nassert: V(sub/V-) between 5.9 and 6.1\n"
+            "expect: 6\n")
+        d = json.loads(self.spice().stdout)
+        self.assertEqual(d["results"][0]["status"], "pass", d["results"][0]["detail"])
+        from forge import config, gates
+        prj = config.Project(self.dir)
+        rec = os.path.join(self.mod, "Simulations/Sheet_Brief_spice.md")
+        self.assertTrue(gates.sims_ok([rec], prj)[0][0])
+        sub = os.path.join(self.dir, "08_PCB/spc/sub.kicad_sch")
+        t = open(sub).read()
+        head, tail = t.rsplit('(property "Value" "1"', 1)
+        open(sub, "w").write(head + '(property "Value" "3"' + tail)
+        ok, msg = gates.sims_ok([rec], prj)[0]
+        self.assertFalse(ok)
+        self.assertIn("stale", msg)
+
+    @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
+    def test_part_excluded_from_simulation_stops_the_block(self):
+        shutil.copy(os.path.join(KFIX, "excl.kicad_sch"), self.sheet)          # the load R2 is excluded from sim
+        open(os.path.join(self.mod, "Sheet_Brief.md"), "w").write(
+            "---\nmodule: M-01\nkicad_sheet: 08_PCB/spc/spc.kicad_sch\n---\n# b\n\n## Simulation\n"
+            "scope: V+, V-, GND\nignore: D1\nsource: V+ = 12\nassert: V(V-) between 5.9 and 6.1\nexpect: 6\n")
+        d = json.loads(self.spice().stdout)
+        self.assertIn("not in KiCad's SPICE export", d["results"][0]["detail"])
+        self.assertEqual(d["results"][0]["status"], "fail")
+
+    @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
+    def test_parse_failure_is_a_rejected_row_and_closes_g5(self):
+        self.brief(assertion="V(VSENSE) betwen 5.9 and 6.1")
+        self.spice()
+        rec = os.path.join(self.mod, "Simulations/Sheet_Brief_spice.md")
+        self.assertIn("| REJECTED | does not parse", open(rec).read())
+        from forge import config, gates
+        self.assertFalse(gates.sims_ok([rec], config.Project(self.dir))[0][0])
+
+    @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
     def test_stale_record_keeps_g5_closed(self):
         self.brief()
         self.assertEqual(self.spice().returncode, 0)
@@ -1463,11 +1504,20 @@ class SpiceMeasures(unittest.TestCase):
 
     def test_band_pass_corners_from_the_peak(self):
         # series C (high-pass, 100 Hz) then R-C low-pass (10 kHz), buffered by distance: corners near both
+        bp = "C1 /VIN /A 1.59155u\nR1 /A GND 1k\nR2 /A /OUT 100k\nC2 /OUT GND 159.155p"
         r = self.run_("scope: VIN, A, OUT, GND\nanalysis: ac 1 1e7\nsource: VIN = 0 ac 1\n"
-                      "assert: f3db_low(OUT) between 80 and 125\nassert: f3db(OUT) between 8k and 12.5k",
-                      "C1 /VIN /A 1.59155u\nR1 /A GND 1k\nR2 /A /OUT 100k\nC2 /OUT GND 159.155p")
+                      "assert: f3db_low(OUT, peak) between 80 and 125\nassert: f3db(OUT, peak) between 8k and 12.5k", bp)
         self.assertEqual([x["status"] for x in r], ["provisional", "provisional"], [x["detail"] for x in r])
         self.assertIn("no closed-form", r[0]["detail"])           # no expect: PROVISIONAL, never ACCEPTED
+        r = self.run_("scope: VIN, A, OUT, GND\nanalysis: ac 1 1e7\nsource: VIN = 0 ac 1\nassert: f3db(OUT) < 1e9", bp)
+        self.assertIn("use f3db(OUT, peak)", r[0]["detail"])      # a band-pass needs the explicit peak reference
+
+    def test_peaking_low_pass_uses_the_conventional_reference(self):
+        # series R-L-C, out across C: f0 1591.5 Hz, Q 2; |H| = 1/sqrt(2) of DC at x^2 = 2.2038 -> 2362.6 Hz
+        r = self.run_("scope: VIN, A, OUT, GND\nanalysis: ac 10 1e6\nsource: VIN = 0 ac 1\n"
+                      "assert: f3db(OUT) between 2300 and 2420\nexpect: 2362.6 ± 1%",
+                      "R1 /VIN /A 50\nL1 /A /OUT 10m\nC1 /OUT GND 1u")
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
 
     def test_settle_and_half_time_step(self):
         blk = "scope: VIN, OUT, GND\nanalysis: tran 1u {stop}\nsource: VIN = 0 pulse(0 1 0 1n 1n 1 2)\n" \
@@ -1478,6 +1528,62 @@ class SpiceMeasures(unittest.TestCase):
         self.assertIn("half time step", r[0]["detail"])
         r = self.run_(blk.format(stop="2m").replace("between 3.5m 4.3m", "between 3.5m and 4.3m"), rc)
         self.assertIn("has not settled by the end of the run", r[0]["detail"])
+
+    def test_three_tau_window_is_not_settled(self):
+        r = self.run_("scope: VIN, OUT, GND\nanalysis: tran 1u 300u\nsource: VIN = 0 pulse(0 1 0 1n 1n 1 2)\n"
+                      "assert: settle(OUT, 2%) < 1m\nexpect: 391.2u", "R1 /VIN /OUT 100\nC1 /OUT GND 1u")   # tau 100 us
+        self.assertIn("has not settled", r[0]["detail"])
+
+    def test_model_from_mc_parts_fields(self):
+        from forge import spice
+        blk = spice.parse_block("## Simulation\nscope: VIN, A, GND\nsource: VIN = 5\n"
+                                "assert: V(A) between 0.6 and 0.8\nexpect: 0.6925 ± 1%")
+        cir, comps = circuit("R1 /VIN /A 1k\nD1 __D1 GND /A")     # D1 pin 1 = K on GND, pin 2 = A
+        comps["D1"]["fields"] = {"Sim_Model": "D DX | .model DX D(Is=1e-14 N=1)", "Sim_Pins": "2 1"}
+        with tempfile.TemporaryDirectory() as wd:
+            r, deck, _ = spice.run_block(blk, cir, comps, NG, wd)
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
+        self.assertIn("D1 n_A 0 DX", deck)
+
+    def test_nc_pin_and_inline_subckt_and_ic(self):
+        from forge import spice
+        blk = spice.parse_block("## Simulation\nscope: VIN, A, GND\nsource: VIN = 5\nassert: V(A) between 0.6 and 0.8\n"
+                                "expect: 0.6925 ± 1%")
+        cir, comps = circuit("R1 /VIN /A 1k\nU1 __U1 /A GND unconnected-(U1-NC-Pad3)")
+        comps["U1"]["fields"] = {"Sim_Model": "D DX | .model DX D(Is=1e-14 N=1)", "Sim_Pins": "1 2"}
+        with tempfile.TemporaryDirectory() as wd:
+            r, deck, _ = spice.run_block(blk, cir, comps, NG, wd)
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])            # the NC pin does not stop the block
+        blk = spice.parse_block("## Simulation\nscope: VIN, OUT, GND\nanalysis: tran 1u 1m\nsource: VIN = 0\n"
+                                "assert: V(OUT) between 0.3 and 0.45 at 1m\nexpect: 0.3679")
+        cir, comps = circuit("XU1 /VIN /OUT RCX\n.ic v(/OUT)=1\n.subckt RCX a b\nR1 a b 1k\n.ends\nC1 /OUT GND 1u")
+        comps["U1"] = comps.pop("XU1")
+        with tempfile.TemporaryDirectory() as wd:
+            r, deck, _ = spice.run_block(blk, cir, comps, NG, wd)
+        self.assertIn(".ic v(n_OUT)=1", deck)                               # renamed like every other node
+        self.assertIn(".ends", deck)
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])            # 1 V decaying through 1 ms tau: e^-1
+
+    def test_sources_unique_drawn_source_and_probing_a_source(self):
+        r = self.run_("scope: +15V, -15V, MID, GND\nsource: +15V = 15\nsource: -15V = -15\n"
+                      "assert: V(MID) between -0.01 and 0.01\nexpect: 0 ± 0.001",
+                      "R1 /+15V /MID 1k\nR2 /MID /-15V 1k\nR3 /MID GND 1meg")
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
+        r = self.run_("scope: VIN, OUT, GND\nsource: VIN = 5\nassert: V(VIN) between 4.9 and 5.1\nexpect: 5", self.RC)
+        self.assertIn("reads a net a source drives", r[0]["detail"])
+        r = self.run_("scope: VIN, OUT, GND\nsource: VIN = 5\nassert: V(OUT) < 9\nexpect: 5",
+                      self.RC + "\nV1 /VIN GND 5")
+        self.assertIn("the sheet draws a source", r[0]["detail"])
+
+    def test_log_patterns_and_units(self):
+        from forge import spice
+        for msg in ("Error on line 8", "ERROR: unknown subckt", "doAnalyses: TRAN:  Timestep too small",
+                    "run simulation(s) aborted", "Warning: singular matrix:  check node n_x",
+                    "Model issue on line 4 : unrecognized parameter (bf2) - ignored"):
+            self.assertTrue(spice.LOG_BAD.search(msg), msg)
+        self.assertEqual(spice.num("1Mhz"), 1e6)
+        self.assertIn("dc 0.1", spice.source_line("V_S1_X", "n_X", "100 mV"))
+        self.assertIn("sin(0.0 1.0 1000000.0)", spice.source_line("V_S1_X", "n_X", "0 sin(0 1 1Mhz)"))
 
     def test_grammar(self):
         from forge import spice

@@ -101,9 +101,11 @@ def sims_ok(paths, prj=None):
         if prj is not None:                  # forge spice records: also refuse NOT RUN and stale ones
             from .spice import record_problem
             problem = record_problem(prj, p)
+        prov = re.search(r"^result: PROVISIONAL", t, re.M)
         out.append((bool(has_svr) and not rejected and not problem,
                     f"{os.path.basename(p)}: SVR {'present' if has_svr else 'MISSING'}"
-                    + (", contains a REJECTED result" if rejected else "") + (f", {problem}" if problem else "")))
+                    + (", contains a REJECTED result" if rejected else "") + (f", {problem}" if problem else "")
+                    + (", PROVISIONAL: its bench tests must be in the test plan" if prov and not problem else "")))
     return out or [(False, "no simulation result documents")]
 
 

@@ -115,6 +115,10 @@ written down.
 6. Schematic discipline (above). 7. One master plan. 8. Big decisions go to the council. 9. V-model traceability
    and standards checks for every requirement. 10. Never without you: spending, orders, messages, git push.
 
+Design edits that span several files run as transactions (`forge txn begin / verify / commit / rollback`): a
+rollback restores the tree byte for byte, including your own uncommitted work from before the transaction, and
+keeps the failed attempt as a named `git stash` entry. `forge schdraw apply` always runs inside one.
+
 Profiles: `full` (all of the above) or `lite` (one reviewer per gate, same automated checks) for small
 low-voltage boards.
 

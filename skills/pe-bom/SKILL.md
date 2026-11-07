@@ -25,3 +25,8 @@ description: Phase P4 of a pe-forge project - size every component from the chos
 6. **Library**: every chosen part exists in MC_Lib with a verified symbol and footprint (`part-librarian`);
    this is checked again in P6 before drawing.
 7. Gate G4 with `pe-reviewer` and `pe-reliability` (derating, lifetime at the 60 °C or project ambient).
+
+## Changing design files safely
+
+Wrap every change that touches more than one design file in `forge txn begin "<what>"` / `forge txn verify` /
+`forge txn commit` (or `close`), and use `forge txn rollback` instead of reverting by hand (see `pe-run` §4).

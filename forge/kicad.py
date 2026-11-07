@@ -14,8 +14,8 @@ KiCad 10 JSON quirks (read from captured reports in tests/fixtures/kicad/, not g
   - ERC nests violations per sheet (sheets[].violations) and gives item positions in units of 100 mm
     (a pin at 55.88 mm is reported as 0.5588); DRC gives positions in mm. Report items are always in mm.
   - DRC has top-level violations, unconnected_items and schematic_parity.
-  - Without a .kicad_pro next to the file, title-block text variables are unresolved: ERC/DRC report
-    `unresolved_variable`. Those are dropped for a bare file (no project), kept inside a project.
+  - Without <same stem>.kicad_pro next to the file, title-block text variables are unresolved: ERC/DRC report
+    `unresolved_variable`. Those are dropped for a file checked on its own, kept for a project's top file.
 
 Other copies of the search order (documented fallbacks, used only when this module cannot be imported because the
 library lives outside the pe-forge repo): library/tools/kicad_paths.py.
@@ -162,8 +162,9 @@ def _run(args, out, source, path, severity, has_project):
 
 
 def _has_project(path):
-    d = os.path.dirname(os.path.abspath(path))
-    return any(f.endswith(".kicad_pro") for f in os.listdir(d))
+    """kicad-cli resolves text variables only from <same stem>.kicad_pro: a sheet checked on its own without one
+    reports every title-block variable as unresolved, which says nothing about the sheet."""
+    return os.path.exists(os.path.splitext(os.path.abspath(path))[0] + ".kicad_pro")
 
 
 def _out(path, out, suffix):

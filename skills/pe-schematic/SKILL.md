@@ -44,3 +44,11 @@ apply`. The owner reviews the rendered PNG and the sheet in KiCad; their edits a
    `pe-reviewer` (cold, against booklet and requirements); `pe-compliance` for insulation, protection, HV.
 5. Sync the BoM from the schematic (`$MC_LIB/tools/bom.py`) into the module BoM; propagate changes (Rule 4).
 6. Gate G6 for the module.
+
+## Changing design files safely
+
+Wrap every change that touches more than one design file in `forge txn begin "<what>"` / `forge txn verify` /
+`forge txn commit` (or `close`), and use `forge txn rollback` instead of reverting by hand (see `pe-run` §4).
+`forge schdraw apply` does this itself: it opens a transaction, writes the sheet, re-checks the real project
+(no new ERC errors on the top sheet, KiCad netlist matches the brief) and rolls back on failure. On success it
+closes the transaction without committing; commit under the project's commit rule.

@@ -368,5 +368,137 @@ class ForgeCheck(unittest.TestCase):
         self.assertIn("FAIL erc", r.stdout + r.stderr)
 
 
+class Transactions(unittest.TestCase):
+    """WP3: forge txn begin / verify / commit / rollback."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-txn-")
+        self.dir = new_project("Txn", self.tmp)
+        git(self.dir, "add", "-A")
+        r = git(self.dir, "commit", "-qm", "base")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def p(self, rel):
+        return os.path.join(self.dir, rel)
+
+    def read(self, rel):
+        return open(self.p(rel), "rb").read()
+
+    def txn(self, *a):
+        return forge("txn", *a, cwd=self.dir, check=False)
+
+    def test_clean_rollback_is_lossless_and_keeps_failed_work(self):
+        a, b = "CLAUDE.md", "01_Program/Master_Plan.md"
+        a0, b0 = self.read(a), self.read(b)
+        self.assertEqual(self.txn("begin", "swap U1").returncode, 0)
+        open(self.p(a), "ab").write(b"\nedit a\n")
+        open(self.p(b), "ab").write(b"\nedit b\n")
+        open(self.p("04_Hardware/new.md"), "w").write("new\n")
+        r = self.txn("rollback", "--reason", "test")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(git(self.dir, "status", "--porcelain").stdout.strip(), "")
+        self.assertEqual(self.read(a), a0)
+        self.assertEqual(self.read(b), b0)
+        self.assertFalse(os.path.exists(self.p("04_Hardware/new.md")))
+        stash = git(self.dir, "stash", "list").stdout
+        self.assertIn("forge failed txn", stash)
+        self.assertIn("swap U1", stash)
+        shown = git(self.dir, "stash", "show", "--name-only", "stash@{0}").stdout
+        self.assertIn("04_Hardware/new.md", shown)
+        self.assertIn("CLAUDE.md", shown)
+
+    def test_dirty_tree_needs_allow_dirty_and_is_restored(self):
+        a, b, u = "CLAUDE.md", "01_Program/Master_Plan.md", "00_Inbox/mine.md"
+        open(self.p(a), "ab").write(b"\nmy uncommitted edit\n")
+        open(self.p(u), "w").write("my untracked note\n")
+        a1, b0, u0 = self.read(a), self.read(b), self.read(u)
+        r = self.txn("begin", "x")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("uncommitted changes", r.stdout)
+        self.assertEqual(self.txn("begin", "x", "--allow-dirty").returncode, 0)
+        open(self.p(a), "ab").write(b"agent edit\n")
+        open(self.p(b), "ab").write(b"agent edit\n")
+        open(self.p(u), "w").write("agent overwrote it\n")
+        open(self.p("04_Hardware/n.md"), "w").write("n\n")
+        self.assertEqual(self.txn("rollback").returncode, 0)
+        self.assertEqual(self.read(a), a1)
+        self.assertEqual(self.read(b), b0)
+        self.assertEqual(self.read(u), u0)
+        self.assertFalse(os.path.exists(self.p("04_Hardware/n.md")))
+
+    def test_run_record_survives_rollback_even_when_staged(self):
+        self.txn("begin", "audit")
+        tid = json.load(open(self.p(".forge/txn.json")))["id"]
+        open(self.p("CLAUDE.md"), "ab").write(b"x\n")
+        git(self.dir, "add", "-f", ".forge/runs")
+        self.txn("rollback", "--reason", "staged audit")
+        s = open(self.p(f".forge/runs/{tid}/summary.md")).read()
+        self.assertIn("rolled back: staged audit", s)
+        self.assertFalse(os.path.exists(self.p(".forge/txn.json")))
+
+    def test_commit_needs_verify_of_current_tree(self):
+        self.txn("begin", "value change")
+        open(self.p("04_Hardware/calc.md"), "w").write("R5 = 10k\n")
+        r = self.txn("commit")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("no passing", r.stdout)
+        self.assertEqual(self.txn("verify").returncode, 0)
+        open(self.p("04_Hardware/calc.md"), "a").write("R6 = 1k\n")
+        r = self.txn("commit")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("changed after the last passing verify", r.stdout)
+        self.assertEqual(self.txn("verify").returncode, 0)
+        r = self.txn("commit", "-m", "calc: R5 and R6")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        log = git(self.dir, "log", "-1", "--format=%B").stdout
+        self.assertIn("calc: R5 and R6", log)
+        self.assertIn("Forge-Txn: T", log)
+        self.assertEqual(git(self.dir, "status", "--porcelain").stdout.strip(), "")
+
+    def test_second_begin_refused(self):
+        self.txn("begin", "one")
+        r = self.txn("begin", "two")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("already open", r.stdout)
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_schdraw_apply_rolls_back_on_real_project_failure(self):
+        from forge import schdraw as sd
+        sheet = self.p("08_PCB/txn/demo.kicad_sch")
+        forge("schdraw", "new", sheet, "--title", "t")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-qm", "empty sheet")
+        before = self.read("08_PCB/txn/demo.kicad_sch")
+        spec = json.load(open(os.path.join(FIX, "input_protection.json")))
+        spec["sheet"] = sheet
+        sp_path = self.p("00_Inbox/spec.json")
+        json.dump(spec, open(sp_path, "w"))
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-qm", "spec")
+        self.assertEqual(forge("schdraw", "check", sp_path, cwd=self.dir, check=False).returncode, 0)
+        real = sd.post_apply_check
+        sd.post_apply_check = lambda *a: ["forced: real-project ERC found a new error"]
+        cwd = os.getcwd()
+        os.chdir(self.dir)
+        try:
+            with self.assertRaises(SystemExit):
+                sd.main(["apply", sp_path])
+        finally:
+            sd.post_apply_check = real
+            os.chdir(cwd)
+        self.assertEqual(self.read("08_PCB/txn/demo.kicad_sch"), before)
+        self.assertFalse(os.path.exists(self.p(".forge/txn.json")))
+        self.assertIn("forge failed txn", git(self.dir, "stash", "list").stdout)
+        # the real post-apply check passes for this clean spec: applied, transaction closed
+        self.assertEqual(forge("schdraw", "check", sp_path, cwd=self.dir, check=False).returncode, 0)
+        r = forge("schdraw", "apply", sp_path, cwd=self.dir, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("closed (verified)", r.stdout)
+        self.assertNotEqual(self.read("08_PCB/txn/demo.kicad_sch"), before)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

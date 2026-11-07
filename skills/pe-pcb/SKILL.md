@@ -21,3 +21,8 @@ The owner (or a layout engineer) places and routes in KiCad; agents write the ru
    `pe-reviewer` (creepage, current, thermal vs the layout spec), `pe-compliance` for insulation.
 5. **DFT** with `pe-validation`: test points for every rail and key signal, probe access for the bench tests.
 6. Gate G7.
+
+## Changing design files safely
+
+Wrap every change that touches more than one design file in `forge txn begin "<what>"` / `forge txn verify` /
+`forge txn commit` (or `close`), and use `forge txn rollback` instead of reverting by hand (see `pe-run` §4).

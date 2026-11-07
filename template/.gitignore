@@ -10,3 +10,5 @@ __pycache__/
 06_Simulations/**/work/
 .forge/cache/
 .forge/runs/
+.forge/txn.json
+.history/

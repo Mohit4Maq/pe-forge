@@ -2,7 +2,8 @@
 KiCad 10 sheet, from a drawing spec written by the pe-schematic-drafter agent from the sheet brief.
 
   forge schdraw check  <spec.json>            style + connectivity checks, render PNG, ERC on a dry copy
-  forge schdraw apply  <spec.json>            same, then back up and write the sheet (needs a clean dry run)
+  forge schdraw apply  <spec.json>            same, then write the sheet inside a forge transaction (needs a clean
+                                              dry run); re-checks the real project and rolls back on a new failure
   forge schdraw pins   <MC_ID> X Y ROT        where a part's pins land (for planning the layout)
   forge schdraw new    <file.kicad_sch> [--paper A3] [--title T]   empty root sheet from the template
 
@@ -683,11 +684,90 @@ def main(argv):
         sys.exit("not applied: the schematic editor has this project open. Save and close it first.")
     if not os.path.exists(stamp) or open(stamp).read() != h:
         sys.exit("not applied: run `forge schdraw check` on this spec first (sheet or spec changed since)")
+    return apply_verified(sheet, orig, text, spec)
+
+
+def project_root_sheet(sheet):
+    """The project's top sheet (<pro stem>.kicad_sch next to the .kicad_pro), else the sheet itself."""
+    d = os.path.dirname(sheet)
+    pro = glob.glob(os.path.join(d, "*.kicad_pro"))
+    root = os.path.splitext(pro[0])[0] + ".kicad_sch" if pro else sheet
+    if root == sheet or not os.path.exists(root):
+        return sheet
+    # only when the sheet is part of that hierarchy; a stand-alone sheet is checked on its own
+    return root if f'"{os.path.basename(sheet)}"' in open(root, errors="ignore").read() else sheet
+
+
+def _erc_keys(rep):
+    return {(v["type"], v["description"], tuple(sorted(i["ref"] for i in v["items"]))) for v in rep.violations}
+
+
+def post_apply_check(sheet, spec, before):
+    """Checks on the REAL project after writing: new ERC errors on the root sheet, KiCad netlist vs the brief."""
+    root = project_root_sheet(sheet)
+    E = []
+    rep = kc.erc(root)
+    if not rep.tool_ok:
+        return [f"real-project ERC could not run: {rep.error}"]
+    new = _erc_keys(rep) - before
+    E += [f"real-project ERC: {t}: {d}" + (f" [{', '.join(r)}]" if r else "") for t, d, r in sorted(new)]
+    kn = kc.netlist(root)
+    if kn is None:
+        return E + ["real-project netlist export failed"]
+    for net, pins in spec.get("netlist", {}).items():
+        grp = next((g for g in kn.values() if set(pins) & g), set())
+        if set(pins) - grp or grp - set(pins):
+            E.append(f"real-project K1 {net}: expected {sorted(pins)}, KiCad has {sorted(grp)}")
+    return E
+
+
+def apply_verified(sheet, orig, text, spec):
+    """Write the sheet inside a forge transaction; verify on the real project; roll back on any new failure."""
+    sys.path.insert(0, os.path.dirname(HERE))
+    from forge import config, txn as T
+    root = config.find_root(os.path.dirname(sheet))
+    prj = config.Project(root) if root else None
+    auto = None
+    if prj:
+        cr = change_control_block(prj, sheet)
+        if cr:
+            sys.exit(cr)
+        if not T.load(prj):
+            try:
+                auto = T.begin(prj, f"schdraw apply {prj.rel(sheet)}", allow_dirty=True)
+            except T.TxnError as e:
+                print(f"note: no transaction ({str(e).splitlines()[0]}); keeping a backup only")
+    before_rep = kc.erc(project_root_sheet(sheet))
+    before = _erc_keys(before_rep) if before_rep.tool_ok else set()
     bak = os.path.join(sp.SCRATCH, os.path.basename(sheet) + ".bak")
+    os.makedirs(sp.SCRATCH, exist_ok=True)
     open(bak, "wb").write(orig)
     open(sheet, "w").write(text)
-    print(f"applied → {sheet}\nbackup  → {bak}")
+    E = post_apply_check(sheet, spec, before)
+    if E:
+        for e in E:
+            print("  ERROR", e)
+        if auto:
+            ref, files, warn, run = T.rollback(prj, "post-apply check failed: " + E[0][:120])
+            print(f"rolled back (transaction {auto['id']}); failed sheet kept as {ref}; record {run}/summary.md")
+        else:
+            open(sheet, "wb").write(orig)
+            print("restored the sheet from its backup" + (" (your open transaction stays open)" if prj else ""))
+        sys.exit("not applied: the real project failed the post-apply check")
+    if auto:
+        T.finish(prj, "applied; verified on the real project (no new ERC errors, KiCad netlist matches the brief). "
+                      "Not committed: commit under your project's commit rule.")
+    print(f"applied → {sheet}\nbackup  → {bak}" + (f"\ntransaction {auto['id']} closed (verified)" if auto else ""))
     return 0
+
+
+def change_control_block(prj, path):
+    """Reason string when change control forbids writing this path (WP6), else None."""
+    try:
+        from forge import changes
+    except ImportError:
+        return None
+    return changes.block_reason(prj, path)
 
 
 EMPTY = """(kicad_sch

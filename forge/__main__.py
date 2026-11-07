@@ -30,6 +30,8 @@
   forge txn begin "<what>" [--allow-dirty] | status | verify | commit [-m MSG] | close | rollback [--reason T]
                                     transactional design edits: verify before commit, lossless rollback
   forge doctor                      check the toolchain
+  forge update [--yes]              update every tool, pe-forge and its plugins (runs install.sh --update)
+  forge vault init|open [dir]       the project folder as an Obsidian vault (settings, register, open)
   forge kicad-setup [--apply]       register the library, MC_LIB path and ODBC driver in KiCad 10
 
 KiCad is found by forge/kicad.py ($KICAD_CLI, PATH, macOS app, Linux paths); ERC / DRC come from its JSON reports.
@@ -54,6 +56,11 @@ def main(argv):
     if cmd == "new":
         from forge import scaffold
         return scaffold.main(rest)
+    if cmd == "vault":
+        from forge import vault
+        return vault.main(rest)
+    if cmd == "update":
+        os.execvp("bash", ["bash", os.path.join(config.FORGE_ROOT, "install.sh"), "--update", *rest])
     if cmd == "doctor":
         from forge import doctor
         return doctor.main(rest)

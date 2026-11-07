@@ -40,28 +40,49 @@ split into modules, and each module is designed and verified as a small project 
 
 ## Install
 
+### On a Mac: one command
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Mohit4Maq/pe-forge/main/install.sh | bash
+```
+
+It checks the Mac and installs only what is missing, asking first: Apple's command-line tools, Homebrew,
+Python 3.11+, ngspice, the SQLite ODBC driver, **KiCad 10**, **LTspice**, **Obsidian** and **Claude Code**. Anything
+you already have, however you installed it, is kept. Then it downloads pe-forge to `~/pe-forge` and sets it up
+(Python venv with pwrlab, `forge` on your PATH, the Claude Code plugins `pe-forge` and `pe-forge-panel`, the MCP
+servers, the KiCad parts library). Last, it asks:
+
+1. **Start a fresh project**: a new folder, set up as an Obsidian vault and opened in Obsidian; Claude Code then
+   starts there and runs the intake (`/pe-forge:pe-new`).
+2. **Reuse an existing pe-forge project**: adds the vault settings, the status line and the commit check, opens it
+   in Obsidian and in Claude Code (`/pe-forge:pe-run`).
+3. Not now.
+
+Afterwards: `forge update` updates everything (tools, apps, Claude Code, pe-forge, its plugins); `forge doctor` shows
+what works; `./install.sh --check` reports without changing anything. If Claude Code has never run on the Mac, it
+asks you to log in the first time (Claude Pro, Max or an API key).
+
+**Obsidian is the document manager.** Every pe-forge project folder is also an Obsidian vault: the requirements,
+plan, booklets, reviews and V-model notes link to each other with `[[wikilinks]]`, and the tool folders (`.forge/`,
+KiCad backups, release outputs) are hidden from search and the graph. `forge vault open` opens a project in Obsidian.
+
+### Linux, or by hand
+
 Requirements: **Claude Code**, **Python 3.11+**, **git**. For the full flow: **KiCad 10**, **LTspice** (on Linux
-under Wine), the **SQLite ODBC driver** (for the KiCad database library). Optional: ngspice, PyMuPDF, a Mouser /
-DigiKey API key.
+under Wine), the **SQLite ODBC driver**. Optional: ngspice, Obsidian, a Mouser / DigiKey API key.
 
 ```sh
 git clone https://github.com/Mohit4Maq/pe-forge.git ~/pe-forge
 cd ~/pe-forge && ./bootstrap.sh
 ```
 
-`bootstrap.sh` asks before each change. It builds a venv with pwrlab, puts `forge` on your PATH, sets
-`PE_FORGE` / `MC_LIB` for Claude Code, registers the pwrlab MCP server, installs the plugin, and (optionally)
-registers the library in KiCad. `forge doctor` shows what is available. A missing tool disables only the features
-that need it.
-
-Plugin only (without bootstrap): in Claude Code run `/plugin marketplace add Mohit4Maq/pe-forge`, then
-`/plugin install pe-forge@pe-forge`. Simulation and library features still need `./bootstrap.sh`.
+`bootstrap.sh` asks before each change. A missing tool disables only the features that need it (`forge doctor`).
 
 ## Use
 
 ```text
 mkdir my-converter && cd my-converter && claude
-> /pe-new  I want a 3 kW bidirectional 48 V ↔ 400 V DC-DC for a home battery
+> /pe-forge:pe-new  I want a 3 kW bidirectional 48 V ↔ 400 V DC-DC for a home battery
 ```
 
 The intake asks up to three rounds of multiple-choice questions: type, ratings and ranges, isolation, volume and
@@ -75,7 +96,7 @@ It then creates the project:
 13_Validation  90_Templates  modules/M-xx_*  project.toml  CLAUDE.md  .forge/state.json
 ```
 
-Then run `/pe-run` (or just "continue") to move through the phases. `forge status` shows where you are:
+Then run `/pe-forge:pe-run` (or just "continue") to move through the phases. `forge status` shows where you are:
 
 ```
 Demo48  ·  profile full  ·  schematic mode agent

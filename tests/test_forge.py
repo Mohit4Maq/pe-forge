@@ -23,6 +23,7 @@ ENV = dict(os.environ, MC_LIB=os.path.join(REPO, "library"))   # always test aga
 ENV.pop("CLAUDE_PROJECT_DIR", None)
 _CFG = tempfile.mkdtemp(prefix="pe-forge-cfg-")          # status line records never touch the real ~/.config
 ENV["PE_FORGE_CONFIG_DIR"] = os.environ["PE_FORGE_CONFIG_DIR"] = _CFG
+ENV["PE_FORGE_OBSIDIAN_REGISTRY"] = os.environ["PE_FORGE_OBSIDIAN_REGISTRY"] = os.path.join(_CFG, "obsidian.json")
 
 
 def forge(*args, cwd=None, check=True, stdin=None):
@@ -1647,6 +1648,59 @@ class ResultsPanel(unittest.TestCase):
         empty = tempfile.mkdtemp()
         self.assertFalse(json.loads(forge("panel", "--json", cwd=empty).stdout)["ok"])
         shutil.rmtree(empty)
+
+
+class Vault(unittest.TestCase):
+    """Every project is an Obsidian vault; the installer's project step."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-vault-")
+        sys.path.insert(0, REPO)
+        from forge import vault
+        self.V = vault
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def test_new_project_is_a_vault(self):
+        d = new_project("Vlt", self.tmp)
+        app = json.load(open(os.path.join(d, ".obsidian/app.json")))
+        self.assertFalse(app["useMarkdownLinks"])
+        self.assertIn(".forge/", app["userIgnoreFilters"])
+        self.assertIn(".obsidian/workspace*.json", open(os.path.join(d, ".gitignore")).read())
+
+    def test_init_keeps_the_persons_settings_and_is_idempotent(self):
+        d = os.path.join(self.tmp, "v")
+        os.makedirs(os.path.join(d, ".obsidian"))
+        json.dump({"useMarkdownLinks": True, "theme": "mine"}, open(os.path.join(d, ".obsidian/app.json"), "w"))
+        self.V.init(d)
+        app = json.load(open(os.path.join(d, ".obsidian/app.json")))
+        self.assertTrue(app["useMarkdownLinks"])                # their choice wins
+        self.assertEqual(app["theme"], "mine")
+        self.assertEqual(self.V.init(d), [])                     # nothing left to write
+
+    def test_register_and_fresh_folder_from_the_installer(self):
+        d = os.path.join(self.tmp, "Fresh")
+        os.makedirs(d)
+        self.V.init(d)                                           # what install.sh leaves: a vault, nothing else
+        if not self.V.obsidian_running():
+            self.assertEqual(self.V.register(d), "registered")
+            self.assertEqual(self.V.register(d), "known")
+        ans = os.path.join(self.tmp, "a.json")
+        json.dump({"name": "Fresh", "summary": "s", "owner": "T"}, open(ans, "w"))
+        forge("new", d, "--answers", ans)                        # the intake builds the project right there
+        self.assertTrue(os.path.exists(os.path.join(d, "project.toml")))
+        busy = os.path.join(self.tmp, "Busy")
+        os.makedirs(busy)
+        open(os.path.join(busy, "notes.md"), "w").write("x")
+        r = forge("new", busy, "--answers", ans, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("is not empty", r.stdout + r.stderr)
+
+    def test_installer_syntax_and_help(self):
+        self.assertEqual(subprocess.run(["bash", "-n", os.path.join(REPO, "install.sh")]).returncode, 0)
+        r = subprocess.run(["bash", os.path.join(REPO, "install.sh"), "--help"], capture_output=True, text=True)
+        self.assertIn("--update", r.stdout)
 
 
 if __name__ == "__main__":

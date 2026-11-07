@@ -7,7 +7,8 @@ description: Start a new power-electronics project with pe-forge (phase P0). Ask
 
 ## 1. Understand the request
 Read what the user wants to build. Restate it in one line (function, power, input → output). If there is no
-folder yet, propose `<cwd>/<ProjectName>` and confirm it in the first question batch.
+folder yet, propose `<cwd>/<ProjectName>` and confirm it in the first question batch. **If the current folder is
+empty (or holds only `.obsidian/`, as when `install.sh` made it), create the project right here: `forge new .`**
 
 ## 2. Cross-question with multiple choice
 Use AskUserQuestion, **at most 4 questions per call, at most 3 calls**. Every question: concrete options with a

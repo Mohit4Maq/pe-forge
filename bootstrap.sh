@@ -2,6 +2,8 @@
 # pe-forge bootstrap: one command from a fresh clone to a working toolkit.
 #   ./bootstrap.sh            interactive (asks before touching Claude Code or KiCad settings)
 #   ./bootstrap.sh --yes      accept every default
+#   ./bootstrap.sh --update   also refresh the Python packages and update the installed plugins
+# install.sh (the one-command installer) runs this after it has installed the tools.
 # What it does (each step is skipped if already done):
 #   1. checks python ≥ 3.11 and git; reports KiCad 10, LTspice, ngspice
 #   2. builds .venv and installs pwrlab (vendor/pwrlab) + PyMuPDF
@@ -12,7 +14,8 @@
 #   7. optionally registers the parts library in KiCad (forge kicad-setup --apply)
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-YES=0; [[ "${1:-}" == "--yes" ]] && YES=1
+YES=0; UPDATE=0
+for a in "$@"; do [[ "$a" == "--yes" ]] && YES=1; [[ "$a" == "--update" ]] && UPDATE=1; done
 say()  { printf '\033[1m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m!!\033[0m %s\n' "$*"; }
 ask()  { (( YES )) && return 0; read -r -p "$1 [Y/n] " a; [[ -z "$a" || "$a" =~ ^[Yy] ]]; }
@@ -32,13 +35,24 @@ if [[ ! -x "$HERE/.venv/bin/pwrlab-mcp" ]]; then
   "$PY" -m venv "$HERE/.venv"
   "$HERE/.venv/bin/python" -m pip install -q --upgrade pip
   "$HERE/.venv/bin/python" -m pip install -q -e "$HERE/vendor/pwrlab" pymupdf pytest
+elif (( UPDATE )); then
+  say "refreshing the .venv packages"
+  "$HERE/.venv/bin/python" -m pip install -q --upgrade pip
+  "$HERE/.venv/bin/python" -m pip install -q --upgrade -e "$HERE/vendor/pwrlab" pymupdf pytest
 fi
 "$HERE/.venv/bin/python" -c "import fitz" 2>/dev/null || warn "PyMuPDF missing in .venv: schematic renders and text checks need it"
 
 # 3. forge on PATH
 mkdir -p "$HOME/.local/bin"
 ln -sf "$HERE/bin/forge" "$HOME/.local/bin/forge"
-[[ ":$PATH:" == *":$HOME/.local/bin:"* ]] || warn "add ~/.local/bin to PATH to use 'forge' directly"
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+  RC="$HOME/.zshrc"; [[ "${SHELL:-}" == */bash ]] && RC="$HOME/.bash_profile"
+  if grep -qs 'pe-forge: forge on PATH' "$RC"; then :
+  elif ask "Add ~/.local/bin to PATH in $RC (so 'forge' works in every terminal)?"; then
+    printf '\n# pe-forge: forge on PATH\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$RC" && say "PATH line added to $RC (new terminals)"
+  else warn "add ~/.local/bin to PATH to use 'forge' directly"; fi
+  export PATH="$HOME/.local/bin:$PATH"
+fi
 
 # 4. Claude Code env
 SETTINGS="$HOME/.claude/settings.json"
@@ -69,10 +83,16 @@ if command -v claude >/dev/null; then
   elif ask "Register the forge MCP server (user scope; outcome-level tools for any MCP host)?"; then
     claude mcp add forge -s user -- "$HERE/bin/forge-mcp" && say "forge MCP registered"
   fi
-  if ask "Install the pe-forge Claude Code plugin from this folder?"; then
-    claude plugin marketplace add "$HERE" 2>/dev/null || true
-    claude plugin install pe-forge@pe-forge 2>/dev/null && say "plugin installed" \
-      || warn "plugin install failed: inside Claude Code run  /plugin marketplace add $HERE  then  /plugin install pe-forge@pe-forge"
+  if ask "Install or update the pe-forge plugins (pe-forge, and pe-forge-panel: the results panel beside the chat)?"; then
+    claude plugin marketplace add "$HERE" >/dev/null 2>&1 || claude plugin marketplace update pe-forge >/dev/null 2>&1 || true
+    for p in pe-forge pe-forge-panel; do
+      if claude plugin list 2>/dev/null | grep -q "$p@pe-forge"; then
+        claude plugin update "$p@pe-forge" >/dev/null 2>&1 && say "plugin $p updated (restart Claude Code to apply)" || say "plugin $p: up to date"
+      else
+        claude plugin install "$p@pe-forge" >/dev/null 2>&1 && say "plugin $p installed" \
+          || warn "plugin $p: install failed; inside Claude Code run  /plugin marketplace add $HERE  then  /plugin install $p@pe-forge"
+      fi
+    done
   fi
 else
   warn "claude CLI not found: install Claude Code (https://claude.com/claude-code), then re-run"
@@ -90,4 +110,4 @@ if ask "Apply the KiCad library setup above (KiCad must be closed)?"; then "$HER
 
 say "toolchain:"
 "$HERE/bin/forge" doctor || true
-say "done. In Claude Code, in an empty folder:  /pe-new  (then /pe-run to continue a project)"
+say "done. In Claude Code, in an empty folder:  /pe-forge:pe-new  (then /pe-forge:pe-run to continue a project)"

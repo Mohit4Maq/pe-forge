@@ -11,6 +11,7 @@ intake.json (all optional except name / summary):
  "standards": ["IEC 62368-1", "CISPR 32 class B"], "volume": "1k/yr", "target_cost_usd": 40,
  "profile": "full", "schematic_mode": "ask", "reviews": "gate", "region": "IN",
  "distributors": ["mouser", "digikey", "lcsc"], "precommit_hook": true, "answers": {"question": "answer", ...}}
+obsidian (default true): the folder is also an Obsidian vault (.obsidian/ settings; `forge vault open` opens it).
 statusline (default true): the pe-forge bar in <project>/.claude/settings.local.json (this machine only).
 precommit_hook (default true): install the `forge check` git pre-commit hook. The CI workflow
 .github/workflows/forge-check.yml is always copied (it does nothing until the project is pushed to GitHub).
@@ -123,6 +124,10 @@ def main(argv):
         raise SystemExit("--name or answers.name is required")
     if os.path.exists(os.path.join(dst, "project.toml")) and "--force" not in argv:
         raise SystemExit(f"{dst} already holds a pe-forge project")
+    if os.path.isdir(dst) and "--force" not in argv:
+        extra = [f for f in os.listdir(dst) if f not in (".obsidian", ".git", ".gitignore", ".DS_Store", ".claude", "00_Inbox")]
+        if extra:
+            raise SystemExit(f"{dst} is not empty ({', '.join(sorted(extra)[:5])}): use a new folder, or --force")
     shutil.copytree(config.TEMPLATE, dst, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".gitkeep"))
     for key, rel in config.DEFAULT_PATHS.items():   # every standard folder exists, whatever git kept of the template
         os.makedirs(os.path.join(dst, rel if not os.path.splitext(rel)[1] else os.path.dirname(rel)), exist_ok=True)
@@ -153,6 +158,9 @@ def main(argv):
     state.save(prj, st)
     if not os.path.isdir(os.path.join(dst, ".git")):
         subprocess.run(["git", "init", "-q", "-b", "main", dst], check=False)
+    if a.get("obsidian", True):        # the project folder is also an Obsidian vault
+        from . import vault
+        vault.init(dst)
     if a.get("statusline", True):      # the pe-forge bar, for this project on this machine only
         from . import statusline
         try:

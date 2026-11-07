@@ -27,7 +27,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "database" / "mc_parts.sqlite"
+DB_PATH = Path(os.environ["MC_DB"]) if os.environ.get("MC_DB") else ROOT / "database" / "mc_parts.sqlite"
 SCHEMA = ROOT / "database" / "schema.sql"
 SYM_DIR = ROOT / "symbols"
 FP_DIR = ROOT / "footprints"
@@ -58,7 +58,7 @@ TABLES: dict[str, tuple[str, list[str]]] = {
 }
 # fields copied onto the placed schematic symbol (and therefore into BOMs)
 SOURCING_FIELDS = ["Mouser_Stock", "Mouser_Price_1", "Mouser_Price_100", "Lifecycle", "Sourcing_Date"]
-BOM_FIELDS = ["MPN", "Manufacturer", "DigiKey_PN", "Mouser_PN", "Package", "Tolerance",
+BOM_FIELDS = ["MPN", "Manufacturer", "DigiKey_PN", "Mouser_PN", "LCSC_PN", "Package", "Tolerance",
               "Voltage_Rating", "Current_Rating", "Power_Rating", "Dielectric", "AEC_Q",
               "Alt_MPN", "Alt_Manufacturer", "Status"]
 
@@ -75,6 +75,9 @@ def columns() -> list[str]:
     return re.findall(r"^\s+(\w+)\s+TEXT", body, re.M)
 
 
+SCHEMA_VERSION = 2      # 2: LCSC_PN, JLC_Rotation
+
+
 def init_db() -> None:
     body = SCHEMA.read_text().split("CREATE TABLE", 1)[1]
     con = db()
@@ -84,6 +87,8 @@ def init_db() -> None:
         for c in columns():  # schema grew -> add missing columns
             if c not in have:
                 con.execute(f"ALTER TABLE {t} ADD COLUMN {c} TEXT NOT NULL DEFAULT ''")
+    con.execute("CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL DEFAULT '')")
+    con.execute("INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
     con.commit()
 
 

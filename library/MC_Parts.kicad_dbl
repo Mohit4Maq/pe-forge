@@ -81,6 +81,14 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Package",
                     "name": "Package",
                     "visible_on_add": false,
@@ -266,6 +274,14 @@
                 {
                     "column": "Mouser_PN",
                     "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -463,6 +479,14 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Package",
                     "name": "Package",
                     "visible_on_add": false,
@@ -648,6 +672,14 @@
                 {
                     "column": "Mouser_PN",
                     "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -845,6 +877,14 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Package",
                     "name": "Package",
                     "visible_on_add": false,
@@ -1030,6 +1070,14 @@
                 {
                     "column": "Mouser_PN",
                     "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -1227,6 +1275,14 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Package",
                     "name": "Package",
                     "visible_on_add": false,
@@ -1412,6 +1468,14 @@
                 {
                     "column": "Mouser_PN",
                     "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -1609,6 +1673,14 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Package",
                     "name": "Package",
                     "visible_on_add": false,
@@ -1794,6 +1866,14 @@
                 {
                     "column": "Mouser_PN",
                     "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -1991,6 +2071,14 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Package",
                     "name": "Package",
                     "visible_on_add": false,
@@ -2176,6 +2264,14 @@
                 {
                     "column": "Mouser_PN",
                     "name": "Mouser_PN",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "LCSC_PN",
+                    "name": "LCSC_PN",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,

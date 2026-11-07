@@ -35,7 +35,7 @@ KCLI = _kc.find_cli() or 'kicad-cli'
 SCRATCH = os.environ.get('SCH_PLACE_SCRATCH', os.path.join(os.environ.get('TMPDIR', '/tmp'), 'sch_place'))
 TABLE = {'CAP': 'Capacitors', 'RES': 'Resistors', 'MAG': 'Magnetics', 'IC': 'ICs', 'DIO': 'Diodes',
          'CON': 'Connectors', 'PRT': 'Protection'}
-FIELDS = ['MC_ID', 'MPN', 'Manufacturer', 'DigiKey_PN', 'Mouser_PN', 'Package', 'Tolerance', 'Voltage_Rating',
+FIELDS = ['MC_ID', 'MPN', 'Manufacturer', 'DigiKey_PN', 'Mouser_PN', 'LCSC_PN', 'Package', 'Tolerance', 'Voltage_Rating',
           'Current_Rating', 'Power_Rating', 'Dielectric', 'AEC_Q', 'Alt_MPN', 'Alt_Manufacturer', 'Status',
           'Mouser_Stock', 'Mouser_Price_1', 'Mouser_Price_100', 'Lifecycle', 'Sourcing_Date']
 GRID = 1.27

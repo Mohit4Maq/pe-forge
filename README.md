@@ -124,6 +124,9 @@ match, every placed part released with an alternate, the outputs still match the
 Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8
 runs it.
 
+The BoM tool writes DigiKey and Mouser upload files with build quantity and spares, and JLCPCB BoM + CPL files
+(`bom.py --jlcpcb`, LCSC numbers and per-part rotation offsets from the parts database).
+
 Design edits that span several files run as transactions (`forge txn begin / verify / commit / rollback`): a
 rollback restores the tree byte for byte, including your own uncommitted work from before the transaction, and
 keeps the failed attempt as a named `git stash` entry. `forge schdraw apply` always runs inside one.

@@ -9,6 +9,9 @@
 --   Source        where the part came from (Altium IntLib, Ultra Librarian, manual, ...)
 --   Mouser_* / Lifecycle / Sourcing_Date   snapshot from the Mouser API (mclib sourcing), dated
 --   Exclude_BOM / Exclude_Board   "1" to exclude (fiducials, stackup notes, ...)
+--   LCSC_PN       LCSC / JLCPCB part number (Cxxxxx) for JLCPCB assembly
+--   JLC_Rotation  degrees added to the KiCad rotation in the JLCPCB CPL (their reel orientation differs for some parts)
+--   schema_version lives in table _meta (key, value); `mclib.py init` upgrades older databases in place
 
 CREATE TABLE IF NOT EXISTS _template (
     ID               TEXT PRIMARY KEY NOT NULL,
@@ -34,6 +37,8 @@ CREATE TABLE IF NOT EXISTS _template (
     Mouser_Price_1   TEXT NOT NULL DEFAULT '',
     Mouser_Price_100 TEXT NOT NULL DEFAULT '',
     Mouser_Lead_Time TEXT NOT NULL DEFAULT '',
+    LCSC_PN          TEXT NOT NULL DEFAULT '',
+    JLC_Rotation     TEXT NOT NULL DEFAULT '',
     Lifecycle        TEXT NOT NULL DEFAULT '',
     Sourcing_Date    TEXT NOT NULL DEFAULT '',
     Alt_MPN          TEXT NOT NULL DEFAULT '',

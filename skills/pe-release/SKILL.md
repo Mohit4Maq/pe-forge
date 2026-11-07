@@ -10,8 +10,11 @@ description: Phase P8 of a pe-forge project - the manufacturing release - ERC / 
 2. **Outputs**: in `08_PCB/<slug>/` run `./release.sh` (ERC + DRC + library checks + BoM gate, then the KiCad
    jobset: schematic PDF, Gerbers, drill, pick-and-place, STEP, assembly PDF, fab zip). Copy the result to
    `09_Release/<REV>/` with subfolders `gerbers/`, `drill/`, `bom/`, `assembly/`, `3d/`, `docs/`.
-3. **Fab-house files** if asked: JLCPCB BoM + CPL (`kicad-happy:jlcpcb`, LCSC numbers), PCBWay turnkey BoM
-   (`kicad-happy:pcbway`); distributor upload files from `bom.py --boards N`.
+3. **Fab-house files** if asked: JLCPCB BoM + CPL natively with `$MC_LIB/tools/bom.py <sch> --jlcpcb` (or set
+   `project.toml [process] fab_house = "jlcpcb"` and release.sh adds it). Every part needs `LCSC_PN` in MC_Parts
+   (`mclib.py set <ID> LCSC_PN=Cxxxx`); parts whose reel orientation differs get `JLC_Rotation`. The command fails
+   naming any part without an LCSC number. `kicad-happy:jlcpcb` stays an optional cross-check; PCBWay turnkey BoM
+   via `kicad-happy:pcbway`. Distributor upload files: `bom.py --boards N --spares N` (passives get ≥ 10 % spare).
 4. **Release notes** `09_Release/<REV>/Release_Notes.md`: board P/N and rev, stack-up and fab notes (material,
    finish, copper, impedance, special processes), assembly notes (polarised parts, hand-solder items, potting,
    torque), BoM cost at the build quantity, known issues and deviations, the gate records.

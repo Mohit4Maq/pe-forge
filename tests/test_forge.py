@@ -797,5 +797,80 @@ class FabGate(unittest.TestCase):
         self.assertEqual(self.fab("--strict")["parts"]["bom_ready"]["status"], "fail")
 
 
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class JlcExport(unittest.TestCase):
+    """WP8: bom.py --jlcpcb, LCSC field, spares, schema migration."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-jlc-")
+        self.db = os.path.join(self.tmp, "parts.sqlite")
+        shutil.copy(os.path.join(REPO, "library/database/mc_parts.sqlite"), self.db)
+        import sqlite3
+        con = sqlite3.connect(self.db)
+        for table, pid, lc, rot in [("Capacitors", "CAP-0035", "C13585", ""), ("Diodes", "DIO-0015", "C8678", "90"),
+                                    ("Connectors", "CON-0009", "C2896", ""), ("Resistors", "RES-0184", "C22936", "")]:
+            con.execute(f"UPDATE {table} SET LCSC_PN=?, JLC_Rotation=? WHERE ID=?", (lc, rot, pid))
+        con.commit()
+        self.con = con
+        self.sch = os.path.join(self.tmp, "ip.kicad_sch")
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), self.sch)
+        self.pos = os.path.join(self.tmp, "pos.csv")
+        rows = ["Ref,Val,Package,PosX,PosY,Rot,Side"] + [f'"{r}","v","p",{10 + i},20,0,top'
+                                                          for i, r in enumerate(["C1", "C2", "D1", "J1", "R1", "R2"])]
+        open(self.pos, "w").write("\n".join(rows) + "\n")
+
+    def tearDown(self):
+        self.con.close()
+        shutil.rmtree(self.tmp, True)
+
+    def bom(self, *a):
+        env = dict(ENV, MC_DB=self.db)
+        return subprocess.run([sys.executable, os.path.join(REPO, "library/tools/bom.py"), self.sch, "-o", self.tmp,
+                               "--pos", self.pos, *a], capture_output=True, text=True, env=env)
+
+    def rows(self, name):
+        return list(csv.DictReader(open(os.path.join(self.tmp, name))))
+
+    def test_bom_groups_and_cpl_rotation(self):
+        r = self.bom("--jlcpcb")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        b = self.rows("ip-jlcpcb-bom.csv")
+        self.assertEqual(len(b), 4)
+        self.assertIn({"Comment": "10µF", "Designator": "C1,C2", "Footprint": "C_1206_3216Metric",
+                       "LCSC Part #": "C13585"}, b)
+        cpl = {x["Designator"]: x for x in self.rows("ip-jlcpcb-cpl.csv")}
+        self.assertEqual(len(cpl), 6)
+        self.assertEqual(cpl["D1"]["Rotation"], "90")       # only the part with an offset turns
+        self.assertEqual(cpl["R1"]["Rotation"], "0")
+        self.assertEqual(cpl["C1"]["Layer"], "Top")
+
+    def test_missing_lcsc_fails_unless_allowed(self):
+        self.con.execute("UPDATE Resistors SET LCSC_PN='' WHERE ID='RES-0184'")
+        self.con.commit()
+        r = self.bom("--jlcpcb")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("R1 (1", r.stderr)
+        r = self.bom("--jlcpcb", "--allow-missing")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("warning: 2 part(s) without an LCSC number", r.stderr)
+
+    def test_spares(self):
+        r = self.bom("--boards", "10", "--spares", "2")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        q = {x["Customer Reference"]: int(x["Quantity"]) for x in self.rows("ip-digikey.csv")}
+        self.assertEqual(q["C1,C2"], 22)      # passive: 20 + max(2, 10 % of 20)
+        self.assertEqual(q["D1"], 12)
+
+    def test_migration_idempotent(self):
+        env = dict(ENV, MC_DB=self.db)
+        mc = [sys.executable, os.path.join(REPO, "library/tools/mclib.py"), "init"]
+        dump = lambda: subprocess.run(["sqlite3", self.db, ".schema"], capture_output=True, text=True).stdout
+        subprocess.run(mc, env=env, check=True, capture_output=True)
+        s1 = dump()
+        subprocess.run(mc, env=env, check=True, capture_output=True)
+        self.assertEqual(dump(), s1)
+        self.assertIn("LCSC_PN", s1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

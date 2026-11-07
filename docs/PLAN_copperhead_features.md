@@ -854,7 +854,7 @@ turns on every schematic task.
 | WP5 | Obligations ledger hooks | `feat/wp05-ledger` | done | replaces the consistency Stop hook (alias kept); user edits advisory once, then blocking |
 | WP6 | Change-gated edits after baseline | `feat/wp06-change-control` | done | lock check runs at txn verify (begin has no file list); shell edits caught there; lite = warn |
 | WP7 | Fab release gate | `feat/wp07-fab-gate` | done | manifest lives with the outputs (08_PCB/<slug>/release/<REV>/manifest.json); parts under checks.fab.parts |
-| WP8 | JLCPCB export, LCSC, spares | `feat/wp08-jlc-export` | todo | |
+| WP8 | JLCPCB export, LCSC, spares | `feat/wp08-jlc-export` | done | bundled DB migrated to schema 2; MC_DB env overrides the DB path (tests); --pos FILE input |
 | WP9 | `forge explain` | `feat/wp09-explain` | todo | |
 | WP10 | `forge-mcp` | `feat/wp10-mcp` | todo | |
 | WP11 | Legibility lint + score | `feat/wp11-lint` | todo | |

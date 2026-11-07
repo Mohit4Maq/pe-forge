@@ -160,7 +160,7 @@ def panel(prj):
 
 
 # ------------------------------------------------------------------ the HTML report
-COLORS = ["#d52b3d", "#2f6fdf", "#3fb950", "#d29922", "#8c7bf6", "#5aa9ff"]
+COLORS = ["#4245f5", "#e8590c", "#3fb950", "#d29922", "#8c7bf6", "#5aa9ff"]
 GRADE_CSS = {"ACCEPTED": "ok", "PROVISIONAL": "warn", "REJECTED": "err", "NOT RUN": "dim"}
 
 
@@ -242,7 +242,7 @@ def _metrics_table(r):
 
 
 CSS = """
-:root{--bg:#fff;--fg:#1d1d1f;--dim:#6b6b70;--line:#e5e5ea;--card:#fafafa;--accent:#d52b3d;--ok:#1a7f37;--warn:#9a6700;--err:#cf222e}
+:root{--bg:#fff;--fg:#1d1d1f;--dim:#6b6b70;--line:#e5e5ea;--card:#fafafa;--accent:#4245f5;--ok:#1a7f37;--warn:#9a6700;--err:#cf222e}
 @media (prefers-color-scheme:dark){:root{--bg:#111214;--fg:#e8e8ea;--dim:#9a9aa0;--line:#2a2b2f;--card:#18191c;--ok:#3fb950;--warn:#d29922;--err:#ff6e9c}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,system-ui,Segoe UI,sans-serif}
 header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}

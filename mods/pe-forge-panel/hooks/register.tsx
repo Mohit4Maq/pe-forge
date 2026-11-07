@@ -6,7 +6,7 @@ import type { Chart, CheckEntry, PanelData, Result, Stage, Tab } from '../types'
 // pe-forge results beside the chat. All data comes from `forge panel --json` (the project's own files); every button
 // runs a forge command in the project folder. Opens by itself when a new simulation result or a new full check lands.
 const PANE = 'pe-forge-results'
-const RED = '#d52b3d'
+const ACCENT = '#4245f5'
 const GREEN = '#3fb950'
 const AMBER = '#d29922'
 const PINK = '#ff6e9c'
@@ -175,7 +175,7 @@ export const register: Register = on => {
     if (!d || !d.ok) {
       return (
         <Box flexDirection="column">
-          <Text color={RED} bold italic>maq</Text>
+          <Text color={ACCENT} bold italic>maq</Text>
           <Text dimColor>{d?.error ?? 'Loading…'}</Text>
           <Button label="Retry" hotkey="u" onPress={() => void refresh($)} />
         </Box>
@@ -188,15 +188,15 @@ export const register: Register = on => {
     const header = (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1}>
-          <Text color={RED} bold italic>maq</Text>
-          <Text color={RED}>▸</Text>
+          <Text color={ACCENT} bold italic>maq</Text>
+          <Text color={ACCENT}>▸</Text>
           <Text bold>{d.project}</Text>
           <Text dimColor>· {d.phase} · next: {d.next}</Text>
         </Box>
         <Box flexDirection="row" gap={1}>
           {tabs.map(([id, key, label]) => (
             <Button key={`tab-${id}`} hotkey={key} label={label} onPress={() => void update($, tab, () => id)}>
-              <Text color={id === t ? RED : undefined} bold={id === t} dimColor={id !== t}>{key} {label}</Text>
+              <Text color={id === t ? ACCENT : undefined} bold={id === t} dimColor={id !== t}>{key} {label}</Text>
             </Button>
           ))}
         </Box>
@@ -231,7 +231,7 @@ const V_ROWS: [string, string][] = [['concept', 'validation'], ['sysreq', 'sysve
 const V_W = 62
 
 function stageMark(s: Stage, current: string): [string, string | undefined] {
-  if (s.id === current) return ['▶', RED]
+  if (s.id === current) return ['▶', ACCENT]
   if (s.attention) return ['⚠', AMBER]
   if (s.status === 'done') return ['✓', GREEN]
   if (s.status === 'open') return ['·', AMBER]
@@ -269,7 +269,7 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
               {btn(l)}
               <Text dimColor> {'─'.repeat(fill)} </Text>
               {btn(r)}
-              {l === current || r === current ? <Text color={RED}> ◀ now</Text> : null}
+              {l === current || r === current ? <Text color={ACCENT}> ◀ now</Text> : null}
             </Box>
           )
         })}
@@ -277,7 +277,7 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
         <Text dimColor>{v.phase}: {v.next}</Text>
       </Box>
       <Box flexDirection="column">
-        <Text bold color={RED}>{s.title} <Text dimColor>· {s.level} {s.side === 'left' ? 'definition' : s.side === 'right' ? 'verification' : 'build / unit'} · {s.phases.join(', ')} · {s.id === current ? 'working here now' : s.status}</Text></Text>
+        <Text bold color={ACCENT}>{s.title} <Text dimColor>· {s.level} {s.side === 'left' ? 'definition' : s.side === 'right' ? 'verification' : 'build / unit'} · {s.phases.join(', ')} · {s.id === current ? 'working here now' : s.status}</Text></Text>
         {s.facts.map((f, k) => <Text key={`fa${k}`}>{f}</Text>)}
         {s.items.length ? s.items.slice(0, 8).map((it, k) => <Text key={`it${k}`} dimColor>  • {it}</Text>) : null}
         {s.issues.map((f, k) => <Text key={`is${k}`} color={AMBER}>⚠ {f}</Text>)}
@@ -356,7 +356,7 @@ function chart(c: Chart, k: number, Box: any, Text: any) {
         {items.map((it, j) => (
           <Box key={`b${k}-${j}`} flexDirection="row">
             <Text dimColor>{pad(it.name, 17)}</Text>
-            <Text color={RED}>{'█'.repeat(Math.max(1, Math.round((it.value / top) * 22)))}</Text>
+            <Text color={ACCENT}>{'█'.repeat(Math.max(1, Math.round((it.value / top) * 22)))}</Text>
             <Text> {fmt(it.value)} {c.unit ?? ''}</Text>
           </Box>
         ))}
@@ -369,7 +369,7 @@ function chart(c: Chart, k: number, Box: any, Text: any) {
   if (!all.length) return null
   const lo = Math.min(...all)
   const hi = Math.max(...all)
-  const colors = [RED, '#5aa9ff', GREEN, AMBER]
+  const colors = [ACCENT, '#e8590c', GREEN, AMBER]
   return (
     <Box key={`c${k}`} flexDirection="column">
       <Text bold>{c.title}</Text>
@@ -439,7 +439,7 @@ function gatesTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="column">
         {(d.phases ?? []).map(p => (
-          <Text key={`ph-${p.id}`} color={p.status === 'passed' ? GREEN : p.status === 'active' ? RED : undefined}
+          <Text key={`ph-${p.id}`} color={p.status === 'passed' ? GREEN : p.status === 'active' ? ACCENT : undefined}
             dimColor={p.status === 'todo'}>
             {statusIcon(p.status)} {p.id} {pad(p.title, 34)} {p.status === 'passed' ? `${p.gate} ${p.date ?? ''}` : ''}
             {p.review?.verdict ? ` · ${p.review.verdict} ${p.review.status ?? ''}` : ''}

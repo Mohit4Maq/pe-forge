@@ -1,7 +1,7 @@
 # pe-forge terminal UI: layout spec (WP14)
 
 Status: **approved by the owner on 2026-11-07 and implemented** (forge/ui.py, forge/statusline.py). Decisions:
-MaqLabs red accent; `ctx` segment included; installed per pe-forge project only (`.claude/settings.local.json`,
+accent #4245f5 (blue, owner 2026-11-07; was MaqLabs red); `ctx` segment included; installed per pe-forge project only (`.claude/settings.local.json`,
 not the shared settings, because the command holds this machine's path); `bin/` kept.
 Checked against the Claude Code docs on 2026-11-07 (status line: code.claude.com/docs/en/statusline; hooks:
 code.claude.com/docs/en/hooks; plugin manifest: code.claude.com/docs/en/plugins/manifest-reference).
@@ -72,7 +72,7 @@ stays unbranded, as today.
 
 | Token | Truecolor | 256-colour fallback |
 |---|---|---|
-| accent | `#d52b3d` (MaqLabs red, from the MaqLabs logo; `[ui] accent` in project.toml or `~/.config/pe-forge/ui.toml`) | 161 |
+| accent | `#4245f5` (blue; `[ui] accent` in project.toml or `~/.config/pe-forge/ui.toml`) | 63 |
 | bright | default foreground, bold | bold |
 | dim | `#8a8a8a` | 245 |
 | ok | `#3fb950` | 71 |
@@ -96,7 +96,7 @@ Truecolor when `$COLORTERM` is `truecolor` or `24bit`, else 256 colours; no colo
 
 ## 7. Owner decisions
 
-1. Decided: MaqLabs red `#d52b3d`.
+1. Decided: accent `#4245f5` (blue), changed from MaqLabs red on 2026-11-07.
 2. Decided: yes.
 3. Decided: pe-forge projects only (`forge new`); `--user` stays available but bootstrap does not offer it.
 4. Decided: keep `bin/` (Claude Code CLI).

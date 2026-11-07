@@ -2,7 +2,7 @@
 `forge status`. Standard library only; layout spec in docs/ui-layout.md.
 
 Colour: truecolor when $COLORTERM is truecolor / 24bit, else 256 colours; none with $NO_COLOR or [ui] color = false.
-Accent: MaqLabs red #d52b3d unless [ui] accent = "#RRGGBB" (project.toml, or ~/.config/pe-forge/ui.toml).
+Accent: #4245f5 (blue) unless [ui] accent = "#RRGGBB" (project.toml, or ~/.config/pe-forge/ui.toml).
 Glyphs: [ui] glyphs = "ascii" swaps every symbol for plain ASCII.
 Marker: the bar starts with the MaqLabs mark "maq" (bold italic, accent colour); [ui] mark = "<text>" changes it,
 mark = "" removes it. The banner (`forge status --banner`) shows the MaqLabs wordmark; [ui] logo = false hides it.
@@ -17,7 +17,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
 
-PALETTE = {"accent": ("#d52b3d", 161), "dim": ("#8a8a8a", 245), "ok": ("#3fb950", 71), "warn": ("#d29922", 178),
+PALETTE = {"accent": ("#4245f5", 63), "dim": ("#8a8a8a", 245), "ok": ("#3fb950", 71), "warn": ("#d29922", 178),
            "err": ("#ff6e9c", 204), "bright": (None, None)}
 GLYPHS = {"mark": "◆", "hook": "▸", "ok": "✓", "fail": "✗", "active": "▶", "review": "?", "todo": "·", "skip": "–",
           "warn": "⚠", "dirty": "●", "sep": " · "}

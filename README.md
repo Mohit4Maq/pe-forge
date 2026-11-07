@@ -90,7 +90,7 @@ Next: work P1 and pass its gate  (skill pe-foundation, gate G1)
 ## Your terminal
 
 Inside a pe-forge project, Claude Code shows the pe-forge bar at the bottom of the screen, starting with the
-MaqLabs mark `maq` in MaqLabs red (`forge status --banner` shows the full MaqLabs wordmark):
+MaqLabs mark `maq` in the accent blue (#4245f5) (`forge status --banner` shows the full MaqLabs wordmark):
 
 ```
 maq ▸ Buck48to12 · P6 Schematic · M-02 Power stage · G6 ? review · ⚠ 2 open: erc, drift · check ✓ 14:02 · ctx 41% · Opus · main

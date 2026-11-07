@@ -59,6 +59,11 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" watch --mark",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/forge\" meter --cache",
+            "timeout": 30
           }
         ]
       }

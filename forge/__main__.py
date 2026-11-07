@@ -9,7 +9,7 @@
   forge link [--apply]              ID registry + wiki links
   forge consistency [--hook]        superseded-term check (Rule 5)
   forge watch --mark|--report|--show [--event E]   manual-edit watch (Rule 6)
-  forge meter [--json]              token budget GREEN / AMBER / RED
+  forge meter [--json] [--cache]    token budget GREEN / AMBER / RED (--cache: for the status line)
   forge schdraw check|apply|pins|new ...           agent schematic drawing
   forge bom check [file]            BoM completeness (alternates, price, stock)
   forge check [--json] [--strict] [--fab] [--only a,b] [--module M-xx]
@@ -19,6 +19,7 @@
   forge cr new|validate|approve|close|reject|list|status|guard ...   change requests after baseline (G6 / G7)
   forge ledger record|check [--hook] | show | clear --reason T   sync obligations (hooks; Stop blocks while open)
   forge spice check [--module M-xx] [--strict] [--json]   ngspice assertions from the briefs' ## Simulation blocks
+  forge statusline [install [--project|--user] [--uninstall]]   the pe-forge bar in Claude Code (docs/ui-layout.md)
   forge explain U1 | NET | U1.7 | U1.VCC | --pins MC_ID [--json] [--sheet PATH]   deterministic design lookup
   forge fab manifest [<kicad dir>]  release manifest (SHA-256 of sources and outputs); release.sh runs it
   forge drift [--json] [--module M-xx]  BoM / brief / booklet against the drawn schematic {doc, claim, actual}
@@ -61,20 +62,24 @@ def main(argv):
     if cmd == "spice":
         from forge import spice
         return spice.main(need(), rest)
+    if cmd == "statusline":
+        from forge import statusline
+        return statusline.main(rest)
     if cmd == "explain":
         from forge import explain
         return explain.main(config.project_or_none(), rest)
     if cmd == "fab":
         from forge import fab
         return fab.main(config.project_or_none(), rest)
-    if cmd in ("watch", "consistency", "ledger") and config.find_root() is None:
+    if cmd in ("watch", "consistency", "ledger") and config.find_root() is None or \
+            (cmd == "meter" and "--cache" in rest and config.find_root() is None):
         return 0   # hooks outside a forge project: silent no-op
     if cmd == "cr" and rest[:1] == ["guard"] and config.find_root() is None:
         return 0   # hooks outside a forge project: silent no-op
     prj = need()
     if cmd == "status":
         from forge import cli_state
-        return cli_state.status(prj)
+        return cli_state.status(prj, rest)
     if cmd in ("gate", "phase", "module"):
         from forge import cli_state
         return getattr(cli_state, cmd)(prj, rest)

@@ -228,6 +228,7 @@ def check_hook(prj, payload):
     d["mtimes"] = now
     if not any(o["kind"] == "consistency" for o in d["open"]):
         d["open"].append({"kind": "consistency", "target": "project", "opened_by": "stop", "opened_at": _now(), "file": ""})
+    ran = sorted({o["kind"] for o in d["open"]})
     failing = evaluate(prj, d)
     blocking, advisory = [], []
     for o in d["open"]:
@@ -246,6 +247,9 @@ def check_hook(prj, payload):
                  if advisory else ""), file=sys.stderr)
         return 2
     msg = []
+    line = stop_line(prj, ran, failing)
+    if line:
+        msg.append(line)
     if blocking:
         msg.append("pe-forge: obligations still open: " + "; ".join(blocking))
     if advisory:
@@ -253,6 +257,30 @@ def check_hook(prj, payload):
     if msg:
         print(json.dumps({"systemMessage": "\n".join(msg)[:1500]}))
     return 0
+
+
+NAMES = {"erc": "ERC", "drc": "DRC", "drift": "drift", "bom": "BoM", "vmodel": "V-model", "consistency": "consistency",
+         "changelog": "changelog", "legibility": "legibility"}
+
+
+def stop_line(prj, ran, failing):
+    """'pe-forge ▸ ERC ✓ · drift ✓ · consistency ✓', only when it differs from the last Stop's line."""
+    from . import ui
+    t = ui.Theme(color=False)
+    bad = {k for k, _ in failing}
+    text = " · ".join(f"{NAMES.get(k, k)} {t.g('fail') if k in bad else t.g('ok')}" for k in ran)
+    if not text:
+        return ""
+    line = ui.hook_message(text, t)["systemMessage"]
+    f = prj.p("tools_data", "cache", "stop_line.txt")
+    try:
+        if open(f).read() == line:
+            return ""
+    except OSError:
+        pass
+    os.makedirs(os.path.dirname(f), exist_ok=True)
+    open(f, "w").write(line)
+    return line
 
 
 def show(prj):

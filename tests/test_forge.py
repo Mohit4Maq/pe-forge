@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,6 +21,8 @@ FORGE = [sys.executable, os.path.join(REPO, "forge", "__main__.py")]
 FIX = os.path.join(REPO, "tests", "fixtures")
 ENV = dict(os.environ, MC_LIB=os.path.join(REPO, "library"))   # always test against the bundled library
 ENV.pop("CLAUDE_PROJECT_DIR", None)
+_CFG = tempfile.mkdtemp(prefix="pe-forge-cfg-")          # status line records never touch the real ~/.config
+ENV["PE_FORGE_CONFIG_DIR"] = os.environ["PE_FORGE_CONFIG_DIR"] = _CFG
 
 
 def forge(*args, cwd=None, check=True, stdin=None):
@@ -1179,6 +1182,129 @@ class PartsEvidence(unittest.TestCase):
 def dt_today():
     import datetime
     return datetime.date.today().isoformat()
+
+
+class StatusLine(unittest.TestCase):
+    """WP14: forge statusline, ui theme, install / uninstall, hook chrome."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="pe-forge-sl-")
+        cls.cfgdir = os.path.join(cls.tmp, "cfg")
+        os.environ["PE_FORGE_CONFIG_DIR"] = cls.cfgdir
+        ENV["PE_FORGE_CONFIG_DIR"] = cls.cfgdir
+        cls.dir = new_project("Buck48to12", cls.tmp)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, True)
+
+    def bar(self, payload=None, env=None, raw=None):
+        stdin = raw if raw is not None else json.dumps(payload or {
+            "model": {"display_name": "Opus"}, "workspace": {"current_dir": self.dir, "project_dir": self.dir}})
+        e = dict(ENV, COLUMNS="200", **(env or {}))
+        r = subprocess.run(FORGE + ["statusline"], input=stdin, capture_output=True, text=True, env=e, cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.rstrip("\n")
+
+    def test_basic_line(self):
+        out = self.bar(env={"NO_COLOR": "1"})
+        self.assertEqual(out.count("\n"), 0)
+        for s in ("Buck48to12", "P0 Intake", "Opus"):
+            self.assertIn(s, out)
+
+    def test_ledger_segment_appears_and_disappears(self):
+        led = os.path.join(self.dir, ".forge/ledger.json")
+        json.dump({"open": [{"kind": "erc", "target": "a", "opened_by": "agent"},
+                            {"kind": "drift", "target": "M-01", "opened_by": "agent"}]}, open(led, "w"))
+        with_led = self.bar(env={"NO_COLOR": "1"})
+        self.assertIn("2 open: erc, drift", with_led)
+        os.remove(led)
+        self.assertEqual(self.bar(env={"NO_COLOR": "1"}), with_led.replace(" · ⚠ 2 open: erc, drift", ""))
+
+    def test_outside_project_chains_to_previous(self):
+        os.makedirs(self.cfgdir, exist_ok=True)
+        json.dump({"command": "echo my-own-line"}, open(os.path.join(self.cfgdir, "statusline_prev.json"), "w"))
+        out = self.bar({"workspace": {"current_dir": "/", "project_dir": "/"}})
+        self.assertEqual(out, "my-own-line")
+        os.remove(os.path.join(self.cfgdir, "statusline_prev.json"))
+
+    def test_bad_input_and_corrupt_state_give_minimal_line(self):
+        self.assertEqual(self.bar(raw="not json"), "Claude · " + os.path.basename(self.tmp))
+        st = os.path.join(self.dir, ".forge/state.json")
+        good = open(st).read()
+        open(st, "w").write("{broken")
+        try:
+            out = self.bar()
+            self.assertIn("Opus", out)
+            self.assertTrue(os.path.exists(os.path.join(self.dir, ".forge/cache/statusline.log")))
+        finally:
+            open(st, "w").write(good)
+
+    def test_no_color_and_ascii(self):
+        self.assertNotIn("\x1b[", self.bar(env={"NO_COLOR": "1"}))
+        self.assertIn("\x1b[", self.bar())
+        pt = os.path.join(self.dir, "project.toml")
+        orig = open(pt).read()
+        open(pt, "w").write(orig + '\n[ui]\nglyphs = "ascii"\ncolor = false\n')
+        try:
+            out = self.bar()
+            self.assertTrue(all(ord(c) < 128 for c in out), out)
+        finally:
+            open(pt, "w").write(orig)
+
+    def test_fit_drops_whole_segments(self):
+        from forge import ui
+        segs = [(1, "◆ Buck48to12"), (2, "P6 Schematic"), (3, "M-02 Power stage"), (4, "G6 open"), (11, "Opus")]
+        line = ui.fit(segs, 40, " · ")
+        self.assertEqual(line, "◆ Buck48to12 · P6 Schematic")          # mark, project and phase kept whole
+        self.assertLessEqual(ui.visible_len(line), 40)
+        self.assertEqual(ui.visible_len("\x1b[1mab\x1b[0m"), 2)
+
+    def test_fast(self):
+        ts = []
+        for _ in range(20):
+            t0 = time.time()
+            self.bar()
+            ts.append(time.time() - t0)
+        med = sorted(ts)[10] * 1000
+        print(f"\n    statusline median {med:.1f} ms", file=sys.stderr)
+        if not os.environ.get("CI_SLOW"):
+            self.assertLess(med, 100)
+
+    def test_install_uninstall_restores_settings(self):
+        from forge import statusline as sl
+        d = os.path.join(self.tmp, "settings")
+        os.makedirs(d, exist_ok=True)
+        fresh = os.path.join(d, "fresh.json")
+        sl.install(fresh)
+        self.assertIn("statusLine", json.load(open(fresh)))
+        sl.install(fresh, uninstall=True)
+        self.assertFalse(os.path.exists(fresh))
+        had = os.path.join(d, "had.json")
+        orig = '{\n    "env": {"A": "1"},\n  "permissions": {"allow": ["Bash(ls)"]},\n  "statusLine": {"type": "command", "command": "mine"}\n}\n'
+        open(had, "w").write(orig)
+        sl.install(had)
+        cur = json.load(open(had))
+        self.assertEqual(cur["env"], {"A": "1"})
+        self.assertIn("forge", cur["statusLine"]["command"])
+        sl.install(had, uninstall=True)
+        self.assertEqual(open(had).read(), orig)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, ".claude/settings.local.json")))   # forge new
+
+    def test_status_text_unchanged_without_tty(self):
+        out = forge("status", cwd=self.dir).stdout
+        self.assertNotIn("\x1b[", out)
+        self.assertTrue(out.startswith("Buck48to12  ·  profile full"))
+        self.assertIn("  ▶ P0 Intake and project set-up", out)
+
+    def test_stop_line_not_repeated(self):
+        r1 = forge("ledger", "check", "--hook", cwd=self.dir, check=False, stdin="{}")
+        r2 = forge("ledger", "check", "--hook", cwd=self.dir, check=False, stdin="{}")
+        self.assertIn("pe-forge ▸ consistency ✓", json.loads(r1.stdout)["systemMessage"])
+        self.assertEqual(r2.stdout.strip(), "")
+        b = forge("watch", "--report", "--event", "SessionStart", cwd=self.dir).stdout
+        self.assertIn("pe-forge ▸ Buck48to12 · P0 Intake", json.loads(b)["systemMessage"])
 
 
 if __name__ == "__main__":

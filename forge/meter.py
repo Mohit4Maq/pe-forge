@@ -60,6 +60,11 @@ def main(prj, argv):
     st = "RED" if limited or f >= red else "AMBER" if f >= amber else "GREEN"
     res = {"status": st, "day_units": int(day), "day_frac": round(day / day_cap, 3), "w5_units": int(win),
            "w5_frac": round(win / w5_cap, 3), "limited_until": limited.isoformat() if limited else None}
+    if "--cache" in argv:
+        d = prj.p("tools_data", "cache")
+        os.makedirs(d, exist_ok=True)
+        json.dump(dict(res, at=now.isoformat(timespec="seconds")), open(os.path.join(d, "meter.json"), "w"))
+        return 0
     print(json.dumps(res) if "--json" in argv else
           f"TOKENS {st} | today {day / 1e6:.1f}M ({day / day_cap:.0%}) | last 5 h {win / 1e6:.1f}M ({win / w5_cap:.0%})"
           + (f" | plan limit until {limited:%H:%M}" if limited else ""))

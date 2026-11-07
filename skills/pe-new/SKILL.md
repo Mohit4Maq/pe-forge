@@ -42,7 +42,7 @@ answered or that has an obvious default (state the default instead). Pick from t
 ## 3. Create the project
 1. Write the answers to `<scratch>/intake.json` (schema in `forge new --help`: name, summary, owner, type,
    specs, corners, standards, volume, target_cost_usd, profile, schematic_mode, reviews, region, distributors,
-   precommit_hook, answers{question: answer}). **Corners must hold both ends of every range** (input, output, load, f_sw,
+   precommit_hook, statusline (default true: the pe-forge bar for this project), answers{question: answer}). **Corners must hold both ends of every range** (input, output, load, f_sw,
    ambient): every design is verified at both ends.
 2. `forge new <dir> --answers <scratch>/intake.json`.
 3. Fill `01_Program/Master_Plan.md` §1 and open the first items: E-01 market survey, E-02 literature, E-03

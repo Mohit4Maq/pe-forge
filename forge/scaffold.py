@@ -11,6 +11,7 @@ intake.json (all optional except name / summary):
  "standards": ["IEC 62368-1", "CISPR 32 class B"], "volume": "1k/yr", "target_cost_usd": 40,
  "profile": "full", "schematic_mode": "ask", "reviews": "gate", "region": "IN",
  "distributors": ["mouser", "digikey", "lcsc"], "precommit_hook": true, "answers": {"question": "answer", ...}}
+statusline (default true): the pe-forge bar in <project>/.claude/settings.local.json (this machine only).
 precommit_hook (default true): install the `forge check` git pre-commit hook. The CI workflow
 .github/workflows/forge-check.yml is always copied (it does nothing until the project is pushed to GitHub).
 """
@@ -152,6 +153,12 @@ def main(argv):
     state.save(prj, st)
     if not os.path.isdir(os.path.join(dst, ".git")):
         subprocess.run(["git", "init", "-q", "-b", "main", dst], check=False)
+    if a.get("statusline", True):      # the pe-forge bar, for this project on this machine only
+        from . import statusline
+        try:
+            statusline.install(os.path.join(dst, ".claude", "settings.local.json"))
+        except Exception as e:
+            print(f"  status line not installed: {e}")
     if a.get("precommit_hook", True):
         from . import check
         import contextlib
@@ -160,5 +167,7 @@ def main(argv):
             check.hooks(prj, ["install"])
     print(f"created {a['name']} at {dst}\n  KiCad project: 08_PCB/{slug}/"
           + ("\n  git pre-commit hook: forge check (remove with `forge hooks --uninstall`)" if a.get("precommit_hook", True) else "")
+          + ("\n  status line: pe-forge bar in .claude/settings.local.json (restart Claude Code to see it)"
+             if a.get("statusline", True) else "")
           + "\n  next: /pe-run (or `forge status`)")
     return 0

@@ -42,7 +42,8 @@ class Watch:
             return {}
 
     def save(self, tree):
-        json.dump({"tree": tree, "head": self.git("rev-parse", "HEAD").strip()}, open(self.st, "w"))
+        json.dump({"tree": tree, "head": self.git("rev-parse", "HEAD").strip(),
+                   "head_tree": self.git("rev-parse", "HEAD^{tree}").strip()}, open(self.st, "w"))
 
     def report(self):
         st, new = self.load(), self.snapshot()
@@ -84,9 +85,28 @@ def main(prj, argv):
         print(text or "no changes since last snapshot")
         return 0
     w.save(new)
+    out = {}
     if text:
         ctx = ("[pe-forge change watch, Rule 6] Files changed since your last turn (the user, or a background agent). "
                "User edits are design intent: understand them, propagate them (Rule 5), ask if unclear, mention them "
                "briefly, never revert them.\n\n" + text)
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": ev, "additionalContext": ctx}}))
+        out["hookSpecificOutput"] = {"hookEventName": ev, "additionalContext": ctx}
+    if ev == "SessionStart":
+        out.update(banner(prj))
+    if out:
+        print(json.dumps(out))
     return 0
+
+
+def banner(prj):
+    """One branded line for the user at session start: project, phase, module, next step."""
+    try:
+        from . import state, ui
+        from .statusline import SHORT, GATE
+        st = state.load(prj)
+        scope, pid, nxt = state.next_action(st)
+        bits = [prj.name] + ([f"{pid} {SHORT[pid]}"] if pid in SHORT else []) + ([scope] if scope != "system" else [])
+        bits.append(f"next: pass {GATE[pid]}" if pid in GATE else f"next: {nxt}")
+        return ui.hook_message(" · ".join(bits))
+    except Exception:
+        return {}

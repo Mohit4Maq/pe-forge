@@ -87,6 +87,26 @@ Modules:
 Next: work P1 and pass its gate  (skill pe-foundation, gate G1)
 ```
 
+## Your terminal
+
+Inside a pe-forge project, Claude Code shows the pe-forge bar at the bottom of the screen, in MaqLabs red:
+
+```
+◆ Buck48to12 · P6 Schematic · M-02 Power stage · G6 ? review · ⚠ 2 open: erc, drift · check ✓ 14:02 · ctx 41% · Opus · main
+```
+
+Project, phase, module, gate, open obligations, an open transaction, change control, the last `forge check`, the
+token meter, context use, model and branch. Segments that do not fit the width are dropped whole, lowest priority
+first. Session start and each finished turn also print one short `pe-forge ▸` line.
+
+- `forge new` installs it for that project on this machine (`.claude/settings.local.json`); add it to an existing
+  project with `forge statusline install`, remove it with `forge statusline install --uninstall`. Restart Claude
+  Code (or open `/statusline`) to see it.
+- Options in `project.toml [ui]`: `accent = "#RRGGBB"`, `color = false`, `glyphs = "ascii"`,
+  `statusline_lines = 2` (adds a `Next:` line). `NO_COLOR` is honoured.
+- A custom status line hides Claude Code's footer key hints (`esc to interrupt`, `? for shortcuts`), and a folder
+  you have not trusted shows it blank. Layout spec: `docs/ui-layout.md`.
+
 ## Schematics: you draw, or the agents draw
 
 Set at intake (`process.schematic_mode` = `user`, `agent` or `ask` per sheet). In both modes nothing is drawn

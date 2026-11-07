@@ -9,13 +9,28 @@ def _opt(rest, name):
     return rest[rest.index(name) + 1] if name in rest else None
 
 
-def status(prj):
+MARK = ["█▀▀ █▀▀ ▄▄ █▀▀ █▀█ █▀█ █▀▀ █▀▀", "█▀▀ ██▄    █▀  █▄█ █▀▄ █▄█ ██▄", "▀              pe-forge"]
+
+
+def _theme():
+    from . import ui
+    return ui.Theme(color=ui.tty())
+
+
+def status(prj, rest=()):
     st = S.load(prj)
+    T = _theme()
+    if "--banner" in rest:
+        for row in MARK:
+            print(T.paint("accent", row, bold=True))
+    STY = {"passed": "ok", "active": "accent", "in-review": "warn"}
+    paint_line = lambda s, line: T.paint(STY[s], line) if s in STY else line
     print(f"{prj.name}  ·  profile {prj.process.get('profile', 'full')}  ·  schematic mode "
           f"{prj.process.get('schematic_mode', 'ask')}")
     for p in PHASES:
         s = st["phases"][p[0]]
-        print(f"  {ICON[s['status']]} {p[0]} {p[2]}" + (f"  [{p[1]} passed {s.get('date')}]" if s["status"] == "passed" else ""))
+        print(paint_line(s["status"], f"  {ICON[s['status']]} {p[0]} {p[2]}"
+                         + (f"  [{p[1]} passed {s.get('date')}]" if s["status"] == "passed" else "")))
     if st["modules"]:
         print("Modules:")
         for m in st["modules"]:
@@ -50,7 +65,7 @@ def phase(prj, rest):
         st["phase"] = pid
     S.log(st, f"{mid or 'system'} {pid} started")
     S.save(prj, st)
-    print(f"{mid or 'system'} {pid} active")
+    print(_theme().paint("accent", f"▶ {mid or 'system'} {pid} active"))
     return 0
 
 
@@ -87,7 +102,7 @@ def gate(prj, rest):
             m["status"] = "passed"
         S.log(st, f"{mid or 'system'} {g} passed" + (" (OVERRIDE by owner)" if bad else ""))
         S.save(prj, st)
-        print(f"{mid or 'system'} {g} passed")
+        print(_theme().paint("ok", f"✓ {mid or 'system'} {g} passed"))
         return 0
     if act == "fail":
         tgt = m["phases"][pid] if m else st["phases"][pid]

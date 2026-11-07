@@ -12,3 +12,4 @@ __pycache__/
 .forge/runs/
 .forge/txn.json
 .history/
+.claude/settings.local.json

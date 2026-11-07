@@ -1,6 +1,8 @@
 # pe-forge terminal UI: layout spec (WP14)
 
-Status: **draft, waiting for the owner's OK before the renderer is coded.** Accent decided: MaqLabs red.
+Status: **approved by the owner on 2026-11-07 and implemented** (forge/ui.py, forge/statusline.py). Decisions:
+MaqLabs red accent; `ctx` segment included; installed per pe-forge project only (`.claude/settings.local.json`,
+not the shared settings, because the command holds this machine's path); `bin/` kept.
 Checked against the Claude Code docs on 2026-11-07 (status line: code.claude.com/docs/en/statusline; hooks:
 code.claude.com/docs/en/hooks; plugin manifest: code.claude.com/docs/en/plugins/manifest-reference).
 
@@ -35,7 +37,7 @@ bottom of this table (never cut in half). Missing source files drop their segmen
 | 1 | mark + project | `◆ Buck48to12` | `project.toml` name | accent, bold |
 | 2 | phase | `P6 Schematic` | `state.json` phase + short title from `phases.py` | bright |
 | 3 | module | `M-02 Power stage` | `state.json` active_module (name cut to 18 chars) | bright |
-| 4 | gate | `G6 ? review` / `G6 ✓` / `G6 ·` | phase / module status (`cli_state.ICON` words) | ok when passed, warn when in review, dim otherwise |
+| 4 | gate | `G6 ? review` / `G6 ✓` / `G6 open` | phase / module status (`cli_state.ICON` words) | ok when passed, warn when in review, dim otherwise |
 | 5 | obligations | `⚠ 2 open: erc, drift` | `.forge/ledger.json` open list (kinds, max 3) | warn; omitted at 0 |
 | 6 | transaction | `txn: swap Q3` | `.forge/txn.json` what (cut to 16) | warn; omitted when none |
 | 7 | change control | `CR-007` / `locked` | approved CR covering the active module / module past G6 with none | dim / warn |
@@ -92,10 +94,9 @@ Truecolor when `$COLORTERM` is `truecolor` or `24bit`, else 256 colours; no colo
 - `forge status` keeps its exact text when stdout is not a TTY; colour only on a TTY; `--banner` adds a three-row
   block mark.
 
-## 7. Questions for the owner
+## 7. Owner decisions
 
-1. ~~Brand colour~~ **Decided (owner, 2026-11-07): MaqLabs red `#d52b3d`.**
-2. Include the `ctx 41%` segment (from stdin, free)?
-3. Install at user scope from bootstrap (affects every Claude Code session, chaining to your current status line
-   outside pe-forge projects), or project scope only from `forge new`?
-4. The `bin/` finding: keep `bin/` (Claude Code CLI only), or move launchers so claude.ai / Cowork can install it?
+1. Decided: MaqLabs red `#d52b3d`.
+2. Decided: yes.
+3. Decided: pe-forge projects only (`forge new`); `--user` stays available but bootstrap does not offer it.
+4. Decided: keep `bin/` (Claude Code CLI).

@@ -860,7 +860,7 @@ turns on every schematic task.
 | WP11 | Legibility lint + score | `feat/wp11-lint` | done | ownership in .forge/schdraw_owned.json (no stamp on the drawing); fixed lib_symbols indentation (engine sheets hid their parts from existing()) |
 | WP12 | ngspice assertion gate | `feat/wp12-spice-assert` | done | `roast` agent does not exist in pe-forge: independent review still owed; deck nodes renamed n_NET (ngspice reads / as division); schema 3 Sim_Model / Sim_Pins |
 | WP13 | Datasheet evidence cache | `feat/wp13-datasheets` | done | cache gitignored here; missing evidence warns (fails --strict) so existing libraries keep working; pad check in forge (stdlib) instead of fp_qa |
-| WP14 | Branded status line + hook chrome | `feat/wp14-statusline` | spec written | docs/ui-layout.md waits for the owner's OK (4 questions); renderer not coded |
+| WP14 | Branded status line + hook chrome | `feat/wp14-statusline` | done | MaqLabs red; project scope in .claude/settings.local.json; width from $COLUMNS; median ~32 ms |
 
 ---
 

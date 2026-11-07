@@ -60,7 +60,7 @@ TABLES: dict[str, tuple[str, list[str]]] = {
 SOURCING_FIELDS = ["Mouser_Stock", "Mouser_Price_1", "Mouser_Price_100", "Lifecycle", "Sourcing_Date"]
 BOM_FIELDS = ["MPN", "Manufacturer", "DigiKey_PN", "Mouser_PN", "LCSC_PN", "Package", "Tolerance",
               "Voltage_Rating", "Current_Rating", "Power_Rating", "Dielectric", "AEC_Q",
-              "Alt_MPN", "Alt_Manufacturer", "Status"]
+              "Alt_MPN", "Alt_Manufacturer", "Status", "Sim_Model", "Sim_Pins"]
 
 
 # ---------------------------------------------------------------- database
@@ -75,7 +75,7 @@ def columns() -> list[str]:
     return re.findall(r"^\s+(\w+)\s+TEXT", body, re.M)
 
 
-SCHEMA_VERSION = 2      # 2: LCSC_PN, JLC_Rotation
+SCHEMA_VERSION = 3      # 2: LCSC_PN, JLC_Rotation; 3: Sim_Model, Sim_Pins
 
 
 def init_db() -> None:

@@ -11,6 +11,8 @@
 --   Exclude_BOM / Exclude_Board   "1" to exclude (fiducials, stackup notes, ...)
 --   LCSC_PN       LCSC / JLCPCB part number (Cxxxxx) for JLCPCB assembly
 --   JLC_Rotation  degrees added to the KiCad rotation in the JLCPCB CPL (their reel orientation differs for some parts)
+--   Sim_Model     SPICE element for forge spice: '<letter> <model or subckt> | <.model / .subckt card> ...'
+--   Sim_Pins      symbol pin numbers in SPICE node order, e.g. '2 1' (anode, cathode)
 --   schema_version lives in table _meta (key, value); `mclib.py init` upgrades older databases in place
 
 CREATE TABLE IF NOT EXISTS _template (
@@ -39,6 +41,8 @@ CREATE TABLE IF NOT EXISTS _template (
     Mouser_Lead_Time TEXT NOT NULL DEFAULT '',
     LCSC_PN          TEXT NOT NULL DEFAULT '',
     JLC_Rotation     TEXT NOT NULL DEFAULT '',
+    Sim_Model        TEXT NOT NULL DEFAULT '',
+    Sim_Pins         TEXT NOT NULL DEFAULT '',
     Lifecycle        TEXT NOT NULL DEFAULT '',
     Sourcing_Date    TEXT NOT NULL DEFAULT '',
     Alt_MPN          TEXT NOT NULL DEFAULT '',

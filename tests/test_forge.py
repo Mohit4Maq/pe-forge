@@ -1028,5 +1028,90 @@ class Lint(unittest.TestCase):
         self.assertTrue(c["ok"])
 
 
+BRIEF_SIM = """---
+module: M-01
+kicad_sheet: 08_PCB/spc/spc.kicad_sch
+---
+# brief
+
+## Simulation
+scope: nets {scope}
+analysis: {analysis}
+source: VOUT = {source}
+assert: {assertion}
+{expect}
+"""
+
+
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class SpiceAssert(unittest.TestCase):
+    """WP12: forge spice check."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-spice-")
+        self.dir = new_project("Spc", self.tmp)
+        self.sheet = os.path.join(self.dir, "08_PCB/spc/spc.kicad_sch")
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), self.sheet)
+        forge("module", "add", "Sense", cwd=self.dir)
+        self.mod = os.path.join(self.dir, "modules/M-01_Sense")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def brief(self, assertion="V(VSENSE) between 5.9 and 6.1 at op", expect="expect: 6", scope="VOUT, VSENSE, GND",
+              analysis="op", source="12"):
+        open(os.path.join(self.mod, "Sheet_Brief.md"), "w").write(BRIEF_SIM.format(
+            assertion=assertion, expect=expect, scope=scope, analysis=analysis, source=source))
+
+    def spice(self, *a, env=None):
+        e = dict(ENV, **(env or {}))
+        return subprocess.run(FORGE + ["spice", "check", "--json", *a], cwd=self.dir, capture_output=True, text=True, env=e)
+
+    @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
+    def test_divider_holds_then_fails_on_a_changed_resistor(self):
+        self.brief()
+        r = self.spice()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["status"], "pass")
+        rec = open(os.path.join(self.mod, "Simulations/Sheet_Brief_spice.md")).read()
+        self.assertIn("ACCEPTED", rec)
+        self.assertIn("Simulation Verification Record", rec)
+        t = open(self.sheet).read()
+        head, tail = t.rsplit('(property "Value" "1"', 1)        # the last placed resistor: R2
+        open(self.sheet, "w").write(head + '(property "Value" "3"' + tail)
+        r = self.spice()
+        self.assertEqual(r.returncode, 1)
+        res = json.loads(r.stdout)["results"][0]
+        self.assertEqual(res["status"], "fail")
+        self.assertIn("measured 9; bound 5.9 to 6.1", res["detail"])
+
+    @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
+    def test_closed_form_disagreement_is_reported_even_inside_the_bound(self):
+        self.brief(expect="expect: 6.5")
+        d = json.loads(self.spice().stdout)
+        self.assertEqual(d["results"][0]["status"], "provisional")
+        self.assertIn("disagree by more than 2 %", d["results"][0]["detail"])
+        self.assertEqual(d["status"], "warn")
+
+    @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
+    def test_ac_gain_and_unmodelled_part(self):
+        self.brief("gain(VSENSE, VOUT) between 0.49 and 0.51 at 1k", "", analysis="ac 10 1e5", source="0 ac 1")
+        d = json.loads(self.spice().stdout)
+        self.assertEqual(d["results"][0]["status"], "pass", d)
+        self.brief(scope="VOUT, Net-(D1-A), GND", assertion="V(VOUT) between 11 and 13", expect="")
+        d = json.loads(self.spice().stdout)
+        self.assertEqual(d["results"][0]["status"], "skip")
+        self.assertIn("no SPICE model for D1", d["results"][0]["detail"])
+
+    def test_no_ngspice_is_a_skip_and_strict_fails(self):
+        self.brief()
+        r = self.spice(env={"NGSPICE": "/nonexistent/ngspice"})
+        self.assertEqual(r.returncode, 0)
+        d = json.loads(r.stdout)
+        self.assertEqual(d["status"], "skip")
+        self.assertIn("ngspice not found", d["reason"])
+        self.assertEqual(self.spice("--strict", env={"NGSPICE": "/nonexistent/ngspice"}).returncode, 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

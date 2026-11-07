@@ -14,6 +14,7 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   pcb_extra    library/tools/pcb_check.py: layout checks DRC does not do (needs KiCad's pcbnew)
   legibility   forge schdraw lint on every sheet: advice (warn) only; a sheet the engine drew and nobody has
                saved since is held to it by the ledger instead
+  spice        ngspice assertions from the sheet briefs' `## Simulation` blocks (skip: none, or no ngspice)
   fab          release readiness (only with --fab): routing, schematic/board match, BoM ready, outputs fresh
                (content hashes) and complete, power layout rules, release docs. See forge/fab.py
 
@@ -33,7 +34,7 @@ import time
 
 from . import config, consistency, gates, kicad, vmodel
 
-ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "pcb_extra", "legibility"]
+ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "pcb_extra", "legibility", "spice"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
 
@@ -229,6 +230,11 @@ def c_legibility(prj, opts):
     return result("warn" if F else "pass", F, reason="; ".join(scores))
 
 
+def c_spice(prj, opts):
+    from . import spice
+    return spice.as_check(prj, opts)
+
+
 def c_fab(prj, opts):
     try:
         from . import fab
@@ -238,7 +244,8 @@ def c_fab(prj, opts):
 
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
-          "drift": c_drift, "sch_lib": c_sch_lib, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "fab": c_fab}
+          "drift": c_drift, "sch_lib": c_sch_lib, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice,
+          "fab": c_fab}
 
 
 def run(prj, only=None, fab=False, strict=False, module=None):

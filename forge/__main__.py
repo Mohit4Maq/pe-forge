@@ -18,6 +18,7 @@
   forge hooks install [--chain] | --uninstall   git pre-commit hook running forge check (fast subset)
   forge cr new|validate|approve|close|reject|list|status|guard ...   change requests after baseline (G6 / G7)
   forge ledger record|check [--hook] | show | clear --reason T   sync obligations (hooks; Stop blocks while open)
+  forge spice check [--module M-xx] [--strict] [--json]   ngspice assertions from the briefs' ## Simulation blocks
   forge explain U1 | NET | U1.7 | U1.VCC | --pins MC_ID [--json] [--sheet PATH]   deterministic design lookup
   forge fab manifest [<kicad dir>]  release manifest (SHA-256 of sources and outputs); release.sh runs it
   forge drift [--json] [--module M-xx]  BoM / brief / booklet against the drawn schematic {doc, claim, actual}
@@ -57,6 +58,9 @@ def main(argv):
     if cmd == "schdraw":
         from forge import schdraw
         return schdraw.main(rest)
+    if cmd == "spice":
+        from forge import spice
+        return spice.main(need(), rest)
     if cmd == "explain":
         from forge import explain
         return explain.main(config.project_or_none(), rest)

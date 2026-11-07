@@ -126,6 +126,11 @@ match, every placed part released with an alternate, the outputs still match the
 Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8
 runs it.
 
+Small analog circuits (sense amplifiers, dividers into ADCs, gate-drive RC, UVLO thresholds) are checked with
+ngspice from the drawn schematic: a `## Simulation` block in the sheet brief states bounds and the closed-form
+value, and `forge spice check` reports each assertion as ACCEPTED, PROVISIONAL (ngspice and the closed form differ
+by more than 2 %) or REJECTED.
+
 The BoM tool writes DigiKey and Mouser upload files with build quantity and spares, and JLCPCB BoM + CPL files
 (`bom.py --jlcpcb`, LCSC numbers and per-part rotation offsets from the parts database).
 
@@ -164,7 +169,7 @@ v0.1. The process, engine, drawing engine and library are in daily use on a real
 from KiCad's JSON reports through one layer (`forge/kicad.py`; set `KICAD_CLI` if KiCad is not in a standard place).
 Known limits:
 - pwrlab covers buck, DAB, H-bridge, T-type / NPC and totem-pole PFC; other topologies are hand-built netlists
-  with the same checks done by hand (the skill says so).
+  with the same checks done by hand (the skill says so). `forge spice` handles small linear / analog circuits only.
 - `forge schdraw` draws new sheets or adds to a sheet. It does not yet rearrange parts already placed.
 - The bundled library is small. Vendor-generated symbols and footprints cannot be redistributed (see
   `library/EXCLUDED.md`); the part-librarian agent builds the rest from manufacturers' files.

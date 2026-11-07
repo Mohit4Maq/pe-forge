@@ -24,3 +24,10 @@ description: Phase P5 of a pe-forge project - verified simulation of the chosen 
 6. Results that fail or cannot be verified: an explicit "not verified, and why" list; never a design value.
 7. Gate G5: `pe-reviewer` runs SIM-QC on every result (ACCEPTED / PROVISIONAL / REJECTED) and re-runs at least
    one key case itself.
+
+## Small analog circuits (ngspice assertions)
+
+Sense amplifiers, dividers into ADCs, gate-drive RC, UVLO / OVP thresholds, feedback and NTC bias are not
+pwrlab's job. Write a `## Simulation` block in the sheet brief (grammar: `references/assertions.md`), give every
+assertion an `expect:` closed form, then `forge spice check --module M-xx`. The record lands in the module's
+`Simulations/` with its SVR, and `forge check` runs it whenever ngspice is installed.

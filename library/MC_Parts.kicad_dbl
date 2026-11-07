@@ -169,6 +169,22 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Mouser_Stock",
                     "name": "Mouser_Stock",
                     "visible_on_add": false,
@@ -362,6 +378,22 @@
                 {
                     "column": "Status",
                     "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -567,6 +599,22 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Mouser_Stock",
                     "name": "Mouser_Stock",
                     "visible_on_add": false,
@@ -760,6 +808,22 @@
                 {
                     "column": "Status",
                     "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -965,6 +1029,22 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Mouser_Stock",
                     "name": "Mouser_Stock",
                     "visible_on_add": false,
@@ -1158,6 +1238,22 @@
                 {
                     "column": "Status",
                     "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -1363,6 +1459,22 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Mouser_Stock",
                     "name": "Mouser_Stock",
                     "visible_on_add": false,
@@ -1556,6 +1668,22 @@
                 {
                     "column": "Status",
                     "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -1761,6 +1889,22 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Mouser_Stock",
                     "name": "Mouser_Stock",
                     "visible_on_add": false,
@@ -1954,6 +2098,22 @@
                 {
                     "column": "Status",
                     "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,
@@ -2159,6 +2319,22 @@
                     "inherit_properties": false
                 },
                 {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
                     "column": "Mouser_Stock",
                     "name": "Mouser_Stock",
                     "visible_on_add": false,
@@ -2352,6 +2528,22 @@
                 {
                     "column": "Status",
                     "name": "Status",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Model",
+                    "name": "Sim_Model",
+                    "visible_on_add": false,
+                    "visible_in_chooser": false,
+                    "show_name": false,
+                    "inherit_properties": false
+                },
+                {
+                    "column": "Sim_Pins",
+                    "name": "Sim_Pins",
                     "visible_on_add": false,
                     "visible_in_chooser": false,
                     "show_name": false,

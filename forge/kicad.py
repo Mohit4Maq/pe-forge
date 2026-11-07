@@ -277,7 +277,9 @@ def parse_design(text):
                       "sheetfile": props.get("Sheetfile", ""), "sheet": _val(_get(c, "sheetpath"), "names", "/")}
     nets = {}
     for n in (_get(tree, "nets") or [])[1:]:
-        name = _val(n, "name").lstrip("/")
+        raw = _val(n, "name").replace("{slash}", "/")
+        name = raw.lstrip("/")
+        token = re.sub(r"[\s()\[\]{},;=]", "_", raw)       # how KiCad's SPICE export spells this net
         pins = set()
         for nd in n:
             if isinstance(nd, list) and nd and nd[0] == "node":
@@ -290,7 +292,8 @@ def parse_design(text):
                     if fn.endswith("_" + pin):        # KiCad 10 writes pin K of pin 1 as "K_1"
                         fn = fn[:-len(pin) - 1]
                     comps[ref].setdefault("pins", {})[pin] = {"name": fn, "type": _val(nd, "pintype"),
-                                                               "net": name, "class": _val(n, "class", "Default")}
+                                                               "net": name, "class": _val(n, "class", "Default"),
+                                                               "token": token}
         nets[name] = pins
     return comps, nets
 

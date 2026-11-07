@@ -91,14 +91,19 @@ def bom_ok(path):
              + (f": {', '.join(bad[:6])}" if bad else ""))]
 
 
-def sims_ok(paths):
+def sims_ok(paths, prj=None):
     out = []
     for p in paths:
         t = open(p, errors="ignore").read()
         has_svr = re.search(r"simulation verification record|\bSVR\b", t, re.I)
         rejected = re.search(r"\bREJECTED\b", t)
-        out.append((bool(has_svr) and not rejected, f"{os.path.basename(p)}: SVR {'present' if has_svr else 'MISSING'}"
-                    + (", contains a REJECTED result" if rejected else "")))
+        problem = None
+        if prj is not None:                  # forge spice records: also refuse NOT RUN and stale ones
+            from .spice import record_problem
+            problem = record_problem(prj, p)
+        out.append((bool(has_svr) and not rejected and not problem,
+                    f"{os.path.basename(p)}: SVR {'present' if has_svr else 'MISSING'}"
+                    + (", contains a REJECTED result" if rejected else "") + (f", {problem}" if problem else "")))
     return out or [(False, "no simulation result documents")]
 
 
@@ -125,7 +130,7 @@ def check(prj, gate, mod=None):
         res += bom_ok(os.path.join(prj.root, mod["dir"], "BOM.csv") if mod else prj.p("bom_csv"))
     if gate == "G5":
         base = os.path.join(prj.root, mod["dir"], "Simulations") if mod else prj.p("sim_results")
-        res += sims_ok(glob.glob(os.path.join(base, "*.md")))
+        res += sims_ok(glob.glob(os.path.join(base, "*.md")), prj)
     if gate in ("G6", "G7"):   # the same sub-check `forge check` runs, so the two never disagree
         from . import check as fc
         r = (fc.c_erc if gate == "G6" else fc.c_drc)(prj, {})

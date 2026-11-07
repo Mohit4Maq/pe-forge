@@ -1055,6 +1055,7 @@ kicad_sheet: 08_PCB/spc/spc.kicad_sch
 scope: nets {scope}
 analysis: {analysis}
 source: VOUT = {source}
+{ignore}
 assert: {assertion}
 {expect}
 """
@@ -1076,9 +1077,9 @@ class SpiceAssert(unittest.TestCase):
         shutil.rmtree(self.tmp, True)
 
     def brief(self, assertion="V(VSENSE) between 5.9 and 6.1 at op", expect="expect: 6", scope="VOUT, VSENSE, GND",
-              analysis="op", source="12"):
+              analysis="op", source="12", ignore="ignore: D1"):
         open(os.path.join(self.mod, "Sheet_Brief.md"), "w").write(BRIEF_SIM.format(
-            assertion=assertion, expect=expect, scope=scope, analysis=analysis, source=source))
+            assertion=assertion, expect=expect, scope=scope, analysis=analysis, source=source, ignore=ignore))
 
     def spice(self, *a, env=None):
         e = dict(ENV, **(env or {}))
@@ -1107,18 +1108,43 @@ class SpiceAssert(unittest.TestCase):
         self.brief(expect="expect: 6.5")
         d = json.loads(self.spice().stdout)
         self.assertEqual(d["results"][0]["status"], "provisional")
-        self.assertIn("disagree by more than 2 %", d["results"][0]["detail"])
+        self.assertIn("disagree beyond 2 %", d["results"][0]["detail"])
         self.assertEqual(d["status"], "warn")
 
     @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
     def test_ac_gain_and_unmodelled_part(self):
-        self.brief("gain(VSENSE, VOUT) between 0.49 and 0.51 at 1k", "", analysis="ac 10 1e5", source="0 ac 1")
+        self.brief("gain(VSENSE, VOUT) between 0.49 and 0.51 at 1k", "expect: 0.5", analysis="ac 10 1e5", source="0 ac 1")
         d = json.loads(self.spice().stdout)
         self.assertEqual(d["results"][0]["status"], "pass", d)
-        self.brief(scope="VOUT, Net-(D1-A), GND", assertion="V(VOUT) between 11 and 13", expect="")
+        self.brief(scope="VOUT, VSENSE, GND", ignore="")          # D1 reaches outside the scope: the block stops
+        d = json.loads(self.spice().stdout)
+        self.assertIn("D1 (reaches Net-_D1-A_)", d["results"][0]["detail"])
+        self.brief(scope="VOUT, VSENSE, Net-(D1-A), GND", assertion="V(VOUT) between 11 and 13", expect="", ignore="")
         d = json.loads(self.spice().stdout)
         self.assertEqual(d["results"][0]["status"], "skip")
-        self.assertIn("no SPICE model for D1", d["results"][0]["detail"])
+        self.assertIn("no SPICE model for D1, J1", d["results"][0]["detail"])
+        self.assertIn("NOT RUN", open(os.path.join(self.mod, "Simulations/Sheet_Brief_spice.md")).read())
+        sys.path.insert(0, REPO)
+        from forge import config, gates
+        prj = config.Project(self.dir)
+        ok, msg = gates.sims_ok([os.path.join(self.mod, "Simulations/Sheet_Brief_spice.md")], prj)[0]
+        self.assertFalse(ok)                                       # a record whose checks never ran keeps G5 closed
+        self.assertIn("result NOT RUN", msg)
+
+    @unittest.skipUnless(shutil.which("ngspice") or os.path.exists("/opt/homebrew/bin/ngspice"), "ngspice not installed")
+    def test_stale_record_keeps_g5_closed(self):
+        self.brief()
+        self.assertEqual(self.spice().returncode, 0)
+        from forge import config, gates
+        prj = config.Project(self.dir)
+        rec = os.path.join(self.mod, "Simulations/Sheet_Brief_spice.md")
+        self.assertTrue(gates.sims_ok([rec], prj)[0][0])
+        t = open(self.sheet).read()
+        head, tail = t.rsplit('(property "Value" "1"', 1)
+        open(self.sheet, "w").write(head + '(property "Value" "3"' + tail)       # the drawing changes after the run
+        ok, msg = gates.sims_ok([rec], prj)[0]
+        self.assertFalse(ok)
+        self.assertIn("stale", msg)
 
     def test_no_ngspice_is_a_skip_and_strict_fails(self):
         self.brief()
@@ -1362,6 +1388,110 @@ class StatusLine(unittest.TestCase):
         self.assertEqual(r2.stdout.strip(), "")
         b = forge("watch", "--report", "--event", "SessionStart", cwd=self.dir).stdout
         self.assertIn("pe-forge ▸ Buck48to12 · P0 Intake", json.loads(b)["systemMessage"])
+
+
+NG = shutil.which("ngspice") or ("/opt/homebrew/bin/ngspice" if os.path.exists("/opt/homebrew/bin/ngspice") else None)
+
+
+def circuit(text):
+    """KiCad-style SPICE export lines -> (cir, comps) as forge.kicad.design would give them."""
+    comps, cir = {}, [".title test"]
+    for line in text.strip().split("\n"):
+        tok = line.split()
+        cir.append(line.strip())
+        if tok[0].startswith("."):
+            continue
+        ref, nodes = tok[0], tok[1:3]
+        if len(tok) > 1 and tok[1].startswith("__"):
+            ref, nodes = tok[0], tok[2:]                          # test shorthand: "U1 __U1 /INP /OUT /VCC"
+            cir[-1] = f"{tok[0]} {tok[1]}"
+        comps[ref] = {"fields": {}, "pins": {str(i + 1): {"net": n.lstrip("/"), "token": n}
+                                             for i, n in enumerate(nodes)}}
+    return "\n".join(cir + [".end"]), comps
+
+
+@unittest.skipUnless(NG, "ngspice not installed")
+class SpiceMeasures(unittest.TestCase):
+    """The review's findings, each against a hand calculation."""
+
+    def run_(self, block, text):
+        from forge import spice
+        blk = spice.parse_block("## Simulation\n" + block)
+        cir, comps = circuit(text)
+        with tempfile.TemporaryDirectory() as wd:
+            res, deck, _ = spice.run_block(blk, cir, comps, NG, wd)
+        return res
+
+    RC = "R1 /VIN /OUT 1k\nC1 /OUT GND 159.155n"            # f_c = 1 / (2 pi R C) = 1000 Hz
+
+    def test_op_reading_in_an_ac_block_is_the_operating_point(self):
+        r = self.run_("scope: VIN, OUT, GND\nanalysis: ac 10 1e5\nsource: VIN = 5 ac 1\n"
+                      "assert: V(OUT) between 4.9 and 5.1 at op\nexpect: 5\n"
+                      "assert: f3db(OUT) between 950 and 1050\nexpect: 1000\n"
+                      "assert: gain(OUT, VIN) between 0.69 and 0.72 at 1k\nexpect: 0.7071", self.RC)
+        self.assertEqual([x["status"] for x in r], ["pass", "pass", "pass"], [x["detail"] for x in r])
+
+    def test_currents_are_delivered_and_ac_is_a_magnitude(self):
+        r = self.run_("scope: VIN, GND\nanalysis: op\nsource: VIN = 12\nassert: I(VIN) between 5.9 and 6.1\nexpect: 6",
+                      "R1 /VIN GND 2")
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
+        r = self.run_("scope: VIN, OUT, GND\nanalysis: ac 10 1e5\nsource: VIN = 0 ac 1\n"
+                      "assert: I(VIN) between 0.6e-3 and 0.8e-3 at 1k\nexpect: 0.7071m", self.RC)   # |1/(R(1+j))|
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
+
+    def test_active_part_reaching_outside_the_scope_stops_the_block(self):
+        r = self.run_("scope: INP, OUT, GND\nsource: INP = 1\nassert: V(OUT) between 1.9 and 2.1\nexpect: 2",
+                      "R1 /OUT /FB 10k\nR2 /FB GND 10k\nU1 __U1 /INP /FB /OUT /VCC GND")
+        self.assertEqual(r[0]["status"], "fail")
+        self.assertIn("U1 (reaches FB, VCC)", r[0]["detail"])
+
+    def test_names_never_collide_and_ground_variants(self):
+        r = self.run_("scope: V+, V-, GND\nsource: V+ = 12\nassert: V(V-) between 5.9 and 6.1\nexpect: 6",
+                      "R1 /V+ /V- 1\nR2 /V- GND 1")
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
+        r = self.run_("scope: VIN, OUT, PGND\nsource: VIN = 12\nassert: V(OUT) between 5.9 and 6.1\nexpect: 6",
+                      "R1 /VIN /OUT 1\nR2 /OUT PGND 1")
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
+        r = self.run_("scope: VIN, OUT, PGND, GND\nsource: VIN = 12\nassert: V(OUT) < 7", "R1 /VIN /OUT 1\nR2 /OUT PGND 1\nR3 /OUT GND 1")
+        self.assertIn("several ground nets in scope", r[0]["detail"])
+
+    def test_missing_or_misspelt_source_is_an_error_not_zero(self):
+        r = self.run_("scope: VIN, OUT, GND\nsource: VINN = 12\nassert: V(OUT) < 1", self.RC)
+        self.assertIn("'VINN' is not a net", r[0]["detail"])
+        r = self.run_("scope: VIN, OUT, GND\nassert: V(OUT) < 1", self.RC)
+        self.assertIn("no source", r[0]["detail"])
+
+    def test_band_pass_corners_from_the_peak(self):
+        # series C (high-pass, 100 Hz) then R-C low-pass (10 kHz), buffered by distance: corners near both
+        r = self.run_("scope: VIN, A, OUT, GND\nanalysis: ac 1 1e7\nsource: VIN = 0 ac 1\n"
+                      "assert: f3db_low(OUT) between 80 and 125\nassert: f3db(OUT) between 8k and 12.5k",
+                      "C1 /VIN /A 1.59155u\nR1 /A GND 1k\nR2 /A /OUT 100k\nC2 /OUT GND 159.155p")
+        self.assertEqual([x["status"] for x in r], ["provisional", "provisional"], [x["detail"] for x in r])
+        self.assertIn("no closed-form", r[0]["detail"])           # no expect: PROVISIONAL, never ACCEPTED
+
+    def test_settle_and_half_time_step(self):
+        blk = "scope: VIN, OUT, GND\nanalysis: tran 1u {stop}\nsource: VIN = 0 pulse(0 1 0 1n 1n 1 2)\n" \
+              "assert: settle(OUT, 2%) between 3.5m 4.3m\nexpect: 3.912m"
+        rc = "R1 /VIN /OUT 1k\nC1 /OUT GND 1u"                 # tau 1 ms: 2 % after 3.912 ms
+        r = self.run_(blk.format(stop="10m").replace("between 3.5m 4.3m", "between 3.5m and 4.3m"), rc)
+        self.assertEqual(r[0]["status"], "pass", r[0]["detail"])
+        self.assertIn("half time step", r[0]["detail"])
+        r = self.run_(blk.format(stop="2m").replace("between 3.5m 4.3m", "between 3.5m and 4.3m"), rc)
+        self.assertIn("has not settled by the end of the run", r[0]["detail"])
+
+    def test_grammar(self):
+        from forge import spice
+        for s, v in zip(("1M", "1meg", "1m5", "5.", "4u7", "10uF", "3.3V"), (1e6, 1e6, 1.5e-3, 5.0, 4.7e-6, 1e-5, 3.3)):
+            self.assertAlmostEqual(spice.num(s), v, delta=abs(v) * 1e-12, msg=s)
+        b = spice.parse_block("## Simulation\nassert: V(Net-(D1-A)) <=5\nexpect: 4\nassert: bad stuff\nexpect: 9\n"
+                              "assert: V(X) between 6 and 5\nassert: V(Y) < 1\nexpect: 0")
+        a = b["asserts"]
+        self.assertEqual((a[0]["args"], a[0]["hi"], a[0]["hi_strict"], a[0]["expect"]), (["Net-(D1-A)"], 5, False, 4))
+        self.assertIn("error", a[1])
+        self.assertIn("lower bound is above", a[2]["error"])
+        self.assertIn("absolute tolerance", a[3]["error"])
+        r = self.run_("scope: VIN, OUT, GND\nsource: VIN = 0\nassert: gain(OUT, VIN) < 1", self.RC)
+        self.assertIn("the input VIN is 0", r[0]["detail"])
 
 
 if __name__ == "__main__":

@@ -31,3 +31,11 @@ Sense amplifiers, dividers into ADCs, gate-drive RC, UVLO / OVP thresholds, feed
 pwrlab's job. Write a `## Simulation` block in the sheet brief (grammar: `references/assertions.md`), give every
 assertion an `expect:` closed form, then `forge spice check --module M-xx`. The record lands in the module's
 `Simulations/` with its SVR, and `forge check` runs it whenever ngspice is installed.
+
+## Results as data (the side panel and the report)
+
+Next to every simulation record, write `<record stem>.result.json` (schema in `forge/results.py`): the grade, the
+corners, one metric per key number with its values per corner, the closed-form value, the difference in % and the
+metric's own grade, the charts (sweeps as `line`, loss breakdowns as `bars`) and the notes. Run
+`forge results check`. The pe-forge side panel (V-cycle, Simulations, Checks, Gates, Parts tabs) opens on it, and
+`forge report --open` shows it as an interactive page. `forge spice check` writes its own result files.

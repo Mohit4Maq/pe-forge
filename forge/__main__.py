@@ -20,6 +20,9 @@
   forge ledger record|check [--hook] | show | clear --reason T   sync obligations (hooks; Stop blocks while open)
   forge evidence todo [--write] | sync   datasheet work list per board; copy datasheets into the project
   forge spice check [--module M-xx] [--strict] [--json]   ngspice assertions from the briefs' ## Simulation blocks
+  forge vcycle [--json]            the V-cycle: every stage, where the project is, what needs attention
+  forge results check | forge panel --json | forge report [--open]   simulation results as data; the side panel's
+                                    feed; the offline HTML report
   forge statusline [install [--project|--user] [--uninstall]]   the pe-forge bar in Claude Code (docs/ui-layout.md)
   forge explain U1 | NET | U1.7 | U1.VCC | --pins MC_ID [--json] [--sheet PATH]   deterministic design lookup
   forge fab manifest [<kicad dir>]  release manifest (SHA-256 of sources and outputs); release.sh runs it
@@ -66,6 +69,15 @@ def main(argv):
     if cmd == "spice":
         from forge import spice
         return spice.main(need(), rest)
+    if cmd == "panel" and config.find_root() is None:
+        print('{"ok": false, "error": "not inside a pe-forge project"}')
+        return 0
+    if cmd == "vcycle":
+        from forge import vcycle
+        return vcycle.main(need(), rest)
+    if cmd in ("results", "panel", "report"):
+        from forge import results
+        return {"results": results.main_results, "panel": results.main_panel, "report": results.main_report}[cmd](need(), rest)
     if cmd == "statusline":
         from forge import statusline
         return statusline.main(rest)

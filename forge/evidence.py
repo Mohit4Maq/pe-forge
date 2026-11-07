@@ -9,6 +9,7 @@ Cache: $MC_DATASHEETS or $MC_LIB/datasheets/ (library/tools/datasheets.py fills 
 """
 import datetime as dt
 import hashlib
+import json
 import math
 import os
 import re
@@ -267,7 +268,21 @@ def main(prj, argv):
         return 1
     if argv[0] == "todo":
         text, groups = todo(prj, "--write" in argv)
-        if "--write" not in argv:
+        data = {"at": __import__("time").strftime("%Y-%m-%dT%H:%M:%S"),
+                "parts": sum(len(v) for v in groups.values()),
+                "groups": [{"family": f"{k[0] or '?'} {k[1]}".strip(), "footprint": k[2], "count": len(v),
+                            "refs": sorted(i[0] for i in v),
+                            "need": "add to MC_Parts" if not any(i[1] for i in v) else
+                            ("datasheet + check" if not any(cached_file((i[1] or {}).get("Datasheet"))[1] for i in v)
+                             else "check + Active")} for k, v in sorted(groups.items(), key=lambda kv: -len(kv[1]))]}
+        try:
+            os.makedirs(prj.p("tools_data", "cache"), exist_ok=True)
+            json.dump(data, open(prj.p("tools_data", "cache", "parts.json"), "w"))
+        except OSError:
+            pass
+        if "--json" in argv:
+            print(json.dumps(data))
+        elif "--write" not in argv:
             print(text)
         return 1 if groups else 0
     copied, n, missing = sync(prj)

@@ -270,16 +270,20 @@ def run(prj, only=None, fab=False, strict=False, module=None):
                                                           (r["status"] == "skip" and r["missing_tool"])))
     ok = not any(bad(r) for r in out.values())
     res = {"ok": ok, "checks": out, "duration_s": round(time.time() - t0, 2)}
-    cache(prj, res)
+    cache(prj, res, full=only is None)
     return res
 
 
-def cache(prj, res):
+def cache(prj, res, full=False):
+    """check.json (status line) on every run; check_full.json (side panel) when every check ran."""
     try:
         d = prj.p("tools_data", "cache")
         os.makedirs(d, exist_ok=True)
+        at = time.strftime("%Y-%m-%dT%H:%M:%S")
         json.dump({"ok": res["ok"], "failed": [n for n, r in res["checks"].items() if r["status"] == "fail"],
-                   "at": time.strftime("%Y-%m-%dT%H:%M:%S")}, open(os.path.join(d, "check.json"), "w"))
+                   "at": at}, open(os.path.join(d, "check.json"), "w"))
+        if full:
+            json.dump(dict(res, at=at), open(os.path.join(d, "check_full.json"), "w"))
     except OSError:
         pass
 

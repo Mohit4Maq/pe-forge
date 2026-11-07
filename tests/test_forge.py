@@ -1600,5 +1600,54 @@ class SpiceMeasures(unittest.TestCase):
         self.assertIn("the input VIN is 0", r[0]["detail"])
 
 
+class ResultsPanel(unittest.TestCase):
+    """Results files, the side panel's feed, the HTML report and the V-cycle."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-panel-")
+        self.dir = new_project("Pnl", self.tmp)
+        sys.path.insert(0, REPO)
+        from forge import config, results
+        self.prj, self.R = config.Project(self.dir), results
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def sample(self, **kw):
+        return dict({"id": "s1", "title": "Sample", "tool": "pwrlab buck", "grade": "ACCEPTED", "corners": ["36 V", "60 V"],
+                     "metrics": [{"name": "Efficiency", "unit": "%", "values": [93.1, 91.4], "grade": "ACCEPTED"}],
+                     "charts": [{"type": "line", "title": "Eff", "x": {"values": [0.1, 1.0]},
+                                 "series": [{"name": "36 V", "values": [82, 93]}]},
+                                {"type": "bars", "title": "Loss", "unit": "W", "items": [{"name": "Q1", "value": 0.4}]}]}, **kw)
+
+    def test_validate_catches_shape_errors(self):
+        self.assertEqual(self.R.validate(dict(self.sample(), schema=self.R.SCHEMA)), [])
+        bad = dict(self.sample(grade="GOOD"), schema=self.R.SCHEMA)
+        bad["metrics"][0]["values"] = [1]
+        p = self.R.validate(bad)
+        self.assertTrue(any("grade must be" in x for x in p))
+        self.assertTrue(any("1 value(s) for 2 corner(s)" in x for x in p))
+        with self.assertRaises(ValueError):
+            self.R.write(self.prj, os.path.join(self.dir, "06_Simulations/Results/x.result.json"), bad)
+
+    def test_panel_report_and_vcycle(self):
+        self.R.write(self.prj, os.path.join(self.dir, "06_Simulations/Results/s1.result.json"), self.sample())
+        d = json.loads(forge("panel", "--json", cwd=self.dir).stdout)
+        self.assertTrue(d["ok"])
+        self.assertEqual(d["results"][0]["title"], "Sample")
+        self.assertEqual(d["vcycle"]["current"], "concept")
+        self.assertEqual(len(d["vcycle"]["nodes"]), 10)
+        self.assertEqual(d["vcycle"]["nodes"]["sysreq"]["pair"], "sysver")
+        self.assertIn("Concept & needs", d["vcycle"]["nodes"]["concept"]["ask"])
+        page = open(forge("report", cwd=self.dir).stdout.strip()).read()
+        self.assertIn("<svg", page)
+        self.assertIn("Sample", page)
+        self.assertNotIn("http://", page.replace("http://www.w3.org", ""))      # offline: nothing fetched
+        self.assertIn("Now: Concept & needs", forge("vcycle", cwd=self.dir).stdout)
+        empty = tempfile.mkdtemp()
+        self.assertFalse(json.loads(forge("panel", "--json", cwd=empty).stdout)["ok"])
+        shutil.rmtree(empty)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

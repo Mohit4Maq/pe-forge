@@ -109,6 +109,15 @@ first. Session start and each finished turn also print one short `pe-forge ▸` 
 - A custom status line hides Claude Code's footer key hints (`esc to interrupt`, `? for shortcuts`), and a folder
   you have not trusted shows it blank. Layout spec: `docs/ui-layout.md`.
 
+### The results panel
+
+A second plugin, `pe-forge-panel` (`mods/pe-forge-panel`), puts a panel beside the chat with five tabs:
+**V-cycle** (every stage of the V, where the project is now, what needs attention; pick a stage to see its facts,
+items and documents, and press `a` to ask Claude about it), **Simulations** (grade, key numbers per corner against
+the hand calculation, charts), **Checks**, **Gates** and **Parts**. It opens by itself when a simulation result or a
+full check lands; `/results [project folder]` opens it at any time. `forge report --open` shows the same as an
+interactive page in the browser, offline. Install: `/plugin install pe-forge-panel@pe-forge`.
+
 ## Schematics: you draw, or the agents draw
 
 Set at intake (`process.schematic_mode` = `user`, `agent` or `ask` per sheet). In both modes nothing is drawn

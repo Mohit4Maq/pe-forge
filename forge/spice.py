@@ -877,7 +877,27 @@ def write_svr(prj, m, brief, blk, res, deck, sch, files, ng, info):
               "| Reproduce | `forge spice check" + (f" --module {m['id']}" if m else "") + "` |", "",
               "## Deck", "", "```", re.sub(r"wrdata \S+", "wrdata out.txt", deck.strip()) or "(not run)", "```", ""]
     open(p, "w").write("\n".join(l for l in lines if l is not None))
+    write_result(prj, m, brief, blk, res, p, result)
     return prj.rel(p)
+
+
+def write_result(prj, m, brief, blk, res, record, result):
+    """The record as data (<stem>.result.json) for the side panel and the report."""
+    from . import results
+    metrics = []
+    for r in res:
+        cf = r.get("expect")
+        err = ((r["value"] - cf) / cf * 100) if cf and r.get("value") is not None else None
+        metrics.append({"name": r["text"], "unit": "", "values": [r.get("value")], "closed_form": [cf] if cf is not None else None,
+                        "err_pct": err, "grade": GRADE[r["status"]], "note": r["detail"]})
+    doc = {"id": os.path.splitext(os.path.basename(record))[0], "title": f"{os.path.basename(brief)}: ngspice assertions",
+           "module": m["id"] if m else None, "tool": "ngspice (forge spice check)", "record": prj.rel(record),
+           "grade": result, "corners": [blk["analysis"]], "metrics": metrics, "charts": [],
+           "notes": [f"{GRADE[r['status']]}: {r['text']}: {r['detail']}" for r in res if r["status"] != "pass"]}
+    try:
+        results.write(prj, os.path.splitext(record)[0] + ".result.json", doc)
+    except (ValueError, OSError):
+        pass
 
 
 def record_problem(prj, path):

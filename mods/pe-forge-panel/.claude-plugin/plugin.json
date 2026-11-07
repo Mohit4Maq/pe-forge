@@ -1,0 +1,7 @@
+{
+  "name": "pe-forge-panel",
+  "version": "0.1.0",
+  "description": "pe-forge results beside the chat: simulations with key numbers and charts, checks, gates and the parts work list; opens when a result lands",
+  "types": "./types/index.d.ts",
+  "license": "MIT"
+}

@@ -15,6 +15,7 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   legibility   forge schdraw lint on every sheet: advice (warn) only; a sheet the engine drew and nobody has
                saved since is held to it by the ledger instead
   spice        ngspice assertions from the sheet briefs' `## Simulation` blocks (skip: none, or no ngspice)
+  parts_evidence  every placed part's datasheet evidence exists and matches by hash; sourcing snapshot age
   fab          release readiness (only with --fab): routing, schematic/board match, BoM ready, outputs fresh
                (content hashes) and complete, power layout rules, release docs. See forge/fab.py
 
@@ -34,7 +35,7 @@ import time
 
 from . import config, consistency, gates, kicad, vmodel
 
-ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "pcb_extra", "legibility", "spice"]
+ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "pcb_extra", "legibility", "spice", "parts_evidence"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
 
@@ -235,6 +236,11 @@ def c_spice(prj, opts):
     return spice.as_check(prj, opts)
 
 
+def c_parts_evidence(prj, opts):
+    from . import evidence
+    return evidence.as_check(prj, opts)
+
+
 def c_fab(prj, opts):
     try:
         from . import fab
@@ -244,7 +250,7 @@ def c_fab(prj, opts):
 
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
-          "drift": c_drift, "sch_lib": c_sch_lib, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice,
+          "drift": c_drift, "sch_lib": c_sch_lib, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
           "fab": c_fab}
 
 

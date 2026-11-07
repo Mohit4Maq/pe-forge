@@ -9,3 +9,6 @@ vendor/pwrlab/work/
 *.raw
 *.log
 *.op.raw
+
+# third-party datasheets: never in the public repo (keep them in your private library)
+library/datasheets/

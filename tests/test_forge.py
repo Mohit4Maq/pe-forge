@@ -1113,5 +1113,73 @@ class SpiceAssert(unittest.TestCase):
         self.assertEqual(self.spice("--strict", env={"NGSPICE": "/nonexistent/ngspice"}).returncode, 1)
 
 
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class PartsEvidence(unittest.TestCase):
+    """WP13: datasheet cache, evidence pointers, sourcing age."""
+
+    def setUp(self):
+        import sqlite3
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-ev-")
+        self.db = os.path.join(self.tmp, "parts.sqlite")
+        shutil.copy(os.path.join(REPO, "library/database/mc_parts.sqlite"), self.db)
+        self.cache = os.path.join(self.tmp, "datasheets")
+        self.env = dict(ENV, MC_DB=self.db, MC_DATASHEETS=self.cache)
+        self.dir = new_project("Evd", self.tmp)
+        shutil.copy(os.path.join(KFIX, "input_protection.kicad_sch"), os.path.join(self.dir, "08_PCB/evd/evd.kicad_sch"))
+        self.con = sqlite3.connect(self.db)
+        self.con.execute("UPDATE Resistors SET Sourcing_Date=? WHERE ID='RES-0184'", (dt_today(),))
+        self.con.commit()
+
+    def tearDown(self):
+        self.con.close()
+        shutil.rmtree(self.tmp, True)
+
+    def tool(self, *a):
+        return subprocess.run([sys.executable, os.path.join(REPO, "library/tools/datasheets.py"), *a],
+                              capture_output=True, text=True, env=self.env, cwd=self.tmp)
+
+    def ev(self, *a):
+        r = subprocess.run(FORGE + ["check", "--only", "parts_evidence", "--json", *a], cwd=self.dir,
+                           capture_output=True, text=True, env=self.env)
+        return json.loads(r.stdout)["checks"]["parts_evidence"]
+
+    def r1(self, f):
+        return [x for x in f["findings"] if x["claim"].startswith("R1 ")]
+
+    def test_cached_evidence_passes_then_a_missing_hash_fails(self):
+        pdf = os.path.join(self.tmp, "rc0603.pdf")
+        open(pdf, "wb").write(b"%PDF-1.4\n% test datasheet\n")
+        r = self.tool("add", pdf, "--mpn", "RC0603FR-071RL", "--manufacturer", "YAGEO")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        sha = r.stdout.split()[0]
+        self.assertEqual(self.tool("verify", "RES-0184", sha, "--page", "3", "--section", "Dimensions").returncode, 0)
+        self.assertEqual(self.r1(self.ev()), [])
+        self.assertEqual(self.tool("check").returncode, 0)
+        self.con.execute("UPDATE Resistors SET Verified_Against='deadbeefdeadbeef#p3' WHERE ID='RES-0184'")
+        self.con.commit()
+        f = self.ev()
+        self.assertEqual(f["status"], "fail")
+        self.assertIn("deadbeefdeadbeef.pdf is missing", json.dumps(self.r1(f)))
+
+    def test_old_sourcing_snapshot_warns(self):
+        self.con.execute("UPDATE Resistors SET Sourcing_Date='2020-01-01' WHERE ID='RES-0184'")
+        self.con.commit()
+        f = self.ev()
+        self.assertEqual(f["status"], "warn")
+        self.assertTrue(any("sourcing snapshot" in x["claim"] for x in self.r1(f)))
+        self.assertEqual(self.ev("--strict")["status"], "fail")
+
+    def test_active_needs_evidence(self):
+        r = subprocess.run([sys.executable, os.path.join(REPO, "library/tools/mclib.py"), "set", "RES-0184", "Status=Active"],
+                           capture_output=True, text=True, env=self.env)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("needs datasheet evidence", r.stderr)
+
+
+def dt_today():
+    import datetime
+    return datetime.date.today().isoformat()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

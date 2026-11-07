@@ -126,6 +126,10 @@ match, every placed part released with an alternate, the outputs still match the
 Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8
 runs it.
 
+Every part's symbol and footprint check is tied to the exact datasheet used: `library/tools/datasheets.py`
+caches the PDF by content hash and records page and section on the part, and `forge check` (parts_evidence) fails
+when that file is missing or has changed. Datasheets stay out of this repo (they are the makers' copyright).
+
 Small analog circuits (sense amplifiers, dividers into ADCs, gate-drive RC, UVLO thresholds) are checked with
 ngspice from the drawn schematic: a `## Simulation` block in the sheet brief states bounds and the closed-form
 value, and `forge spice check` reports each assertion as ACCEPTED, PROVISIONAL (ngspice and the closed form differ

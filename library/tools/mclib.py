@@ -75,7 +75,7 @@ def columns() -> list[str]:
     return re.findall(r"^\s+(\w+)\s+TEXT", body, re.M)
 
 
-SCHEMA_VERSION = 3      # 2: LCSC_PN, JLC_Rotation; 3: Sim_Model, Sim_Pins
+SCHEMA_VERSION = 4      # 2: LCSC_PN, JLC_Rotation; 3: Sim_Model, Sim_Pins; 4: Verified_*
 
 
 def init_db() -> None:
@@ -705,7 +705,11 @@ def cmd_set(a) -> int:
     t, _ = find_part(con, a.id)
     row = parse_kv(a.fields)
     con.execute(f"UPDATE {t} SET {','.join(f'{k}=?' for k in row)} WHERE ID=?", [*row.values(), a.id])
-    errs = resolve_errors(con.execute(f"SELECT * FROM {t} WHERE ID=?", (a.id,)).fetchone())
+    new = con.execute(f"SELECT * FROM {t} WHERE ID=?", (a.id,)).fetchone()
+    errs = resolve_errors(new)
+    if row.get("Status") == "Active" and not all(new[k] for k in ("Verified_Against", "Verified_By", "Verified_On")):
+        errs.append("Status Active needs datasheet evidence first: tools/datasheets.py add <pdf> --mpn ..., then "
+                    "tools/datasheets.py verify <ID> <sha16> --page N --section ...")
     if errs:
         con.rollback()
         sys.exit("not saved:\n  " + "\n  ".join(errs))

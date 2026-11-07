@@ -30,3 +30,13 @@ description: Phase P4 of a pe-forge project - size every component from the chos
 
 Wrap every change that touches more than one design file in `forge txn begin "<what>"` / `forge txn verify` /
 `forge txn commit` (or `close`), and use `forge txn rollback` instead of reverting by hand (see `pe-run` §4).
+
+## Datasheet evidence (cache, cite, verify)
+1. Download the latest datasheet from the manufacturer and cache it: `$MC_LIB/tools/datasheets.py add <file.pdf>
+   --mpn <MPN> --manufacturer <M> --url <where it came from>` (prints the 16-character id).
+2. After checking the symbol pins and the footprint land pattern against it, record the evidence:
+   `datasheets.py verify <MC_ID> <id> --page <N> --section "<table or figure>" --pads <count> --pitch <mm>`.
+3. Only then `mclib.py set <MC_ID> Status=Active` (it refuses without evidence). `forge check` (parts_evidence)
+   confirms every placed part points at a cached file with a matching hash and that the pad count and pitch match
+   the footprint, and warns when the sourcing snapshot is older than 90 days.
+Datasheets are copyrighted: the cache stays in the private library (Git LFS), never in a public repo.

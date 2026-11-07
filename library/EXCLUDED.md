@@ -58,3 +58,8 @@ These items exist in the maintainer's private library but may not be redistribut
 | `footprints/<legacy library>/` | imported from a third-party project library: not redistributable |
 | `datasheets/*.pdf` | manufacturer copyright: fetch by URL |
 | `3dmodels/*` | manufacturer licence: fetch from vendor |
+
+## Datasheets
+
+The datasheet evidence cache (`library/datasheets/`, filled by `tools/datasheets.py`) is gitignored here: datasheets
+are the manufacturers' copyrighted documents. Keep the cache in your private library, ideally with Git LFS.

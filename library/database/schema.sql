@@ -13,6 +13,9 @@
 --   JLC_Rotation  degrees added to the KiCad rotation in the JLCPCB CPL (their reel orientation differs for some parts)
 --   Sim_Model     SPICE element for forge spice: '<letter> <model or subckt> | <.model / .subckt card> ...'
 --   Sim_Pins      symbol pin numbers in SPICE node order, e.g. '2 1' (anode, cathode)
+--   Verified_Against  datasheet evidence: <sha256[:16]>#p<page>/<section> of a file in datasheets/ (tools/datasheets.py)
+--   Verified_By / Verified_On  who checked symbol and footprint against it, and when; Status Active needs all three
+--   Verified_Pads     <pad count>@<pitch mm> from that page, compared with the footprint by forge check
 --   schema_version lives in table _meta (key, value); `mclib.py init` upgrades older databases in place
 
 CREATE TABLE IF NOT EXISTS _template (
@@ -43,6 +46,10 @@ CREATE TABLE IF NOT EXISTS _template (
     JLC_Rotation     TEXT NOT NULL DEFAULT '',
     Sim_Model        TEXT NOT NULL DEFAULT '',
     Sim_Pins         TEXT NOT NULL DEFAULT '',
+    Verified_Against TEXT NOT NULL DEFAULT '',
+    Verified_By      TEXT NOT NULL DEFAULT '',
+    Verified_On      TEXT NOT NULL DEFAULT '',
+    Verified_Pads    TEXT NOT NULL DEFAULT '',
     Lifecycle        TEXT NOT NULL DEFAULT '',
     Sourcing_Date    TEXT NOT NULL DEFAULT '',
     Alt_MPN          TEXT NOT NULL DEFAULT '',

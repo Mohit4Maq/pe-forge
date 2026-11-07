@@ -21,3 +21,13 @@ You maintain MC_Lib ($MC_LIB). Read its `CLAUDE.md` first and follow it exactly.
 - New rows stay `Status=Seed` until the user has reviewed them. Say what they should check.
 - Finish with `mclib check`, then commit: `git -C $MC_LIB add -A && git -C $MC_LIB commit -m "Add <MPN>"`.
 - Report: what was added (ID, MPN, symbol, footprints), the evidence links, and what needs human review.
+
+## Datasheet evidence (cache, cite, verify)
+1. Download the latest datasheet from the manufacturer and cache it: `$MC_LIB/tools/datasheets.py add <file.pdf>
+   --mpn <MPN> --manufacturer <M> --url <where it came from>` (prints the 16-character id).
+2. After checking the symbol pins and the footprint land pattern against it, record the evidence:
+   `datasheets.py verify <MC_ID> <id> --page <N> --section "<table or figure>" --pads <count> --pitch <mm>`.
+3. Only then `mclib.py set <MC_ID> Status=Active` (it refuses without evidence). `forge check` (parts_evidence)
+   confirms every placed part points at a cached file with a matching hash and that the pad count and pitch match
+   the footprint, and warns when the sourcing snapshot is older than 90 days.
+Datasheets are copyrighted: the cache stays in the private library (Git LFS), never in a public repo.

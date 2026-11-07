@@ -790,15 +790,29 @@ class FabGate(unittest.TestCase):
         self.assertIn("Gerber for F.Mask", [x["claim"] for x in p["findings"]])
 
     def test_seed_fails_nrnd_warns_then_fails_strict(self):
+        import sqlite3
         self.assertIn("status Seed", json.dumps(self.fab()["parts"]["bom_ready"]))
-        sch = os.path.join(self.k, "fab.kicad_sch")
-        t = open(sch).read().replace('(property "Status" "Seed"', '(property "Status" "Active"')
-        t = t.replace('(property "Alt_MPN" ""', '(property "Alt_MPN" "ALT-1"')
-        head, tail = t.rsplit('(property "Status" "Active"', 1)      # the last one is a placed part, not lib_symbols
-        t = head + '(property "Status" "NRND"' + tail
-        open(sch, "w").write(t)
-        self.assertEqual(self.fab()["parts"]["bom_ready"]["status"], "warn")
-        self.assertEqual(self.fab("--strict")["parts"]["bom_ready"]["status"], "fail")
+        db = os.path.join(self.tmp, "parts.sqlite")              # the parts database is authoritative, not the sheet
+        shutil.copy(os.path.join(REPO, "library/database/mc_parts.sqlite"), db)
+        con = sqlite3.connect(db)
+        for tbl in ("Capacitors", "Diodes", "Connectors", "Resistors"):
+            con.execute(f"UPDATE {tbl} SET Status='Active', Alt_MPN='ALT-1', Verified_Against='0123456789abcdef#p1', "
+                        "Verified_By='T', Verified_On='2026-11-07'")
+        con.commit()
+        os.environ["MC_DB"] = ENV["MC_DB"] = db
+        try:
+            self.assertEqual(self.fab()["parts"]["bom_ready"]["status"], "pass", self.fab()["parts"]["bom_ready"])
+            con.execute("UPDATE Diodes SET Status='NRND' WHERE ID='DIO-0015'")
+            con.commit()
+            self.assertEqual(self.fab()["parts"]["bom_ready"]["status"], "warn")
+            self.assertEqual(self.fab("--strict")["parts"]["bom_ready"]["status"], "fail")
+            con.execute("UPDATE Diodes SET Status='Active', Verified_Against='' WHERE ID='DIO-0015'")
+            con.commit()
+            self.assertIn("Active but no datasheet evidence", json.dumps(self.fab()["parts"]["bom_ready"]))
+        finally:
+            con.close()
+            os.environ.pop("MC_DB", None)
+            ENV.pop("MC_DB", None)
 
 
 @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
@@ -1156,6 +1170,12 @@ class PartsEvidence(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         sha = r.stdout.split()[0]
         self.assertEqual(self.tool("verify", "RES-0184", sha, "--page", "3", "--section", "Dimensions").returncode, 0)
+        self.assertIn("not copied into the project", json.dumps(self.r1(self.ev())))
+        r = subprocess.run(FORGE + ["evidence", "sync"], cwd=self.dir, capture_output=True, text=True, env=self.env)
+        self.assertIn("datasheet(s) in 04_Hardware/Datasheets/", r.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, f"04_Hardware/Datasheets/RC0603FR-071RL_{sha}.pdf")))
+        idx = open(os.path.join(self.dir, "04_Hardware/Datasheets/Datasheets_Index.md")).read()
+        self.assertIn(f"{sha}#p3/Dimensions", idx)
         self.assertEqual(self.r1(self.ev()), [])
         self.assertEqual(self.tool("check").returncode, 0)
         self.con.execute("UPDATE Resistors SET Verified_Against='deadbeefdeadbeef#p3' WHERE ID='RES-0184'")
@@ -1171,6 +1191,43 @@ class PartsEvidence(unittest.TestCase):
         self.assertEqual(f["status"], "warn")
         self.assertTrue(any("sourcing snapshot" in x["claim"] for x in self.r1(f)))
         self.assertEqual(self.ev("--strict")["status"], "fail")
+
+    def test_new_part_needs_a_datasheet(self):
+        mc = [sys.executable, os.path.join(REPO, "library/tools/mclib.py")]
+        args = ["add", "Resistors", "MPN=TESTR-1", "Manufacturer=T", "Value=1k", "Package=0603",
+                "Symbols=MC_Generic:R", "Footprints=Resistor_SMD:R_0603_1608Metric", "--no-mouser"]
+        r = subprocess.run(mc + args, capture_output=True, text=True, env=self.env)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("every new part gets its datasheet", r.stdout + r.stderr)
+        pdf = os.path.join(self.tmp, "t.pdf")
+        open(pdf, "wb").write(b"%PDF-1.4\n% new part\n")
+        r = subprocess.run(mc + args + ["--datasheet", pdf], capture_output=True, text=True, env=self.env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        pid = r.stdout.split()[0]
+        ds = self.con.execute("SELECT Datasheet FROM Resistors WHERE ID=?", (pid,)).fetchone()[0]
+        self.assertRegex(ds, r"^\$\{MC_LIB\}/datasheets/[0-9a-f]{16}\.pdf$")
+        self.assertTrue(os.path.exists(os.path.join(self.cache, os.path.basename(ds))))
+
+    def test_family_verify_previews_then_applies_and_skips_mismatched_footprints(self):
+        pdf = os.path.join(self.tmp, "rc.pdf")
+        open(pdf, "wb").write(b"%PDF-1.4\n% yageo rc\n")
+        sha = self.tool("add", pdf, "--mpn", "RC0603 series").stdout.split()[0]
+        r = self.tool("verify-family", sha, "--match", "RC0603*", "--page", "4", "--pads", "2", "--pitch", "1.65",
+                      "--activate")
+        self.assertIn("preview only", r.stdout)
+        n = int(r.stdout.split()[0])
+        self.assertGreater(n, 10)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM Resistors WHERE Verified_Against!=''").fetchone()[0], 0)
+        r = self.tool("verify-family", sha, "--match", "RC0603*", "--page", "4", "--pads", "2", "--pitch", "1.65",
+                      "--activate", "--apply")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM Resistors WHERE Status='Active' AND Verified_Against "
+                                          "LIKE ?", (sha + "#p4%",)).fetchone()[0], n)
+        r = self.tool("verify-family", sha, "--match", "RC0603*", "--page", "4", "--pads", "3")
+        self.assertIn("SKIP", r.stdout)                         # a 2-pad footprint never takes 3-pad evidence
+        todo = subprocess.run(FORGE + ["evidence", "todo"], cwd=self.dir, capture_output=True, text=True, env=self.env)
+        self.assertNotIn("RC0603FR", todo.stdout)               # R1 / R2 are done now
+        self.assertIn("C3216X7R1H106K160AC", todo.stdout)        # the capacitors are not
 
     def test_active_needs_evidence(self):
         r = subprocess.run([sys.executable, os.path.join(REPO, "library/tools/mclib.py"), "set", "RES-0184", "Status=Active"],

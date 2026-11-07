@@ -161,11 +161,16 @@ def p_bom(ctx):
         for r in tables.read_csv(ctx["prj"].p("bom_csv")):
             for ref in tables.refs(r.get("ref", "")):
                 wip[ref] = r
+    from .evidence import rows_by_id
+    db = rows_by_id() or {}
     F, W = [], []
     for ref, c in sorted(comps.items()):
         if ref.startswith("#") or not c["in_bom"] or c["dnp"]:
             continue
-        fl = c["fields"]
+        row = db.get(c["fields"].get("MC_ID", ""))
+        # the parts database is authoritative; the placed symbol's fields are a snapshot from placement time
+        fl = dict(c["fields"], **{k: row[k] for k in ("MPN", "Manufacturer", "Status", "Alt_MPN") if row and row.get(k)}) \
+            if row else c["fields"]
         loc = os.path.basename(c.get("sheetfile") or "")
         for k in ("MPN", "Manufacturer"):
             if not (fl.get(k) or (wip.get(ref, {}).get(k) or "")).strip():
@@ -177,6 +182,9 @@ def p_bom(ctx):
             W.append(_f(f"{ref} library status Active", "status NRND (not recommended for new designs)", loc))
         elif not st:
             W.append(_f(f"{ref} library status Active", "no status: part not reviewed", loc))
+        elif st == "Active" and row is not None and not (row.get("Verified_Against") or "").strip():
+            F.append(_f(f"{ref} ({row['ID']}) checked against its datasheet", "Active but no datasheet evidence recorded "
+                        "(forge evidence todo)", loc))
         alt = (fl.get("Alt_MPN") or (wip.get(ref, {}).get("Alt MPN") or "")).strip()
         if not alt:
             F.append(_f(f"{ref} has an alternate (Rule 3)", "no Alt_MPN in the symbol or the WIP BoM", loc))

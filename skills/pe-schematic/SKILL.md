@@ -45,7 +45,7 @@ apply`. The owner reviews the rendered PNG and the sheet in KiCad; their edits a
    then look at the rendered sheet (`kicad-cli sch export svg` → PNG): readability per the style guide.
 4. Reviews in parallel: `schematic-reviewer` (datasheet-backed), `power-reviewer` (power stages),
    `pe-reviewer` (cold, against booklet and requirements); `pe-compliance` for insulation, protection, HV.
-5. Sync the BoM from the schematic (`$MC_LIB/tools/bom.py`) into the module BoM; propagate changes (Rule 4).
+5. `forge evidence sync` (copies every placed part's datasheet into `04_Hardware/Datasheets/`), then sync the BoM from the schematic (`$MC_LIB/tools/bom.py`) into the module BoM; propagate changes (Rule 4).
 6. Gate G6 for the module.
 
 ## Changing design files safely

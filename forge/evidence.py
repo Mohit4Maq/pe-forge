@@ -80,6 +80,12 @@ def pads(fp_text):
     return len(pts), pitch
 
 
+def in_project(prj, sha):
+    """Is the datasheet with this content id copied into the project's datasheet folder?"""
+    d = prj.p("datasheets")
+    return os.path.isdir(d) and any(n.endswith(f"_{sha}.pdf") for n in os.listdir(d))
+
+
 def as_check(prj, opts):
     from .check import finding, result
     from .drift import Design
@@ -102,6 +108,11 @@ def as_check(prj, opts):
         if not r:
             W.append(finding(f"{ref} is an MC_Parts part", "not from MC_Parts: no evidence record", loc))
             continue
+        sha, dsf = cached_file(r.get("Datasheet"))
+        if not dsf:
+            W.append(finding(f"{ref} ({mid}) has its datasheet in the cache", "no cached datasheet: forge evidence todo", loc))
+        elif not in_project(prj, sha):
+            W.append(finding(f"{ref} datasheet in {prj.paths['datasheets']}/", "not copied into the project: forge evidence sync", loc))
         ev = (r.get("Verified_Against") or "").strip()
         if not ev:
             W.append(finding(f"{ref} ({mid}) checked against a cached datasheet", "no datasheet evidence recorded", loc))
@@ -136,3 +147,130 @@ def as_check(prj, opts):
     return result("fail" if F else "warn" if W else "pass", F + W, reason=f"{len(comps)} part(s)")
 
 
+
+
+# ------------------------------------------------------------------ project commands
+USAGE = """forge evidence todo [--write]   parts on this board still missing a datasheet or its check, grouped by family
+forge evidence sync             copy every placed part's cached datasheet into 04_Hardware/Datasheets/ (+ index)"""
+
+
+def family(r):
+    """Group key: manufacturer, MPN series (up to the first '-'), footprint. One datasheet usually covers it."""
+    mpn = (r.get("MPN") or "").strip()
+    return (r.get("Manufacturer") or "", re.split(r"[-/]", mpn)[0] if mpn else "?", (r.get("Footprints") or "").split(";")[0])
+
+
+def placed(prj):
+    from .drift import Design
+    D = Design(prj)
+    if not D.ok:
+        raise SystemExit(D.error)
+    return {r: c for r, c in D.comps.items() if not r.startswith("#") and c["in_bom"] and not c["dnp"]}
+
+
+def cached_file(ds):
+    m = re.search(r"([0-9a-f]{16})\.pdf$", ds or "")
+    if not m:
+        return None, None
+    f = os.path.join(cache_dir(), f"{m.group(1)}.pdf")
+    return m.group(1), (f if os.path.exists(f) else None)
+
+
+def todo(prj, write=False):
+    comps, db = placed(prj), rows_by_id() or {}
+    groups = {}
+    for ref, c in comps.items():
+        r = db.get(c["fields"].get("MC_ID", ""))
+        if r is None:
+            groups.setdefault(("not in MC_Parts", c["fields"].get("MPN") or c["value"], c["footprint"]), []).append((ref, None, c))
+            continue
+        sha, f = cached_file(r.get("Datasheet"))
+        if f and r.get("Verified_Against") and r.get("Status") == "Active":
+            continue
+        groups.setdefault(family(r), []).append((ref, r, c))
+    lines = [f"# Datasheet evidence to-do: {prj.name}", "",
+             f"{sum(len(v) for v in groups.values())} placed part(s) in {len(groups)} family / families still need a "
+             "cached datasheet, a recorded check, or Status Active. One datasheet usually covers a family.", ""]
+    for (mfr, series, fp), items in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        refs = ", ".join(sorted(i[0] for i in items))
+        ids = sorted({i[1]["ID"] for i in items if i[1]})
+        r0 = next((i[1] for i in items if i[1]), None)
+        lines += [f"## {mfr or '?'} {series}  ·  {fp or 'no footprint'}  ·  {len(items)} part(s)", "", f"Refs: {refs}"]
+        if not r0:
+            lines += ["Not from MC_Parts: add it with `mclib.py add ... --datasheet <file.pdf>` first.", ""]
+            continue
+        need = []
+        sha, f = cached_file(r0.get("Datasheet"))
+        url = (r0.get("Datasheet") or "") if (r0.get("Datasheet") or "").startswith("http") else ""
+        if not f:
+            need.append("datasheet: " + (f"download {url}" if url else "find the latest one on the maker's site")
+                        + f", then `datasheets.py add <file.pdf> --mpn {r0['MPN']} --manufacturer \"{mfr}\" --part {','.join(ids)}`")
+        fpf = footprint_file(fp)
+        n, pitch = pads(open(fpf, errors="ignore").read()) if fpf else (None, None)
+        meas = f"footprint has {n} pads" + (f", pitch {pitch:.3g} mm" if pitch else "") if n else "footprint file not found"
+        glob_pat = (r0["MPN"].split("-")[0] + "*") if len(ids) > 1 else r0["MPN"]
+        need.append(f"check symbol pins and land pattern against the datasheet ({meas}), then "
+                    + (f"`datasheets.py verify-family <id> --match \"{glob_pat}\" --footprint {fp} --page N --section \"...\" "
+                       f"--pads {n or 'N'}" + (f" --pitch {pitch:.3g}" if pitch else "") + " --activate` (preview, then --apply)"
+                       if len(ids) > 1 else
+                       f"`datasheets.py verify {ids[0]} <id> --page N --section \"...\" --pads {n or 'N'}"
+                       + (f" --pitch {pitch:.3g}" if pitch else "") + " --activate`"))
+        lines += [f"Parts: {', '.join(ids)}"] + [f"- {x}" for x in need] + [""]
+    text = "\n".join(lines) + "\n"
+    if write:
+        p = prj.p("datasheets", "Evidence_Todo.md")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "w").write(text)
+        print(f"wrote {prj.rel(p)}")
+    return text, groups
+
+
+def sync(prj):
+    """Copy the cached datasheet of every placed part into the project, with an index. Idempotent."""
+    comps, db = placed(prj), rows_by_id() or {}
+    out = prj.p("datasheets")
+    os.makedirs(out, exist_ok=True)
+    rows, missing, copied = {}, [], 0
+    for ref, c in sorted(comps.items()):
+        r = db.get(c["fields"].get("MC_ID", ""))
+        sha, f = cached_file((r or {}).get("Datasheet"))
+        if not f:
+            missing.append(f"{ref} ({c['fields'].get('MPN') or c['value']})")
+            continue
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", r["MPN"] or r["ID"])
+        name = f"{safe}_{sha}.pdf"
+        dst = os.path.join(out, name)
+        if not os.path.exists(dst) or sha256(dst)[:16] != sha:
+            import shutil
+            shutil.copy(f, dst)
+            copied += 1
+        e = rows.setdefault(name, {"refs": [], "mpn": r["MPN"], "id": r["ID"], "mfr": r.get("Manufacturer", ""),
+                                   "ev": r.get("Verified_Against") or "", "status": r.get("Status", "")})
+        e["refs"].append(ref)
+    idx = [f"# Datasheets used on {prj.name}", "",
+           "Copied from the library cache by `forge evidence sync` (file name = MPN + content id). These are the exact",
+           "files each part was checked against. Manufacturers' copyright: keep this folder out of public repositories.", "",
+           "| Refs | MPN | Manufacturer | MC_ID | File | Checked against | Status |", "|---|---|---|---|---|---|---|"]
+    for name, e in sorted(rows.items(), key=lambda kv: kv[1]["refs"][0]):
+        idx.append(f"| {', '.join(e['refs'])} | {e['mpn']} | {e['mfr']} | {e['id']} | [{name}]({name}) | "
+                   f"{e['ev'] or 'NOT CHECKED'} | {e['status']} |")
+    if missing:
+        idx += ["", "## No cached datasheet yet", "", *[f"- {m}" for m in missing], "",
+                "Run `forge evidence todo` for the commands."]
+    open(os.path.join(out, "Datasheets_Index.md"), "w").write("\n".join(idx) + "\n")
+    return copied, len(rows), missing
+
+
+def main(prj, argv):
+    if not argv or argv[0] not in ("todo", "sync"):
+        print(USAGE)
+        return 1
+    if argv[0] == "todo":
+        text, groups = todo(prj, "--write" in argv)
+        if "--write" not in argv:
+            print(text)
+        return 1 if groups else 0
+    copied, n, missing = sync(prj)
+    print(f"{n} datasheet(s) in {prj.paths['datasheets']}/ ({copied} copied now)"
+          + (f"; {len(missing)} part(s) have none cached: {', '.join(missing[:8])}" if missing else ""))
+    return 1 if missing else 0

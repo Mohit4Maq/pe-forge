@@ -23,11 +23,23 @@ You maintain MC_Lib ($MC_LIB). Read its `CLAUDE.md` first and follow it exactly.
 - Report: what was added (ID, MPN, symbol, footprints), the evidence links, and what needs human review.
 
 ## Datasheet evidence (cache, cite, verify)
-1. Download the latest datasheet from the manufacturer and cache it: `$MC_LIB/tools/datasheets.py add <file.pdf>
-   --mpn <MPN> --manufacturer <M> --url <where it came from>` (prints the 16-character id).
-2. After checking the symbol pins and the footprint land pattern against it, record the evidence:
-   `datasheets.py verify <MC_ID> <id> --page <N> --section "<table or figure>" --pads <count> --pitch <mm>`.
-3. Only then `mclib.py set <MC_ID> Status=Active` (it refuses without evidence). `forge check` (parts_evidence)
-   confirms every placed part points at a cached file with a matching hash and that the pad count and pitch match
-   the footprint, and warns when the sourcing snapshot is older than 90 days.
-Datasheets are copyrighted: the cache stays in the private library (Git LFS), never in a public repo.
+1. **Every part you create gets its datasheet.** Download the latest datasheet from the manufacturer, then create
+   the part with it: `mclib.py add <Table> MPN=... --datasheet <file.pdf> --datasheet-url <where it came from>` (or
+   `mclib.py import ... --table T --datasheet <file.pdf>`; a vendor zip that ships one PDF uses it). For a series
+   that shares one datasheet, cache it once (`datasheets.py add <file.pdf> --mpn "<series>"`) and pass
+   `--datasheet-id <id>`. The part's Datasheet field then opens the cached file from KiCad. Creation without a
+   datasheet is refused.
+2. After checking the symbol pins and the footprint land pattern against it, record the evidence and promote the
+   part in one step: `datasheets.py verify <MC_ID> <id> --page <N> --section "<table or figure>" --pads <count>
+   --pitch <mm> --activate`. For a whole series: `datasheets.py verify-family <id> --match "RC0603*" --footprint
+   <LIB:FP> --page N --section "..." --pads N --pitch MM --activate` (preview, then `--apply`; every part's own
+   footprint is checked against the pad count and pitch, mismatches are skipped and listed).
+3. Per board: `forge evidence todo` lists the placed parts still missing a datasheet, a check or Status Active,
+   grouped by family, with the measured pads and the exact commands. `forge evidence sync` copies every placed
+   part's datasheet into the project's `04_Hardware/Datasheets/` with `Datasheets_Index.md`, so reviewers and
+   agents read the exact file the part was checked against.
+4. `forge check` (parts_evidence) warns on a part without a cached datasheet, a check or a project copy, and fails
+   on a pointer to a missing or changed file. The release gate (G8) fails any part that is not Active with recorded
+   evidence; status is read from the parts database, not from the copy in the placed symbol.
+Datasheets are copyrighted: the cache stays in the private library (Git LFS) and project folders, never in a
+public repo.

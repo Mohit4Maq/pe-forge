@@ -668,8 +668,15 @@ def cmd_import(a) -> int:
     steps = [p for p in files if p.suffix.lower() in (".step", ".stp")]
     if not syms:
         sys.exit(f"no symbol library found in {a.source}")
+    extra = parse_kv(a.field or [])
+    if a.table:                      # a DB row is created: it needs its datasheet (a vendor zip may ship one)
+        pdfs = [p for p in files if p.suffix.lower() == ".pdf"]
+        if not a.datasheet and not a.datasheet_id and len(pdfs) == 1:
+            a.datasheet = str(pdfs[0])
+            print(f"  datasheet: using {pdfs[0].name} from the download")
+        extra["Datasheet"] = datasheet_field(a, extra.get("MPN", a.name or ""), extra.get("Manufacturer", ""))
     import_files(syms, fps, steps, a.lib, a.table, a.fp_lib, a.footprint, a.name, a.value,
-                 parse_kv(a.field or []), a.src_label or f"import {Path(a.source).name}", a.overwrite)
+                 extra, a.src_label or f"import {Path(a.source).name}", a.overwrite)
     if tmp:
         tmp.cleanup()
     return 0
@@ -686,9 +693,27 @@ def parse_kv(items: list[str]) -> dict[str, str]:
     return row
 
 
+NEED_DATASHEET = ("every new part gets its datasheet: --datasheet <file.pdf> (download it from the manufacturer "
+                  "first), or --datasheet-id <sha16> for a family datasheet already in the cache (datasheets.py list)")
+
+
+def datasheet_field(a, mpn, manufacturer):
+    """Cache the part's datasheet and return the Datasheet field value, or exit when none was given."""
+    import datasheets
+    if getattr(a, "datasheet_id", None):
+        if not datasheets.cached(a.datasheet_id):
+            sys.exit(f"{a.datasheet_id}.pdf is not in the datasheet cache: datasheets.py add <file.pdf> first")
+        return datasheets.field_value(a.datasheet_id)
+    if getattr(a, "datasheet", None):
+        return datasheets.field_value(datasheets.cache(a.datasheet, mpn, manufacturer, getattr(a, "datasheet_url", "") or ""))
+    sys.exit("refusing to add part: " + NEED_DATASHEET)
+
+
 def cmd_add(a) -> int:
     con = db()
-    pid = insert(con, a.table, parse_kv(a.fields))
+    row = parse_kv(a.fields)
+    row["Datasheet"] = datasheet_field(a, row.get("MPN", ""), row.get("Manufacturer", ""))
+    pid = insert(con, a.table, row)
     con.commit()
     print(pid)
     if not a.no_mouser:
@@ -792,7 +817,11 @@ def main() -> int:
     s = sp.add_parser("show", help="show one part"); s.add_argument("id"); s.set_defaults(fn=cmd_show)
     s = sp.add_parser("add", help="add a part: add <Table> Col=Val ...")
     s.add_argument("table", choices=TABLES); s.add_argument("fields", nargs="+")
-    s.add_argument("--no-mouser", action="store_true"); s.set_defaults(fn=cmd_add)
+    s.add_argument("--no-mouser", action="store_true")
+    s.add_argument("--datasheet", help="the part's datasheet PDF (required, or --datasheet-id)")
+    s.add_argument("--datasheet-id", help="a datasheet already in the cache (family datasheet)")
+    s.add_argument("--datasheet-url", help="where the PDF came from (kept in datasheets/index.csv)")
+    s.set_defaults(fn=cmd_add)
     s = sp.add_parser("set", help="update fields: set <ID> Col=Val ...")
     s.add_argument("id"); s.add_argument("fields", nargs="+"); s.set_defaults(fn=cmd_set)
     s = sp.add_parser("import", help="import a vendor download (folder/zip/SchLib/IntLib/kicad_sym)")
@@ -803,6 +832,9 @@ def main() -> int:
     s.add_argument("--name", help="symbol name (default: MPN)"); s.add_argument("--value")
     s.add_argument("--field", action="append", help="extra Column=Value for the DB row")
     s.add_argument("--src-label"); s.add_argument("--overwrite", action="store_true")
+    s.add_argument("--datasheet", help="the part's datasheet PDF (required with --table, unless the download has one)")
+    s.add_argument("--datasheet-id", help="a datasheet already in the cache")
+    s.add_argument("--datasheet-url", help="where the PDF came from")
     s.set_defaults(fn=cmd_import)
     sp.add_parser("check", help="validate DB rows").set_defaults(fn=cmd_check)
     s = sp.add_parser("sourcing", help="refresh Mouser stock/price/lifecycle on library rows")

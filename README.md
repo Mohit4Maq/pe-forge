@@ -146,9 +146,12 @@ match, every placed part released with an alternate, the outputs still match the
 Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8
 runs it.
 
-Every part's symbol and footprint check is tied to the exact datasheet used: `library/tools/datasheets.py`
-caches the PDF by content hash and records page and section on the part, and `forge check` (parts_evidence) fails
-when that file is missing or has changed. Datasheets stay out of this repo (they are the makers' copyright).
+Every part is created with its datasheet (`mclib.py add --datasheet file.pdf`; refused without one), and its
+symbol and footprint check is tied to that exact file: `library/tools/datasheets.py` caches the PDF by content hash
+and records page and section on the part (one check can cover a whole series with `verify-family`). Per board,
+`forge evidence todo` lists what is still missing and `forge evidence sync` copies every placed part's datasheet
+into the project's `04_Hardware/Datasheets/`. The release gate needs every part Active with recorded evidence.
+Datasheets stay out of this repo (they are the makers' copyright).
 
 Small analog circuits (sense amplifiers, dividers into ADCs, gate-drive RC, UVLO thresholds) are checked with
 ngspice from the drawn schematic: a `## Simulation` block in the sheet brief states bounds and the closed-form

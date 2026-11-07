@@ -7,8 +7,18 @@
   datasheets.py verify <MC_ID> <sha16> --page N [--section TEXT] [--pads N --pitch MM]
         record the evidence on the part: Verified_Against = <sha16>#p<N>/<section>, Verified_By (git user.name),
         Verified_On (today), Verified_Pads = <pads>@<pitch mm> (checked against the footprint by forge check)
+  datasheets.py verify ... --activate                   also set Status=Active (evidence first, then status)
+  datasheets.py verify-family <sha16> --match "RC0603*" [--table T] [--footprint LIB:FP] --page N
+        [--section TEXT] --pads N --pitch MM [--activate] [--apply]
+        one datasheet covering a whole series: every row whose MPN matches the glob (and footprint, if given) gets
+        the evidence, after its own footprint's pad count and pitch are checked against --pads / --pitch.
+        Preview by default; --apply writes. Rows whose footprint disagrees are listed and left alone.
+  datasheets.py attach <MC_ID[,MC_ID...]> <sha16>       point the part's Datasheet field at the cached file
   datasheets.py list [MPN]
   datasheets.py check            every Verified_Against points at a cached file whose hash matches
+
+Every new part gets its datasheet when it is created (`mclib.py add / import --datasheet file.pdf`): the PDF is
+cached and the part's Datasheet field becomes ${MC_LIB}/datasheets/<sha16>.pdf, which KiCad opens from the symbol.
 
 Licensing: datasheets are the manufacturers' copyrighted documents. The cache is gitignored in the public pe-forge
 repo; keep it in your private library (Git LFS recommended: `git lfs track "datasheets/*.pdf"`).
@@ -54,10 +64,11 @@ def pages(p):
         return str(n) if n else ""
 
 
-def cmd_add(a):
-    src = Path(a.file)
+def cache(file, mpn, manufacturer="", url="", title=""):
+    """Copy a PDF into the cache (by content hash) and index it. Returns the 16-character id."""
+    src = Path(file).expanduser()
     if not src.exists() or open(src, "rb").read(5) != b"%PDF-":
-        sys.exit(f"{src}: not a PDF file")
+        sys.exit(f"{src}: not a PDF file (download the datasheet from the manufacturer first)")
     h = sha256(src)
     CACHE.mkdir(parents=True, exist_ok=True)
     dst = CACHE / f"{h[:16]}.pdf"
@@ -65,13 +76,45 @@ def cmd_add(a):
         shutil.copy(src, dst)
     have = rows()
     if not any(r["sha256"] == h for r in have):
-        have.append({"sha256": h, "mpn": a.mpn, "manufacturer": a.manufacturer or "", "url": a.url or "",
-                     "retrieved": dt.date.today().isoformat(), "pages": pages(dst), "title": a.title or src.stem})
+        have.append({"sha256": h, "mpn": mpn, "manufacturer": manufacturer or "", "url": url or "",
+                     "retrieved": dt.date.today().isoformat(), "pages": pages(dst), "title": title or src.stem})
         with open(INDEX, "w", newline="") as fh:
             w = csv.DictWriter(fh, COLS)
             w.writeheader()
             w.writerows(have)
-    print(f"{h[:16]}  {a.mpn}  {dst}")
+    return h[:16]
+
+
+def field_value(sha16):
+    """What goes in the part's Datasheet field: the cached file through KiCad's ${MC_LIB} variable."""
+    return "${MC_LIB}/datasheets/" + f"{sha16}.pdf"
+
+
+def cached(sha16):
+    return (CACHE / f"{sha16}.pdf").exists()
+
+
+def cmd_add(a):
+    h = cache(a.file, a.mpn, a.manufacturer, a.url, a.title)
+    print(f"{h}  {a.mpn}  {CACHE / (h + '.pdf')}")
+    if a.part:
+        attach(a.part.split(","), h)
+    return 0
+
+
+def attach(ids, sha16):
+    if not cached(sha16):
+        sys.exit(f"{sha16}.pdf is not in {CACHE}: add the datasheet first")
+    con = mclib.db()
+    for pid in ids:
+        t, _ = mclib.find_part(con, pid)
+        con.execute(f"UPDATE {t} SET Datasheet=? WHERE ID=?", (field_value(sha16), pid))
+    con.commit()
+    print(f"datasheet {sha16} attached to {', '.join(ids)}")
+
+
+def cmd_attach(a):
+    attach(a.ids.split(","), a.sha)
     return 0
 
 
@@ -85,9 +128,71 @@ def cmd_verify(a):
     fields = {"Verified_Against": ref, "Verified_By": who, "Verified_On": dt.date.today().isoformat()}
     if a.pads:
         fields["Verified_Pads"] = f"{a.pads}@{a.pitch}" if a.pitch else str(a.pads)
+    row = con.execute(f"SELECT * FROM {t} WHERE ID=?", (a.id,)).fetchone()
+    if not (row["Datasheet"] or "").strip():
+        fields["Datasheet"] = field_value(a.sha)
+    if a.activate:
+        fields["Status"] = "Active"
     con.execute(f"UPDATE {t} SET {','.join(f'{k}=?' for k in fields)} WHERE ID=?", [*fields.values(), a.id])
     con.commit()
-    print(f"{a.id}: verified against {ref} by {who}")
+    print(f"{a.id}: verified against {ref} by {who}" + (", now Active" if a.activate else ""))
+    return 0
+
+
+def _forge_evidence():
+    for root in (os.environ.get("PE_FORGE"), str(Path(__file__).resolve().parents[2])):
+        if root and (Path(root) / "forge" / "evidence.py").exists():
+            sys.path.insert(0, root)
+            from forge import evidence
+            return evidence
+    sys.exit("verify-family needs pe-forge (set PE_FORGE) to read footprints")
+
+
+def cmd_family(a):
+    if not cached(a.sha):
+        sys.exit(f"{a.sha}.pdf is not in {CACHE}: add the datasheet first")
+    ev = _forge_evidence()
+    con = mclib.db()
+    tables = [a.table] if a.table else list(mclib.TABLES)
+    who = subprocess.run(["git", "config", "user.name"], capture_output=True, text=True).stdout.strip() or "unknown"
+    ref = f"{a.sha}#p{a.page}" + (f"/{a.section}" if a.section else "")
+    ok, bad = [], []
+    for t in tables:
+        for r in con.execute(f"SELECT * FROM {t} WHERE MPN GLOB ? ORDER BY ID", (a.match,)):
+            fp = (r["Footprints"] or "").split(";")[0]
+            if a.footprint and fp != a.footprint:
+                continue
+            f = ev.footprint_file(fp)
+            if not f:
+                bad.append((r["ID"], r["MPN"], f"footprint {fp or '(none)'} not found"))
+                continue
+            n, pitch = ev.pads(open(f, errors="ignore").read())
+            if n != a.pads or (a.pitch and (pitch is None or abs(pitch - a.pitch) > 0.01)):
+                bad.append((r["ID"], r["MPN"], f"{fp}: {n} pads, pitch {pitch if pitch is None else round(pitch, 3)}"))
+                continue
+            ok.append((t, r["ID"], r["MPN"], r["Datasheet"]))
+    print(f"{len(ok)} part(s) match {a.match!r} and their footprints agree with {a.pads} pads"
+          + (f" at {a.pitch} mm" if a.pitch else ""))
+    for _, pid, mpn, _ in ok[:12]:
+        print(f"  {pid}  {mpn}")
+    if len(ok) > 12:
+        print(f"  ... +{len(ok) - 12} more")
+    for pid, mpn, why in bad:
+        print(f"  SKIP {pid} {mpn}: {why}")
+    if not a.apply:
+        print("preview only: add --apply to record the evidence" + (" and set them Active" if a.activate else ""))
+        return 0
+    today = dt.date.today().isoformat()
+    for t, pid, _, ds in ok:
+        fields = {"Verified_Against": ref, "Verified_By": who, "Verified_On": today,
+                  "Verified_Pads": f"{a.pads}@{a.pitch}" if a.pitch else str(a.pads)}
+        if not (ds or "").strip():
+            fields["Datasheet"] = field_value(a.sha)
+        if a.activate:
+            fields["Status"] = "Active"
+        con.execute(f"UPDATE {t} SET {','.join(f'{k}=?' for k in fields)} WHERE ID=?", [*fields.values(), pid])
+    con.commit()
+    print(f"recorded evidence {ref} on {len(ok)} part(s)" + (", now Active" if a.activate else ""))
     return 0
 
 
@@ -115,10 +220,18 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = ap.add_subparsers(dest="cmd", required=True)
     s = sp.add_parser("add"); s.add_argument("file"); s.add_argument("--mpn", required=True)
-    s.add_argument("--manufacturer"); s.add_argument("--url"); s.add_argument("--title"); s.set_defaults(fn=cmd_add)
+    s.add_argument("--manufacturer"); s.add_argument("--url"); s.add_argument("--title")
+    s.add_argument("--part", help="MC_ID[,MC_ID] to attach it to"); s.set_defaults(fn=cmd_add)
     s = sp.add_parser("verify"); s.add_argument("id"); s.add_argument("sha"); s.add_argument("--page", required=True)
     s.add_argument("--section"); s.add_argument("--pads", type=int); s.add_argument("--pitch", type=float)
-    s.set_defaults(fn=cmd_verify)
+    s.add_argument("--activate", action="store_true"); s.set_defaults(fn=cmd_verify)
+    s = sp.add_parser("verify-family"); s.add_argument("sha"); s.add_argument("--match", required=True)
+    s.add_argument("--table", choices=list(mclib.TABLES)); s.add_argument("--footprint")
+    s.add_argument("--page", required=True); s.add_argument("--section")
+    s.add_argument("--pads", type=int, required=True); s.add_argument("--pitch", type=float)
+    s.add_argument("--activate", action="store_true"); s.add_argument("--apply", action="store_true")
+    s.set_defaults(fn=cmd_family)
+    s = sp.add_parser("attach"); s.add_argument("ids"); s.add_argument("sha"); s.set_defaults(fn=cmd_attach)
     s = sp.add_parser("list"); s.add_argument("mpn", nargs="?"); s.set_defaults(fn=cmd_list)
     sp.add_parser("check").set_defaults(fn=cmd_check)
     a = ap.parse_args()

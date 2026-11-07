@@ -18,6 +18,7 @@
   forge hooks install [--chain] | --uninstall   git pre-commit hook running forge check (fast subset)
   forge cr new|validate|approve|close|reject|list|status|guard ...   change requests after baseline (G6 / G7)
   forge ledger record|check [--hook] | show | clear --reason T   sync obligations (hooks; Stop blocks while open)
+  forge evidence todo [--write] | sync   datasheet work list per board; copy datasheets into the project
   forge spice check [--module M-xx] [--strict] [--json]   ngspice assertions from the briefs' ## Simulation blocks
   forge statusline [install [--project|--user] [--uninstall]]   the pe-forge bar in Claude Code (docs/ui-layout.md)
   forge explain U1 | NET | U1.7 | U1.VCC | --pins MC_ID [--json] [--sheet PATH]   deterministic design lookup
@@ -59,6 +60,9 @@ def main(argv):
     if cmd == "schdraw":
         from forge import schdraw
         return schdraw.main(rest)
+    if cmd == "evidence":
+        from forge import evidence
+        return evidence.main(need(), rest)
     if cmd == "spice":
         from forge import spice
         return spice.main(need(), rest)

@@ -1914,5 +1914,36 @@ class Insulation(unittest.TestCase):
         self.assertIn("no net is in class HV", r["checks"]["insulation"]["findings"][0]["actual"])
 
 
+class PcbSync(unittest.TestCase):
+    """forge pcb sync: headless Update PCB from Schematic; schematic parity must come out clean."""
+
+    def test_field_rename_and_parse(self):
+        sys.path.insert(0, REPO)
+        from forge import pcb
+        text = netlist_text({"R1": ("10k", "R10K", "RES-1")}, {"/A": ("Default", [("R1", "1", "")])})
+        text = text.replace('(field (name "MC_ID")', '(field (name "Sim_Pins") "1 2") (field (name "MC_ID")')
+        c = pcb.components(text)[0]
+        self.assertEqual(c["pads"], {"1": "/A"})
+        self.assertIn("Sim.Pins", c["fields"])            # KiCad's rename on load, or parity fails
+        self.assertNotIn("Sim_Pins", c["fields"])
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_sync_gives_zero_parity_and_is_idempotent(self):
+        sys.path.insert(0, REPO)
+        from forge import kicad
+        if not kicad.find_python():
+            self.skipTest("KiCad's Python not found")
+        tmp = tempfile.mkdtemp(prefix="pe-forge-sync-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        d = new_project("Sy", tmp)
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/sy/sy.kicad_sch"))
+        r = forge("pcb", "sync", cwd=d, check=False)
+        self.assertIn("added:", r.stdout)
+        self.assertIn("DRC schematic parity: 0 issue(s)", r.stdout, r.stdout + r.stderr)
+        r = forge("pcb", "sync", cwd=d, check=False)
+        self.assertNotIn("added:", r.stdout)                 # second run updates in place
+        self.assertIn("parity: 0 issue(s)", r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

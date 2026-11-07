@@ -13,8 +13,14 @@ The owner (or a layout engineer) places and routes in KiCad; agents write the ru
    commutation-loop placement rules, gate-drive loops, Kelvin connections, shunt routing, isolation barrier
    (slots, keep-outs), thermal (device pads, vias, heatsink interface), EMC (filter placement, ground strategy,
    return paths), DFM / assembly (fab house limits, test points, fiducials, panelisation).
+   **Rule 11:** for every critical part (converter IC, driver, isolator, switch) copy its datasheet "Layout
+   Guidelines" and "Layout Example" into the spec as numbered rules (datasheet revision, page, section), and the
+   recommended land pattern and copper weight. Placement and routing follow them strictly; a deviation needs a
+   reason and the owner's OK, written next to the rule.
 2. Encode what can be encoded: net classes and custom rules in the `.kicad_dru` (the template has a starting
    set), board setup from the fab's capabilities (`kicad-happy:jlcpcb` / `pcbway`).
+   Get the parts onto the board with `forge pcb sync` (headless "Update PCB from Schematic"; close the board in
+   KiCad first). It must end with schematic parity 0; mark board-only parts (holes, logos) "not in schematic".
 3. **Placement milestone**: `pcb-reviewer` (placement, loops, zones) + `kicad-happy:emc` risk pass. The owner can
    run `kicad-copilot` to get checks on every save.
 4. **Routing milestone**: DRC with schematic parity (0 errors), `$MC_LIB/tools/pcb_check.py`, `pcb-reviewer`,

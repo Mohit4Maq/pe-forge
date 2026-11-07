@@ -27,6 +27,7 @@
   forge explain U1 | NET | U1.7 | U1.VCC | --pins MC_ID [--json] [--sheet PATH]   deterministic design lookup
   forge fab manifest [<kicad dir>]  release manifest (SHA-256 of sources and outputs); release.sh runs it
   forge drift [--json] [--module M-xx]  BoM / brief / booklet against the drawn schematic {doc, claim, actual}
+  forge pcb sync [--prune] [--dry-run]   update the board from the schematic headless (KiCad's F8)
   forge insulation [--rules] [--json]   insulation from the netlist (INS-1/2/3, NET-4); --rules proves the
                                     .kicad_dru enforces [[insulation.rule]] (CLS-2)
   forge txn begin "<what>" [--allow-dirty] | status | verify | commit [-m MSG] | close | rollback [--reason T]
@@ -135,6 +136,9 @@ def main(argv):
     if cmd == "drift":
         from forge import drift
         return drift.main(prj, rest)
+    if cmd == "pcb":
+        from forge import pcb
+        return pcb.main(prj, rest)
     if cmd == "insulation":
         from forge import insulation
         return insulation.main(prj, rest)

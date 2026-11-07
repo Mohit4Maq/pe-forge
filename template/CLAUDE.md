@@ -103,6 +103,16 @@ writes the record). Routine choices do not. The owner decides.
 Spending, orders, emails / messages, git push, changing decided architecture, closing a D-xx, lowering a
 review tier, passing a gate with an override. These go to the owner with a recommendation.
 
+## Rule 11: follow the datasheet strictly for critical parts
+Critical parts (converter and controller ICs, gate drivers, isolators, power switches, current-sense amplifiers,
+references) are designed **exactly as their datasheet recommends**: application circuit and component values,
+recommended land pattern, and every item of the "Layout Guidelines" / "Layout Example" sections (input-cap
+placement, hot loop, SW node area, BOOT / FB placement, thermal pad and vias, ground plane, copper weight).
+- Before drawing or placing a critical part, turn its datasheet recommendations into numbered rules in the sheet
+  brief / layout spec, each citing the datasheet revision, page and section.
+- Every review checks the design against those rules, one by one.
+- A deviation needs a stated reason and the owner's OK, recorded next to the rule; never a silent one.
+
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |
 |---|---|

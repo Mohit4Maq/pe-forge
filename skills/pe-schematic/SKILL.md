@@ -35,6 +35,9 @@ instructions; never edit their sheet unless they ask.
 spec, iterates `forge schdraw check` until there are 0 errors and the render looks right, then `forge schdraw
 apply`. The owner reviews the rendered PNG and the sheet in KiCad; their edits afterwards are design intent.
 
+Critical parts follow their datasheet's application circuit and values strictly (project Rule 11): the brief
+lists each recommendation with its page, and a deviation carries a reason and the owner's OK.
+
 ## Step 5: verify the sheet
 1. `kicad-cli sch erc` (0 errors), `$MC_LIB/tools/sch_check.py` (library discipline, net naming, decoupling).
 2. Netlist vs brief: `forge drift --module M-xx` compares KiCad's own netlist with the brief's netlist table, and

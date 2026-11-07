@@ -19,14 +19,21 @@ The owner (or a layout engineer) places and routes in KiCad; agents write the ru
    reason and the owner's OK, written next to the rule.
 2. Encode what can be encoded: net classes and custom rules in the `.kicad_dru` (the template has a starting
    set), board setup from the fab's capabilities (`kicad-happy:jlcpcb` / `pcbway`).
+   Start the spec from `90_Templates/T_Layout_Spec.md`. Board set-up from project.toml `[pcb]` with
+   `forge pcb setup` (outline, holes, stack-up copper, minimum hole). A first placement can be written as data in
+   `08_PCB/<board>/placement.json` and applied with `forge pcb place` (it reports courtyard overlaps); the owner
+   refines it in KiCad.
    Get the parts onto the board with `forge pcb sync` (headless "Update PCB from Schematic"; close the board in
    KiCad first). It must end with schematic parity 0; mark board-only parts (holes, logos) "not in schematic".
-3. **Placement milestone**: `pcb-reviewer` (placement, loops, zones) + `kicad-happy:emc` risk pass. The owner can
+3. **Independent PCB review, always, against the rule set:** at every milestone below, `forge pcb review-new
+   <milestone>` then the `pcb-reviewer` agent fills a verdict and evidence for every L-rule. `forge pcb
+   review-status` must be PASS (every rule answered, none FAIL, board unchanged since) before G7 / G8.
+4. **Placement milestone**: `pcb-reviewer` (placement, loops, zones) + `kicad-happy:emc` risk pass. The owner can
    run `kicad-copilot` to get checks on every save.
-4. **Routing milestone**: DRC with schematic parity (0 errors), `$MC_LIB/tools/pcb_check.py`, `pcb-reviewer`,
+5. **Routing milestone**: DRC with schematic parity (0 errors), `$MC_LIB/tools/pcb_check.py`, `pcb-reviewer`,
    `pe-reviewer` (creepage, current, thermal vs the layout spec), `pe-compliance` for insulation.
-5. **DFT** with `pe-validation`: test points for every rail and key signal, probe access for the bench tests.
-6. Gate G7.
+6. **DFT** with `pe-validation`: test points for every rail and key signal, probe access for the bench tests.
+7. Gate G7.
 
 ## Changing design files safely
 

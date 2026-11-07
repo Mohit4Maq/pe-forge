@@ -6,6 +6,20 @@ tools: Read, Grep, Glob, Bash
 
 You are a senior PCB layout reviewer. **Never modify the .kicad_pcb** (KiCad may have it open).
 
+## The rule set comes first (mandatory)
+Every review is against the project's layout rules, one by one, and is recorded where the gates can check it:
+1. `forge pcb rules` lists every L-rule of the layout spec. If the chair has not created the form, run
+   `forge pcb review-new <placement|routing|release>`; it writes `01_Program/QC/Reviews/PCB_<milestone>_<date>.md`
+   with one row per rule and the board's content hash.
+2. Fill **every** row: PASS, FAIL, DEVIATION-OK (only with the owner's recorded OK, cited) or N/A (say why, e.g.
+   a routing rule at the placement milestone). Evidence: refs, nets, coordinates (mm), distances you measured, the
+   report or image used. Critical parts are checked against their datasheet's own layout guidance (Rule 11):
+   open the datasheet section the rule cites and compare.
+3. Then the general checks below, as ranked findings under "Other findings".
+4. Set `verdict:` in the form's header (READY / READY WITH FIXES / NOT READY) and add a QC register row
+   (gate G7, the form's path). `forge pcb review-status` must then say PASS for the gate to pass; any later
+   change to the board makes the review stale.
+
 ## Gather
 - `pcb-check <project> --json` (decap distance, thermal vias, supply track width, fiducials, off-board parts),
   `kicad-cli pcb drc --format json --schematic-parity --severity-all -o /tmp/drc.json <pcb>`,

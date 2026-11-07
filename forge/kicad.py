@@ -51,6 +51,11 @@ def find_python():
     return _first([os.environ.get("KICAD_PYTHON"), *PY_PATHS, shutil.which("python3")])
 
 
+def stock_footprints():
+    return _first([os.environ.get("KICAD_FOOTPRINT_DIR"), os.environ.get("KICAD10_FOOTPRINT_DIR"),
+                   *[s.replace("/symbols", "/footprints") for s in SYMBOL_PATHS]])
+
+
 def stock_symbols():
     return _first([os.environ.get("KICAD_SYMBOL_DIR"), os.environ.get("KICAD10_SYMBOL_DIR"), *SYMBOL_PATHS])
 

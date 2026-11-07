@@ -15,6 +15,8 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
                creepage, one island class per HV net (forge/insulation.py; skip: no HV net)
   dru_rules    CLS-2: the .kicad_dru flags copper just closer than each [[insulation.rule]] (a generated test
                board through KiCad's DRC; skip: no rule table)
+  pcb_review   the latest independent PCB review covers every L-rule of the layout spec, none FAIL, board
+               unchanged since (forge pcb review-status; warn until then, gates G7 / G8 refuse)
   pcb_extra    library/tools/pcb_check.py: layout checks DRC does not do (needs KiCad's pcbnew)
   legibility   forge schdraw lint on every sheet: advice (warn) only; a sheet the engine drew and nobody has
                saved since is held to it by the ledger instead
@@ -40,6 +42,7 @@ import time
 from . import config, consistency, gates, kicad, vmodel
 
 ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "insulation", "dru_rules", "pcb_extra",
+       "pcb_review",
        "legibility", "spice", "parts_evidence"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
@@ -246,6 +249,11 @@ def c_dru_rules(prj, opts):
     return insulation.as_check_rules(prj, opts)
 
 
+def c_pcb_review(prj, opts):
+    from . import pcb
+    return pcb.as_check_review(prj, opts)
+
+
 def c_spice(prj, opts):
     from . import spice
     return spice.as_check(prj, opts)
@@ -265,7 +273,8 @@ def c_fab(prj, opts):
 
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
-          "drift": c_drift, "sch_lib": c_sch_lib, "insulation": c_insulation, "dru_rules": c_dru_rules, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
+          "drift": c_drift, "sch_lib": c_sch_lib, "insulation": c_insulation, "dru_rules": c_dru_rules,
+          "pcb_review": c_pcb_review, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
           "fab": c_fab}
 
 

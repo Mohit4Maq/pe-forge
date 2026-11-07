@@ -44,6 +44,11 @@ the part's datasheet (latest revision, read the actual table or curve) · an ind
 - Review cadence: `project.toml process.reviews` = `per-task` (review at the end of every design task) or
   `gate` (a short chair self-check per task, full review at the gate; results labelled PROVISIONAL until then).
 
+**PCB:** every placement and routing milestone, and every board before release, gets an independent review by
+`pcb-reviewer` against every L-rule of the layout spec (`forge pcb review-new`, `forge pcb review-status`).
+The review is tied to the board's content hash: a later board change needs a new review. Gates G7 / G8 refuse
+otherwise.
+
 ## Rule 3: parts, BoM and document control
 - Use real, stocked MPNs (Mouser / DigiKey / LCSC / element14 APIs; keys in env vars or `~/.mouser_key`, never
   printed). An out-of-stock part is replaced and the swap is stated.

@@ -8,6 +8,35 @@
       holes, fiducials, logos: footprints with no symbol link) are never touched. Afterwards DRC with schematic
       parity should show no parity issue.
 
+  forge pcb setup
+      Board set-up from project.toml [pcb]: outline, mounting holes (marked "not in schematic"), copper layer
+      count and stack-up (copper weight per layer), minimum hole, values moved to the fab layer.
+  forge pcb place <placement.json> [--dry-run]
+      Place parts from a table {"REF": [x_mm, y_mm, rot_deg], ...}, x / y relative to the board origin, then report
+      courtyard overlaps from KiCad's DRC. Keep the table with the project (08_PCB/<board>/placement.json) and
+      note the datasheet rule behind each critical position (project Rule 11) in the layout spec.
+
+project.toml
+  [pcb]
+  outline_mm = [50, 50]          # width, height
+  origin_mm = [100, 100]         # top-left corner on KiCad's page
+  copper_oz = [2, 1, 1, 2]       # one entry per copper layer, top to bottom (4 entries = 4 layers)
+  thickness_mm = 1.6
+  min_hole_mm = 0.2              # thermal-via footprints use 0.2 mm
+  hole_footprint = "MountingHole:MountingHole_3.2mm_M3"
+  hole_inset_mm = 3.5            # hole centres from each corner; 0 or absent = no holes
+
+  forge pcb rules [--json]
+      The layout rules the board is reviewed against: every row whose first cell is an L-number (L-01, L-02, ...)
+      in the layout spec (project.toml paths.layout_spec).
+  forge pcb review-new <placement|routing|release> [--by NAME]
+      Write the review form 01_Program/QC/Reviews/PCB_<milestone>_<date>.md: one row per L-rule (verdict PASS /
+      FAIL / DEVIATION-OK, evidence), the board's content hash, the spec revision. The independent reviewer
+      (agent pcb-reviewer) fills it; it never edits the board.
+  forge pcb review-status [--json]
+      PASS only when the latest PCB review covers every L-rule, no rule is FAIL or unanswered, and the board has
+      not changed since (hash). Gates G7 / G8 and `forge check` (pcb_review) run it.
+
 The board is changed through KiCad's own Python (pcbnew), so the file stays KiCad's format. Close the board in
 KiCad first: KiCad would overwrite the change on its next save.
 """
@@ -30,8 +59,8 @@ def lib_dirs():
     """{nickname: .pretty dir} from KiCad's global footprint table (with ${VAR} expanded) plus KiCad's stock
     footprints."""
     out = {}
-    stock = "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints"
-    if os.path.isdir(stock):
+    stock = kicad.stock_footprints()
+    if stock and os.path.isdir(stock):
         for d in os.listdir(stock):
             if d.endswith(".pretty"):
                 out[d[:-7]] = os.path.join(stock, d)
@@ -193,8 +222,287 @@ def sync(sch, board, prune=False, dry=False):
     return json.loads(m.group(1)), len(comps)
 
 
+SETUP = r'''
+import json, sys, pcbnew
+s = json.load(open(sys.argv[1]))
+b = pcbnew.LoadBoard(s["board"])
+mm = pcbnew.FromMM
+X0, Y0 = s["origin"]; W, H = s["outline"]
+for d in list(b.GetDrawings()):
+    if d.GetLayer() == pcbnew.Edge_Cuts:
+        b.Remove(d)
+r = pcbnew.PCB_SHAPE(b); r.SetShape(pcbnew.SHAPE_T_RECT); r.SetLayer(pcbnew.Edge_Cuts); r.SetWidth(mm(0.1))
+r.SetStart(pcbnew.VECTOR2I(mm(X0), mm(Y0))); r.SetEnd(pcbnew.VECTOR2I(mm(X0 + W), mm(Y0 + H))); b.Add(r)
+have = {f.GetReference(): f for f in b.GetFootprints()}
+if s["hole_dir"] and s["inset"]:
+    i_ = s["inset"]
+    for i, (hx, hy) in enumerate(((i_, i_), (W - i_, i_), (i_, H - i_), (W - i_, H - i_)), 1):
+        f = have.get(f"H{i}")
+        if f is None:
+            f = pcbnew.FootprintLoad(s["hole_dir"], s["hole_name"]); f.SetReference(f"H{i}"); b.Add(f)
+        f.SetPosition(pcbnew.VECTOR2I(mm(X0 + hx), mm(Y0 + hy)))
+for f in b.GetFootprints():
+    if not f.GetPath().AsString():                  # board-only parts: holes, logos, fiducials
+        f.SetBoardOnly(True); f.SetExcludedFromBOM(True); f.SetExcludedFromPosFiles(True)
+    f.Value().SetLayer(pcbnew.F_Fab if not f.IsFlipped() else pcbnew.B_Fab)
+ds = b.GetDesignSettings()
+ds.SetCopperLayerCount(s["layers"])
+ds.m_MinThroughDrill = mm(s["min_hole"])
+ds.SetBoardThickness(mm(s["thickness"]))
+b.Save(s["board"])
+print("OK")
+'''
+
+PLACE = r'''
+import json, sys, pcbnew
+s = json.load(open(sys.argv[1]))
+b = pcbnew.LoadBoard(s["board"])
+mm = pcbnew.FromMM
+X0, Y0 = s["origin"]
+done, missing = [], []
+refs = {f.GetReference(): f for f in b.GetFootprints()}
+for ref, (x, y, rot) in s["place"].items():
+    f = refs.get(ref)
+    if f is None:
+        missing.append(ref); continue
+    f.SetPosition(pcbnew.VECTOR2I(mm(X0 + x), mm(Y0 + y))); f.SetOrientationDegrees(rot); done.append(ref)
+if not s["dry"]:
+    b.Save(s["board"])
+print("REPORT" + json.dumps({"placed": done, "missing": missing,
+      "unplaced": sorted(r for r, f in refs.items() if r not in s["place"] and f.GetPath().AsString())}))
+'''
+
+
+def stackup_block(copper_oz, thickness):
+    """KiCad (stackup ...) text: copper per layer from oz (1 oz = 35 um), FR-4 dielectrics sharing the rest of
+    the thickness (prepreg 0.2 mm next to each outer layer; ESTIMATE until the fab's stack-up is chosen)."""
+    names = ["F.Cu"] + [f"In{i}.Cu" for i in range(1, len(copper_oz) - 1)] + ["B.Cu"]
+    cu = [round(0.035 * oz, 4) for oz in copper_oz]
+    n_d = len(cu) - 1
+    rest = thickness - sum(cu) - 0.02
+    outer = 0.2 if n_d > 1 else rest
+    core = (rest - 2 * outer) / max(n_d - 2, 1) if n_d > 2 else (rest - outer if n_d == 2 else rest)
+    L = ['\t\t(stackup', '\t\t\t(layer "F.SilkS" (type "Top Silk Screen"))', '\t\t\t(layer "F.Paste" (type "Top Solder Paste"))',
+         '\t\t\t(layer "F.Mask" (type "Top Solder Mask") (thickness 0.01))']
+    for i, (nm, c) in enumerate(zip(names, cu)):
+        L.append(f'\t\t\t(layer "{nm}" (type "copper") (thickness {c:g}))')
+        if i < n_d:
+            th, kind = (outer, "prepreg") if i in (0, n_d - 1) and n_d > 1 else (core, "core")
+            L.append(f'\t\t\t(layer "dielectric {i + 1}" (type "{kind}") (thickness {th:.3f}) (material "FR4") '
+                     '(epsilon_r 4.5) (loss_tangent 0.02))')
+    L += ['\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (thickness 0.01))',
+          '\t\t\t(layer "B.Paste" (type "Bottom Solder Paste"))', '\t\t\t(layer "B.SilkS" (type "Bottom Silk Screen"))',
+          '\t\t\t(copper_finish "None")', '\t\t\t(dielectric_constraints no)', '\t\t)']
+    return "\n".join(L) + "\n"
+
+
+def write_stackup(board, copper_oz, thickness):
+    t = open(board).read()
+    t = re.sub(r"\n\t\t\(stackup\n.*?\n\t\t\)\n", "\n", t, count=1, flags=re.S)
+    t = re.sub(r"(\n\t\(setup\n)", lambda m: m.group(1) + stackup_block(copper_oz, thickness), t, count=1)
+    open(board, "w").write(t)
+
+
+def _run(script, spec):
+    py = kicad.find_python()
+    if not py:
+        raise SystemExit("KiCad's Python (pcbnew) is needed (forge doctor)")
+    d = tempfile.mkdtemp(prefix="pe-forge-pcb-")
+    sp, sc = os.path.join(d, "spec.json"), os.path.join(d, "run.py")
+    json.dump(spec, open(sp, "w"))
+    open(sc, "w").write(script)
+    r = subprocess.run([py, sc, sp], capture_output=True, text=True)
+    return r.stdout, r.stderr
+
+
+def board_only(board):
+    for lock in (os.path.join(os.path.dirname(board), "~" + os.path.basename(board) + ".lck"),):
+        if os.path.exists(lock):
+            raise SystemExit(f"{os.path.basename(board)} is open in KiCad (lock file): close it first")
+
+
+def setup(prj, board):
+    cfg = prj.cfg.get("pcb", {})
+    if not cfg.get("outline_mm"):
+        raise SystemExit("project.toml [pcb] outline_mm is not set (see forge pcb --help)")
+    board_only(board)
+    oz = cfg.get("copper_oz", [1, 1])
+    lib, _, name = cfg.get("hole_footprint", "MountingHole:MountingHole_3.2mm_M3").partition(":")
+    spec = {"board": os.path.abspath(board), "outline": cfg["outline_mm"], "origin": cfg.get("origin_mm", [100, 100]),
+            "layers": len(oz), "min_hole": cfg.get("min_hole_mm", 0.2), "thickness": cfg.get("thickness_mm", 1.6),
+            "hole_dir": lib_dirs().get(lib), "hole_name": name, "inset": cfg.get("hole_inset_mm", 0)}
+    out, err = _run(SETUP, spec)
+    if "OK" not in out:
+        raise SystemExit("pcbnew set-up failed: " + (err or out)[-600:])
+    write_stackup(board, oz, spec["thickness"])
+    return spec
+
+
+def place(prj, board, table, dry=False):
+    cfg = prj.cfg.get("pcb", {})
+    board_only(board)
+    data = json.load(open(table))
+    pl = {k: v for k, v in data.items() if not k.startswith("_")}
+    out, err = _run(PLACE, {"board": os.path.abspath(board), "origin": cfg.get("origin_mm", [100, 100]),
+                            "place": pl, "dry": dry})
+    m = re.search(r"REPORT(\{.*\})", out)
+    if not m:
+        raise SystemExit("pcbnew placement failed: " + (err or out)[-600:])
+    rep = json.loads(m.group(1))
+    if not dry:
+        r = kicad.drc(board, parity=False)
+        rep["overlaps"] = [" / ".join(i["ref"] or i["description"] for i in v["items"])
+                           for v in r.violations + r.warnings if v["type"] == "courtyards_overlap"]
+    return rep
+
+
+# ------------------------------------------------------------------ independent review against the rule set
+RULE_ROW = re.compile(r"^\|\s*(L-\d+[A-Za-z]?)\s*\|\s*(.*?)\s*\|")
+VERDICTS = ("PASS", "FAIL", "DEVIATION-OK", "N/A")
+
+
+def rules(prj):
+    """[(id, text)] from the layout spec, in order."""
+    spec = prj.p("layout_spec")
+    if not os.path.exists(spec):
+        return []
+    out = []
+    for line in open(spec):
+        m = RULE_ROW.match(line)
+        if m and m.group(1) not in [i for i, _ in out]:
+            out.append((m.group(1), m.group(2)))
+    return out
+
+
+def spec_rev(prj):
+    m = re.search(r"^rev:\s*(\S+)", open(prj.p("layout_spec")).read(), re.M) if os.path.exists(prj.p("layout_spec")) else None
+    return m.group(1) if m else "?"
+
+
+def board_hash(board):
+    import hashlib
+    t = open(board, "rb").read()
+    # the content that matters: drop KiCad's volatile header lines (generator version, uuid of the file)
+    t = re.sub(rb"\(generator_version \"[^\"]*\"\)", b"", t)
+    return hashlib.sha256(t).hexdigest()[:16]
+
+
+def reviews_dir(prj):
+    return prj.p("reviews")
+
+
+def review_new(prj, board, milestone, by="pcb-reviewer"):
+    import datetime
+    rs = rules(prj)
+    if not rs:
+        raise SystemExit(f"no L-rules in {prj.paths['layout_spec']}: write the layout spec first (90_Templates/T_Layout_Spec.md)")
+    d = reviews_dir(prj)
+    os.makedirs(d, exist_ok=True)
+    day = datetime.date.today().isoformat()
+    path = os.path.join(d, f"PCB_{milestone}_{day}.md")
+    n = 2
+    while os.path.exists(path):
+        path = os.path.join(d, f"PCB_{milestone}_{day}_{n}.md"); n += 1
+    rows = "\n".join(f"| {i} | {txt[:90]} | | |" for i, txt in rs)
+    open(path, "w").write(f"""---
+type: pcb-review
+milestone: {milestone}
+board: {prj.rel(board)}
+board_sha: {board_hash(board)}
+layout_spec_rev: {spec_rev(prj)}
+reviewer: {by}
+date: {day}
+verdict: OPEN
+---
+# PCB review: {milestone}, {day}
+
+Independent review against every rule of {prj.paths['layout_spec']} (rev {spec_rev(prj)}). Verdict per rule: PASS,
+FAIL, DEVIATION-OK (deviation with the owner's OK, cited) or N/A (with the reason). Evidence: refs, nets,
+coordinates in mm, the image or report used. The board is never edited by the reviewer.
+
+## Rules
+| Rule | Requirement | Verdict | Evidence |
+|---|---|---|---|
+{rows}
+
+## Other findings (ranked Critical / Major / Minor)
+
+## Verdict
+Set `verdict:` above to READY, READY WITH FIXES or NOT READY.
+""")
+    return path
+
+
+def latest_review(prj):
+    d = reviews_dir(prj)
+    if not os.path.isdir(d):
+        return None
+    fs = [os.path.join(d, f) for f in os.listdir(d) if f.startswith("PCB_") and f.endswith(".md")]
+    return max(fs, key=os.path.getmtime) if fs else None
+
+
+def review_status(prj, board):
+    """(ok, [problem]) for the latest PCB review against the rule set and the current board."""
+    rs = [i for i, _ in rules(prj)]
+    if not rs:
+        return False, [f"no L-rules in {prj.paths['layout_spec']}: there is nothing to review against"]
+    f = latest_review(prj)
+    if not f:
+        return False, ["no independent PCB review yet (forge pcb review-new <milestone>, then the pcb-reviewer agent)"]
+    t = open(f).read()
+    probs = []
+    got = {}
+    for line in t.splitlines():
+        m = re.match(r"^\|\s*(L-\d+[A-Za-z]?)\s*\|[^|]*\|\s*([^|]*?)\s*\|", line)
+        if m:
+            got[m.group(1)] = m.group(2).upper()
+    missing = [i for i in rs if not got.get(i)]
+    if missing:
+        probs.append(f"rules without a verdict: {', '.join(missing)}")
+    bad = [i for i in rs if got.get(i) and not got[i].startswith(VERDICTS)]
+    if bad:
+        probs.append(f"unknown verdicts on {', '.join(bad)} (use {', '.join(VERDICTS)})")
+    failed = [i for i in rs if got.get(i, "").startswith("FAIL")]
+    if failed:
+        probs.append(f"rules FAIL: {', '.join(failed)}")
+    m = re.search(r"^board_sha:\s*(\w+)", t, re.M)
+    if not m or m.group(1) != board_hash(board):
+        probs.append("the board changed after the review: review again")
+    m = re.search(r"^verdict:\s*(.+)$", t, re.M)
+    v = (m.group(1).strip() if m else "OPEN").upper()
+    if not v.startswith("READY"):
+        probs.append(f"review verdict {v}")
+    return not probs, probs, os.path.relpath(f, prj.root)
+
+
+def as_check_review(prj, opts):
+    from .check import finding, result, roots, has_content
+    pcbs = [b for b in roots(prj, "kicad_pcb") if has_content(b)]
+    if not pcbs:
+        return result("skip", reason="no board yet")
+    ok, probs, *where = review_status(prj, pcbs[0])
+    loc = where[0] if where else prj.paths["reviews"]
+    return result("pass" if ok else "warn", [finding("independent PCB review covers every layout rule, board unchanged",
+                                                      p, loc) for p in probs], reason=loc)
+
+
+def gate_items(prj):
+    from .check import roots
+    pcbs = roots(prj, "kicad_pcb")
+    if not pcbs:
+        return [(False, "PCB review: no board")]
+    ok, probs, *where = review_status(prj, pcbs[0])
+    return [(ok, "independent PCB review against the layout rules" + (f" ({where[0]})" if where else "")
+             + ("" if ok else ": " + "; ".join(probs)))]
+
+
 def main(prj, argv):
-    if not argv or argv[0] != "sync":
+    if argv[:1] == ["rules"]:
+        rs = rules(prj)
+        print(json.dumps(rs, indent=1) if "--json" in argv else
+              "\n".join(f"{i}  {txt}" for i, txt in rs) or f"no L-rules in {prj.paths['layout_spec']}")
+        return 0 if rs else 1
+    if not argv or argv[0] not in ("sync", "setup", "place", "review-new", "review-status"):
         print(__doc__)
         return 1
     from . import check
@@ -204,6 +512,34 @@ def main(prj, argv):
         if not pcbs:
             raise SystemExit("no board file under 08_PCB")
         board = pcbs[0]
+    if argv[0] == "review-new":
+        if len(argv) < 2:
+            raise SystemExit("forge pcb review-new <placement|routing|release>")
+        by = argv[argv.index("--by") + 1] if "--by" in argv else "pcb-reviewer"
+        print(prj.rel(review_new(prj, board, argv[1], by)))
+        return 0
+    if argv[0] == "review-status":
+        ok, probs, *where = review_status(prj, board)
+        if "--json" in argv:
+            print(json.dumps({"ok": ok, "problems": probs, "review": where[0] if where else None}))
+        else:
+            print(("PASS" if ok else "OPEN") + (f" ({where[0]})" if where else "") + "".join(f"\n  {p}" for p in probs))
+        return 0 if ok else 1
+    if argv[0] == "setup":
+        s = setup(prj, board)
+        print(f"board set up: {s['outline'][0]:g} x {s['outline'][1]:g} mm, {s['layers']} copper layers "
+              f"({'/'.join(str(x) for x in prj.cfg['pcb'].get('copper_oz', [1, 1]))} oz), min hole {s['min_hole']:g} mm"
+              + (", 4 mounting holes" if s["inset"] else ""))
+        return 0
+    if argv[0] == "place":
+        if len(argv) < 2:
+            raise SystemExit("forge pcb place <placement.json>")
+        rep = place(prj, board, argv[1], dry="--dry-run" in argv)
+        print(f"placed {len(rep['placed'])} part(s)" + (f"; not on the board: {', '.join(rep['missing'])}" if rep["missing"] else "")
+              + (f"; not in the table: {', '.join(rep['unplaced'])}" if rep["unplaced"] else ""))
+        for o in rep.get("overlaps", []):
+            print(f"  courtyard overlap: {o}")
+        return 1 if rep.get("overlaps") or rep["missing"] else 0
     sch = os.path.splitext(board)[0] + ".kicad_sch"
     if not os.path.exists(sch):
         raise SystemExit(f"no schematic next to {board}")

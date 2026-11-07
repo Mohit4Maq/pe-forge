@@ -1944,6 +1944,73 @@ class PcbSync(unittest.TestCase):
         self.assertNotIn("added:", r.stdout)                 # second run updates in place
         self.assertIn("parity: 0 issue(s)", r.stdout)
 
+    def test_stackup_block_thickness(self):
+        sys.path.insert(0, REPO)
+        from forge import pcb
+        blk = pcb.stackup_block([2, 1, 1, 2], 1.6)
+        th = sum(float(x) for x in re.findall(r"\(thickness ([\d.]+)\)", blk))
+        self.assertAlmostEqual(th, 1.6, places=2)
+        self.assertEqual(blk.count('(type "copper")'), 4)
+        self.assertIn('(layer "F.Cu" (type "copper") (thickness 0.07))', blk)
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_setup_and_place(self):
+        sys.path.insert(0, REPO)
+        from forge import kicad
+        if not kicad.find_python():
+            self.skipTest("KiCad's Python not found")
+        tmp = tempfile.mkdtemp(prefix="pe-forge-place-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        d = new_project("Pl", tmp)
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/pl/pl.kicad_sch"))
+        open(os.path.join(d, "project.toml"), "a").write(
+            "\n[pcb]\noutline_mm = [40, 30]\ncopper_oz = [2, 1, 1, 2]\nhole_inset_mm = 3.5\n")
+        forge("pcb", "sync", cwd=d)
+        r = forge("pcb", "setup", cwd=d)
+        self.assertIn("40 x 30 mm, 4 copper layers (2/1/1/2 oz)", r.stdout)
+        board = open(os.path.join(d, "08_PCB/pl/pl.kicad_pcb")).read()
+        self.assertEqual(board.count("(stackup"), 1)
+        forge("pcb", "setup", cwd=d)                       # re-run replaces, never stacks a second block
+        self.assertEqual(open(os.path.join(d, "08_PCB/pl/pl.kicad_pcb")).read().count("(stackup"), 1)
+        table = os.path.join(d, "placement.json")
+        json.dump({"U1": [20, 15, 0], "R1": [20, 15, 0]}, open(table, "w"))   # R1 on top of U1
+        r = forge("pcb", "place", table, cwd=d, check=False)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("courtyard overlap", r.stdout)
+        r = forge("pcb", "sync", cwd=d)
+        self.assertIn("parity: 0 issue(s)", r.stdout)       # holes are marked board-only
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_review_against_every_rule_and_board_hash(self):
+        tmp = tempfile.mkdtemp(prefix="pe-forge-rev-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        d = new_project("Rv", tmp)
+        os.makedirs(os.path.join(d, "04_Hardware/Layout"), exist_ok=True)
+        open(os.path.join(d, "04_Hardware/Layout/Layout_Spec.md"), "w").write(
+            "---\nrev: 0.1\n---\n| # | Rule |\n|---|---|\n| L-01 | cap at VIN |\n| L-02 | GND plane |\n")
+        r = forge("pcb", "review-status", cwd=d, check=False)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("no independent PCB review yet", r.stdout)
+        form = os.path.join(d, forge("pcb", "review-new", "placement", cwd=d).stdout.strip())
+        t = open(form).read()
+        self.assertIn("| L-01 |", t)
+        self.assertIn("board_sha:", t)
+        r = forge("pcb", "review-status", cwd=d, check=False)
+        self.assertIn("rules without a verdict: L-01, L-02", r.stdout)
+        t = t.replace("| L-01 | cap at VIN | | |", "| L-01 | cap at VIN | PASS | C4 1.0 mm from pin 3 |")
+        t = t.replace("| L-02 | GND plane | | |", "| L-02 | GND plane | FAIL | L2 split under U1 |")
+        open(form, "w").write(t.replace("verdict: OPEN", "verdict: READY"))
+        r = forge("pcb", "review-status", cwd=d, check=False)
+        self.assertIn("rules FAIL: L-02", r.stdout)
+        t = open(form).read()
+        open(form, "w").write(t.replace("| FAIL | L2 split under U1 |", "| PASS | solid |"))
+        r = forge("pcb", "review-status", cwd=d, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        board = os.path.join(d, "08_PCB/rv/rv.kicad_pcb")
+        open(board, "a").write("\n")                       # any later board change makes the review stale
+        r = forge("pcb", "review-status", cwd=d, check=False)
+        self.assertIn("the board changed after the review", r.stdout)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -27,6 +27,7 @@ Spec (JSON, coordinates in mm, sheet y down, 1.27 mm grid):
 "route": "hv" = horizontal first, "vh" = vertical first, between each consecutive pair of path points.
 
 Style rules (strict; any ERROR blocks apply): see skills/pe-schematic/references/style-guide.md.
+A label may sit anywhere along a wire of its own net (S7); a net drawn only as wires warns S17 (unnamed).
 """
 import collections
 import glob
@@ -244,11 +245,20 @@ def style_check(spec, sh, wires, labels, powers, ncs, style):
             E.append(f"S6 ground symbol {p['net']} at ({p['x']}, {p['y']}) must hang below its pin (dir D)")
         if SUPPLY_UP.search(p["net"]) and not GROUND.search(p["net"]) and p["dir"] != "U":
             E.append(f"S6 supply symbol {p['net']} at ({p['x']}, {p['y']}) must point up (dir U)")
-    # S7 labels sit on a wire end or pin; label text reads left-to-right (rot 0 / 180) unless on a vertical stub
+    # S7 labels sit on a wire (its end or anywhere along it, as KiCad names a rail) or on a pin; a label on another
+    # net's wire would merge the two nets
     points = set(ends) | set(sh.pins)
+    all_segs = list(segments(wires))
     for l in labels:
-        if (r2(l["x"]), r2(l["y"])) not in points:
-            E.append(f"S7 label {l['net']} at ({l['x']}, {l['y']}) is not on a wire end or pin")
+        at = (r2(l["x"]), r2(l["y"]))
+        if at in points:
+            continue
+        under = {n for n, a, b in all_segs if on_seg(at, a, b)}
+        if not under:
+            E.append(f"S7 label {l['net']} at ({l['x']}, {l['y']}) is not on a wire or pin")
+        elif l["net"] not in under and not any(n.startswith("~") for n in under):   # "~net…": unnamed in a saved sheet
+            E.append(f"S7 label {l['net']} at ({l['x']}, {l['y']}) sits on the wire of {', '.join(sorted(under))}: "
+                     "it would merge the nets")
     # S8 crossings of different nets: allowed (no dot) but limited
     cross = 0
     for i, (n1, a1, b1) in enumerate(segs):
@@ -298,6 +308,11 @@ def style_check(spec, sh, wires, labels, powers, ncs, style):
     for p in ncs:
         if p not in sh.pins:
             E.append(f"S12 no-connect at {p} is not on a pin")
+    # S17 a net the spec names but draws only as wires gets KiCad's "Net-(…)" name: brief, DRC classes and
+    # layout then never see the brief's name
+    named = {l["net"] for l in labels} | {p["net"] for p in powers if not p.get("flag")}
+    for net in sorted({c["net"] for c in spec.get("connect", [])} - named):
+        W.append(f"S17 net {net} is drawn but never named: add a label on one of its wires")
     return E, W, junctions
 
 

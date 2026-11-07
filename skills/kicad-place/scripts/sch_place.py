@@ -208,6 +208,17 @@ def instance(p, t, r, libblk, project, path):
         # horizontal 2-pin part (diode, inductor, rotated R / C): reference above, value below, reading left to right
         fa = 0 if rot in (0, 180) else 90
         ra, va = (x, y - 3.05, fa, None), (x, y + 3.05, fa, None)
+    elif two and side is None and len({round(xform(px, py, x, y, rot, mir)[0], 2) for _, _, px, py in pins}) == 1 \
+            and abs(xform(pins[0][2], pins[0][3], x, y, rot, mir)[0] - x) > 1:
+        # one-sided 2-pin part (connector: both pins on one side of the body): both fields above it, centred
+        top = min(xform(px, py, x, y, rot, mir)[1] for _, _, px, py in pins)
+        fa = 0 if rot in (0, 180) else 90
+        ra, va = (x, top - 5.08, fa, None), (x, top - 2.54, fa, None)
+    elif two and not r['Symbols'].startswith('MC_Generic:') and side is None:
+        # vertical 2-pin part from any library (Zener, TVS, ...): text right of the body, reading left to right;
+        # on a rot-90/270 symbol a field angle of 90 reads horizontal
+        fa = 0 if rot in (0, 180) else 90
+        ra, va = (x + 2.54, y - 1.27, fa, 'left'), (x + 2.54, y + 1.27, fa, 'left')
     elif len(pins) <= 2 and r['Symbols'].startswith('MC_Generic:'):
         side = side or ('R' if rot in (0, 180) else 'U')
         if side == 'R':   ra, va = (x + 2.54, y - 1.27, 0, 'left'), (x + 2.54, y + 1.27, 0, 'left')
@@ -216,6 +227,12 @@ def instance(p, t, r, libblk, project, path):
         elif side == 'A': ra, va = (x, y - 5.08, 90, None), (x, y - 2.54, 90, None)   # both above (rot 90)
         elif side == 'D': ra, va = (x, y + 2.54, 90, None), (x, y + 5.08, 90, None)   # field angle 90 on a rot-90
         else:             ra, va = (x, y - 2.54, 90, None), (x, y + 2.54, 90, None)   # symbol reads horizontal
+    elif rot in (90, 270) or (mir and len(pins) <= 4):
+        # rotated or mirrored discrete (FET, connector, ...): both fields above the topmost pin, centred, horizontal
+        pts = [xform(px, py, x, y, rot, mir) for _, _, px, py in pins]
+        cx, top = round((min(q[0] for q in pts) + max(q[0] for q in pts)) / 2 / GRID) * GRID, min(q[1] for q in pts)
+        fa = 0 if rot in (0, 180) else 90
+        ra, va = (cx, top - 7.62, fa, None), (cx, top - 5.08, fa, None)
     else:  # IC / other: keep the library field offsets
         lf = lib_fields(libblk)
         rx, ry = xform(lf['Reference'][0], lf['Reference'][1], x, y, 0)

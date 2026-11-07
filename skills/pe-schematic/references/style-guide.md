@@ -29,7 +29,12 @@ reviewer judge on the rendered sheet.
 
 ## Symbols, labels and text
 - **S6** ground symbols point down, supply symbols point up, never sideways.
-- **S7** labels sit on a wire end or a pin (on a short stub), never floating.
+- **S7** labels sit on a wire (its end, or anywhere along it to name a rail) or on a pin, never floating; a label
+  on another net's wire is an error (it would merge the nets).
+- **S17** every net the brief names carries a label somewhere (warning): an unlabelled net gets KiCad's
+  `Net-(…)` name, which the brief, the net classes and the layout never see.
+- Reference and value text always reads left to right, also on rotated parts; connectors (pins on one side)
+  carry it above the body.
 - **S13** no text overlaps other text, a wire or a symbol body (checked on the text KiCad renders).
 - **S14** reference and value sit next to their symbol (≤ 8.89 mm). **S15** all text reads left to right.
 - **S16** nothing in the frame margin or the title block.

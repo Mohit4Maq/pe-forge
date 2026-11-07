@@ -170,6 +170,28 @@ class SchematicEngine(unittest.TestCase):
         self.assertGreaterEqual(sch.count("(wire"), 10)
         self.assertIn('(label "VSENSE"', sch)
 
+    def mirror_spec(self, label_net="VIN"):
+        spec = {"sheet": "demo.kicad_sch", "netlist": {"VIN": ["J1.1", "R1.1"], "GND": ["J1.2", "R1.2"]},
+                "parts": [{"id": "CON-0009", "ref": "J1", "x": 50.8, "y": 50.8, "rot": 0, "mirror": "y"},
+                          {"id": "RES-0304", "ref": "R1", "x": 76.2, "y": 54.61, "rot": 0}],
+                "connect": [{"net": "VIN", "path": ["J1.1", "R1.1"]},
+                            {"net": "GND", "path": ["J1.2", [58.42, 53.34], [58.42, 60.96]]}],
+                "stubs": [{"pin": "R1.2", "power": "GND", "dir": "D", "len": 2.54}],
+                "power": [{"net": "GND", "x": 58.42, "y": 60.96, "dir": "D"}],
+                "flags": [{"x": 58.42, "y": 57.15, "dir": "R", "net": "GND", "len": 5.08},
+                          {"x": 68.58, "y": 50.8, "dir": "U", "net": "VIN"}],
+                "labels": [{"net": label_net, "x": 63.5, "y": 50.8, "rot": 0, "kind": "local"}]}
+        path = os.path.join(self.tmp, "m.json")
+        json.dump(spec, open(path, "w"))
+        return forge("schdraw", "check", path, cwd=self.tmp, check=False)
+
+    def test_mid_wire_label_and_mirrored_connector_text(self):
+        r = self.mirror_spec()
+        self.assertNotIn("S7", r.stdout)                 # a label along its own wire names the rail
+        self.assertNotIn("J1", "".join(l for l in r.stdout.splitlines() if "S13" in l))   # text above, off the body
+        r = self.mirror_spec("GND")
+        self.assertIn("would merge the nets", r.stdout)   # a label on another net's wire
+
     def test_short_is_caught_twice(self):
         r = self.run_spec("short_circuit.json")
         self.assertEqual(r.returncode, 1)

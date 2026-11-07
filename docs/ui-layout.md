@@ -1,6 +1,6 @@
 # pe-forge terminal UI: layout spec (WP14)
 
-Status: **draft, waiting for the owner's OK before the renderer is coded.**
+Status: **draft, waiting for the owner's OK before the renderer is coded.** Accent decided: MaqLabs red.
 Checked against the Claude Code docs on 2026-11-07 (status line: code.claude.com/docs/en/statusline; hooks:
 code.claude.com/docs/en/hooks; plugin manifest: code.claude.com/docs/en/plugins/manifest-reference).
 
@@ -70,12 +70,12 @@ stays unbranded, as today.
 
 | Token | Truecolor | 256-colour fallback |
 |---|---|---|
-| accent | `#b87333` (copper; `[ui] accent` in project.toml or `~/.config/pe-forge/ui.toml`) | 173 |
+| accent | `#d52b3d` (MaqLabs red, from the MaqLabs logo; `[ui] accent` in project.toml or `~/.config/pe-forge/ui.toml`) | 161 |
 | bright | default foreground, bold | bold |
 | dim | `#8a8a8a` | 245 |
 | ok | `#3fb950` | 71 |
 | warn | `#d29922` | 178 |
-| err | `#f85149` | 203 |
+| err | `#ff6e9c` (pink-red, so an error never looks like the brand mark; always with `✗` or `⚠`) | 204 |
 
 Truecolor when `$COLORTERM` is `truecolor` or `24bit`, else 256 colours; no colour with `$NO_COLOR` or
 `[ui] color = false`. Glyphs `◆ ▸ ✓ ✗ ▶ ? · – ⚠ ●` with an ASCII set for `[ui] glyphs = "ascii"`:
@@ -94,7 +94,7 @@ Truecolor when `$COLORTERM` is `truecolor` or `24bit`, else 256 colours; no colo
 
 ## 7. Questions for the owner
 
-1. Copper accent `#b87333`, or another brand colour?
+1. ~~Brand colour~~ **Decided (owner, 2026-11-07): MaqLabs red `#d52b3d`.**
 2. Include the `ctx 41%` segment (from stdin, free)?
 3. Install at user scope from bootstrap (affects every Claude Code session, chaining to your current status line
    outside pe-forge projects), or project scope only from `forge new`?

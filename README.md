@@ -174,7 +174,9 @@ is compared with the schematic KiCad exports, and each disagreement is reported 
 example `BOM.csv: R5 = 10k, actual R5 = 4.7k in power.kicad_sch`). Values compare by meaning (`4u7` = `4.7 µF`).
 
 `forge insulation` checks the schematic's insulation from KiCad's own netlist. Nets are joined through every part
-that is not a barrier (an MC_Parts row with `Iso_Rating`: isolators, isolated DC-DC, Y-caps), and then:
+that is not a barrier (an MC_Parts row with `Iso_Rating`: isolators, isolated DC-DC, Y-caps). Each barrier has a
+grade (reinforced, basic, functional; Y1 counts as reinforced, Y2 as basic), and only the grade the project asks
+for (default reinforced) separates SELV from HV. Duplicate references are errors. Then:
 - every net on the HV side must be in the HV class (INS-1);
 - no SELV net may reach HV without a barrier, and the finding names the parts on the path (INS-2);
 - each barrier part's package creepage is compared with the board barrier (INS-3);
@@ -182,7 +184,11 @@ that is not a barrier (an MC_Parts row with `Iso_Rating`: isolators, isolated DC
 
 `forge insulation --rules` (CLS-2) proves the project's `.kicad_dru` really enforces the decided creepage and
 clearance per class pair. It builds a two-pad test board 0.05 mm inside each value and runs KiCad's DRC on it.
-Set both up in `project.toml` `[insulation]`; new projects get a commented example. Both run in `forge check`.
+"Not HV" is tested against every defined non-HV class (Default, Power, …), and each value also gets a pair just
+wider than it, which must stay clean. Use `--keep DIR` to save the test board and the DRC report as evidence.
+Set both up in `project.toml` `[insulation]`; new projects get a commented example. Both run in `forge check`. Gate
+G6 runs the schematic checks, and G7 and G8 also need the rules proof. A check that isn't set up says so: it never
+passes silently.
 
 `forge check --fab --strict` answers "can I order this board today?": routing complete, schematic and board
 match, every placed part released with an alternate, the outputs still match the design by content hash, every

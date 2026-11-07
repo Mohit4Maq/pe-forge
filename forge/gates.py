@@ -143,8 +143,12 @@ def check(prj, gate, mod=None):
             bad = [f for f in r["findings"] if f["claim"].startswith(("no ", kind))]
             res.append((r["status"] != "fail", f"{kind} ({r['reason']}): {len(bad)} error(s)"
                         + "".join(f"; {f['location']}: {f['actual']}" for f in bad[:3])))
+        from . import insulation          # INS-0/1/2, NET-4 at G6; the .kicad_dru proof (CLS-2) too at G7
+        res += insulation.gate_items(prj, rules=gate == "G7")
     if gate == "G8":           # the fab release gate, strict: NRND parts and unrun power checks fail too
         from . import check as fc
+        from . import insulation
+        res += insulation.gate_items(prj, rules=True)
         r = fc.c_fab(prj, {"strict": True})
         if r["status"] == "skip":
             res.append((False, f"fab release gate: skipped ({r['reason']})"))

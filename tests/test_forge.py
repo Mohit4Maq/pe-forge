@@ -1737,7 +1737,7 @@ class Insulation(unittest.TestCase):
 
     def run_(self, nets, cfg=None, db=None, comps=None):
         parts, ns = self.I.parse(netlist_text(comps or self.COMPS, nets))
-        cfg = {"barriers": ["ISO-1"], **(cfg or {})}
+        cfg = {"barriers": {"ISO-1": "reinforced"}, **(cfg or {})}
         return self.I.analyse(parts, ns, cfg, db)
 
     def test_hv_side_net_without_hv_class_is_ins1(self):
@@ -1795,8 +1795,101 @@ class Insulation(unittest.TestCase):
         cfg = {"rule": [{"a": "HV", "b": "!HV", "clearance_mm": 2.5, "creepage_mm": 4.0},
                         {"a": "HV", "b": "!HV", "clearance_mm": 10.0}]}
         res = self.I.test_rules(dru, pro, cfg)
-        self.assertEqual([(c["kind"], c["need"], ok) for c, ok, _ in res],
-                         [("clearance", 2.5, True), ("creepage", 4.0, True), ("clearance", 10.0, False)])
+        # "!HV" is tested against every defined non-HV class of the template: Default and Power
+        self.assertEqual([(c["kind"], c["b"], c["need"], ok) for c, ok, _, _ in res],
+                         [("clearance", "!HV as Default", 2.5, True), ("clearance", "!HV as Power", 2.5, True),
+                          ("creepage", "!HV as Default", 4.0, True), ("creepage", "!HV as Power", 4.0, True),
+                          ("clearance", "!HV as Default", 10.0, False), ("clearance", "!HV as Power", 10.0, False)])
+        self.assertFalse(any(w for *_, w in res[:4]))          # 0.5 mm wider than the rule: clean
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_cls2_rule_covering_only_default_misses_power_rails(self):
+        sys.path.insert(0, REPO)
+        from forge import kicad
+        if not kicad.find_python():
+            self.skipTest("KiCad's Python not found")
+        tmp = tempfile.mkdtemp(prefix="pe-forge-cls2t-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        dru = os.path.join(tmp, "x.kicad_dru")
+        open(dru, "w").write("(version 1)\n(rule \"HV to Default\"\n\t(condition \"A.hasNetclass('HV') && "
+                             "B.hasNetclass('Default')\")\n\t(constraint clearance (min 4mm)))\n")
+        pro = os.path.join(REPO, "library", "template", "MC_Standard", "MC_Standard.kicad_pro")
+        res = self.I.test_rules(dru, pro, {"rule": [{"a": "HV", "b": "!HV", "clearance_mm": 4.0}]})
+        self.assertEqual({c["b"]: ok for c, ok, _, _ in res}, {"!HV as Default": True, "!HV as Power": False})
+
+    def test_basic_barrier_does_not_separate_selv(self):
+        comps = dict(self.COMPS, CY=("10n", "Y2CAP", "CAP-9"))
+        n = self.nets()
+        n["/HV_DC_P"] = ("HV", n["/HV_DC_P"][1] + [("CY", "1", "")])
+        n["GND"] = ("Default", n["GND"][1] + [("CY", "2", "")])
+        db = {"CAP-9": {"Iso_Rating": "Y2 safety capacitor, 300 VAC"}}
+        f, info = self.run_(n, comps=comps, db=db)
+        self.assertEqual(info["barriers"]["CY"]["grade"], "basic")
+        got = {x["net"]: x["actual"] for x in f["INS-2"]}
+        self.assertIn("GND", got)
+        self.assertIn("weaker barrier", got["GND"])
+        self.assertIn("CY", got["GND"])
+        self.assertEqual([x["net"] for x in f["INS-1"]], ["Net-(U1-OUT)"])   # the Y-cap still bounds the HV side
+
+    def test_duplicate_reference_is_an_error_and_never_a_barrier(self):
+        comps = dict(self.COMPS)
+        n = self.nets()
+        # a resistor that shares the isolator's reference, from HV_DC_N to GND
+        text = netlist_text(comps, n).replace('(components', '(components\n\t\t(comp (ref "U1") (value "1M") '
+                                                '(footprint "x:y")\n\t\t\t(fields (field (name "MPN") "R1M")))', 1)
+        parts, ns = self.I.parse(text)
+        ns["GND"]["pins"].append(("U1", "9", ""))
+        parts["U1"]["nets"] += ["GND", "/HV_DC_N"]
+        f, info = self.I.analyse(parts, ns, {"barriers": {"ISO-1": "reinforced"}}, None)
+        self.assertEqual([x["ref"] for x in f["INS-0"]], ["U1"])
+        self.assertEqual(f["INS-0"][0]["severity"], "error")
+        self.assertNotIn("U1", info["barriers"])
+        self.assertTrue(f["INS-2"])
+
+    def test_unconnected_hv_pad_gets_its_own_fix(self):
+        n = self.nets(**{"unconnected-(U1-NC-Pad5)": ("Default", [("U1", "5", "NC")])})
+        n["/HV_DC_N"] = ("HV", n["/HV_DC_N"][1])
+        comps = dict(self.COMPS, R2=("0", "R0", "RES-3"))
+        n["unconnected-(U1-NC-Pad5)"] = ("Default", [("R2", "1", "")])
+        n["/HV_DC_N"] = ("HV", n["/HV_DC_N"][1] + [("R2", "2", "")])
+        f, _ = self.run_(n, comps=comps)
+        fixes = {x["net"]: x["fix"] for x in f["INS-1"]}
+        self.assertIn("unconnected pin", fixes["unconnected-(U1-NC-Pad5)"])
+
+    def test_grade_parsing(self):
+        g = self.I.grade_of
+        self.assertEqual([g("reinforced 5.7 kVrms"), g("Y1 cap"), g("Y2 safety"), g("basic"), g("functional"), g("4 kVac")],
+                         ["reinforced", "reinforced", "basic", "basic", "functional", None])
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_check_and_gate_on_a_real_sheet(self):
+        tmp = tempfile.mkdtemp(prefix="pe-forge-ins-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        d = new_project("Hv", tmp)
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/hv/hv.kicad_sch"))
+        pro = os.path.join(d, "08_PCB/hv/hv.kicad_pro")
+        j = json.load(open(pro))
+        j["net_settings"]["netclass_patterns"].append({"netclass": "HV", "pattern": "*VIN"})
+        json.dump(j, open(pro, "w"), indent=2)
+        r = json.loads(forge("check", "--only", "insulation", "--json", cwd=d, check=False).stdout)
+        c = r["checks"]["insulation"]
+        self.assertEqual(c["status"], "fail")                 # no isolator: GND joined to VIN
+        claims = " ".join(f["claim"] for f in c["findings"])
+        self.assertIn("INS-2", claims)
+        self.assertIn("NET-4 runs", claims)                   # not configured is said, not silent
+        self.assertIn("INS-3 runs", claims)
+        sys.path.insert(0, REPO)
+        from forge import config, gates
+        items = gates.check(config.Project(d), "G6")
+        ins = [x for x in items if x[1].startswith("insulation")]
+        self.assertTrue(ins and not ins[0][0], items)
+        # the project says it has HV, but the pattern is gone: a fail, not a skip
+        j["net_settings"]["netclass_patterns"].pop()
+        json.dump(j, open(pro, "w"), indent=2)
+        open(os.path.join(d, "project.toml"), "a").write("\n[insulation]\nbarrier_creepage_mm = 4.0\n")
+        r = json.loads(forge("check", "--only", "insulation", "--json", cwd=d, check=False).stdout)
+        self.assertEqual(r["checks"]["insulation"]["status"], "fail")
+        self.assertIn("no net is in class HV", r["checks"]["insulation"]["findings"][0]["actual"])
 
 
 if __name__ == "__main__":

@@ -54,9 +54,10 @@ def slug(s):
     return re.sub(r"[^A-Za-z0-9]+", "_", s).strip("_")
 
 
-def add_module(prj, st, name, purpose="", depends=()):
+def add_module(prj, st, name, purpose="", depends=(), folder=None):
+    """A new module; `folder` adopts an existing folder (relative to the project) instead of making modules/M-xx_*."""
     mid = next_module_id(st)
-    d = os.path.join(prj.paths["modules"], f"{mid}_{slug(name)}")
+    d = folder.rstrip("/") if folder else os.path.join(prj.paths["modules"], f"{mid}_{slug(name)}")
     m = {"id": mid, "name": name, "dir": d, "purpose": purpose, "depends": list(depends),
          "status": "todo", "phases": {p: {"status": "todo"} for p in MODULE_PHASES}}
     st["modules"].append(m)

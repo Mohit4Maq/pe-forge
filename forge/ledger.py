@@ -108,7 +108,7 @@ def obligations_for(prj, rel, mods):
         out += [("drift", scope), ("bom", rel)]
     elif base in ("Design_Booklet.md", "Sheet_Brief.md"):
         out.append(("drift", scope))
-    if rel == os.path.join(prj.paths["tools_data"], "superseded_terms.csv"):
+    if rel == prj.paths["superseded_terms"]:
         out.append(("consistency", "project"))
     if rel.startswith(prj.paths["requirements"] + "/") or base == "trace.csv":
         out.append(("vmodel", "project"))

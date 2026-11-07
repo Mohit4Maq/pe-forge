@@ -1,4 +1,6 @@
 """forge status / gate / phase / module."""
+import os
+
 from . import state as S
 from .phases import GATE_OF, GATE_REVIEWERS, LITE_REVIEWERS, MODULE_PHASES, PHASE, PHASES
 
@@ -120,7 +122,10 @@ def module(prj, rest):
         return 0
     if rest[0] == "add":
         dep = [d for d in (_opt(rest, "--depends") or "").split(",") if d]
-        m = S.add_module(prj, st, rest[1], _opt(rest, "--purpose") or "", dep)
+        folder = _opt(rest, "--dir")
+        if folder and not os.path.isdir(os.path.join(prj.root, folder)):
+            raise SystemExit(f"--dir {folder}: no such folder in the project")
+        m = S.add_module(prj, st, rest[1], _opt(rest, "--purpose") or "", dep, folder)
         S.save(prj, st)
         print(f"added {m['id']} → {m['dir']}")
         return 0

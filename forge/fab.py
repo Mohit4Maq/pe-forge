@@ -287,8 +287,8 @@ def p_docs(ctx):
     prj = ctx["prj"]
     notes = sorted(glob.glob(prj.p("release", "*", "Release_Notes.md")))
     want = [("Release_Notes.md", notes[-1] if notes else prj.p("release", "<REV>", "Release_Notes.md")),
-            ("DVP_and_R.md", prj.p("validation", "DVP_and_R.md")),
-            ("Layout_Spec.md", prj.p("hardware", "Layout", "Layout_Spec.md"))]
+            (os.path.basename(prj.paths["dvp"]), prj.p("dvp")),
+            (os.path.basename(prj.paths["layout_spec"]), prj.p("layout_spec"))]
     F = []
     for name, p in want:
         if not os.path.exists(p):

@@ -21,10 +21,10 @@ def _csv(path):
 
 
 def scan(prj):
-    terms = _csv(prj.p("tools_data", "superseded_terms.csv"))
+    terms = _csv(prj.p("superseded_terms"))
     if not terms:
         return []
-    allow = {(r["path"], r["term"].lower()) for r in _csv(prj.p("tools_data", "consistency_allow.csv"))}
+    allow = {(r["path"], r["term"].lower()) for r in _csv(prj.p("consistency_allow"))}
     frozen = prj.paths["reviews"]
     hits = []
     for dp, dn, fn in os.walk(prj.root):

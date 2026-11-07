@@ -189,7 +189,7 @@ def build(prj):
         n["facts"] = [f"{len(rows)} {L} verification item(s), {len(done)} done, {len(failed)} failed"]
         n["items"] = [f"{v['id']}: {v.get('title', '')} ({v.get('status', '')})"[:70] for v in rows[:8]]
         n["issues"] = [f"{v['id']} failed" for v in failed][:4]
-        n["docs"] = [d for d in (_rel(prj, prj.p("validation", "DVP_and_R.md")), _rel(prj, prj.p("vmodel", "verification.csv"))) if d]
+        n["docs"] = [d for d in (_rel(prj, prj.p("dvp")), _rel(prj, prj.p("vmodel", "verification.csv"))) if d]
     N["validation"]["facts"].append(f"release: {st['phases']['P8']['status']}")
     unc = [k for k in real if not any(k in (r.get("parents") or "") for r in trace)]
     if unc:

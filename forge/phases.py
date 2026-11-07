@@ -25,9 +25,9 @@ PHASES = [
     ("P6", "G6", "Schematic: booklet, sheet brief, parts, drawing, ERC, review", "pe-schematic",
      ["{booklets}/*.md", "{briefs}/*.md", "{pcb}/**/*.kicad_sch"]),
     ("P7", "G7", "PCB layout: stack-up, placement, routing, DRC, EMC / DFM review", "pe-pcb",
-     ["{pcb}/**/*.kicad_pcb", "{hardware}/Layout/Layout_Spec.md"]),
+     ["{pcb}/**/*.kicad_pcb", "{layout_spec}"]),
     ("P8", "G8", "Manufacturing release: Gerbers, drill, BoM, CPL, fab notes, test plan", "pe-release",
-     ["{release}/*/gerbers/*", "{release}/*/bom/*", "{release}/*/Release_Notes.md", "{validation}/DVP_and_R.md"]),
+     ["{release}/*/gerbers/*", "{release}/*/bom/*", "{release}/*/Release_Notes.md", "{dvp}"]),
 ]
 MODULE_PHASES = ("P2", "P3", "P4", "P5", "P6")
 PHASE = {p[0]: p for p in PHASES}

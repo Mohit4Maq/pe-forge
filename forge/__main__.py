@@ -4,7 +4,7 @@
   forge status                                          phases, modules, next action
   forge gate check|pass|fail G<n> [--module M-xx] [--note TEXT]
   forge phase start P<n> [--module M-xx]
-  forge module add NAME [--purpose TEXT] [--depends M-01,M-02] | list | start M-xx | done M-xx
+  forge module add NAME [--purpose TEXT] [--depends M-01,M-02] [--dir FOLDER] | list | start M-xx | done M-xx
   forge vmodel build|check|impact|diff|cr|sync ...
   forge link [--apply]              ID registry + wiki links
   forge consistency [--hook]        superseded-term check (Rule 5)

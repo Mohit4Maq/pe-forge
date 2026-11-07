@@ -51,6 +51,10 @@ DEFAULT_PATHS = {
     "templates": "90_Templates",
     "modules": "modules",
     "tools_data": ".forge",
+    "superseded_terms": ".forge/superseded_terms.csv",
+    "consistency_allow": ".forge/consistency_allow.csv",
+    "dvp": "13_Validation/DVP_and_R.md",
+    "layout_spec": "04_Hardware/Layout/Layout_Spec.md",
 }
 
 

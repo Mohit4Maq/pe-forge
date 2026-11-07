@@ -1,8 +1,8 @@
-#!/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3
+#!/usr/bin/env python3
 """Footprint QA with KiCad's own DRC: place every MC footprint on a scratch board and report
 footprint-level defects (malformed courtyards, pad/hole problems, ...).
 
-Run with KiCad's bundled Python (the shebang does this):  tools/fp_qa.py [LIB ...]
+Runs under KiCad's bundled Python (re-executes itself there if pcbnew is missing):  tools/fp_qa.py [LIB ...]
 """
 import json
 import subprocess
@@ -10,10 +10,22 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pcbnew
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    import pcbnew
+except ImportError:   # not KiCad's Python: re-run under it (found by kicad_paths, same order as forge/kicad.py)
+    import os
+    import kicad_paths
+    _py = kicad_paths.python()
+    if _py and not os.environ.get("PE_FORGE_KPY_REEXEC") and os.path.realpath(_py) != os.path.realpath(sys.executable):
+        os.environ["PE_FORGE_KPY_REEXEC"] = "1"
+        os.execv(_py, [_py, __file__, *sys.argv[1:]])
+    sys.exit("pcbnew (KiCad's Python module) not found: install KiCad 10 or set KICAD_PYTHON to its python3")
 
 ROOT = Path(__file__).resolve().parent.parent
-CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
+import kicad_paths  # noqa: E402
+
+CLI = kicad_paths.cli()
 # Violations caused by the scratch board having no nets or overlapping neighbours, not by the footprint.
 IGNORE = {"clearance", "solder_mask_bridge", "courtyards_overlap", "shorting_items",
           "unresolved_variable", "lib_footprint_issues", "lib_footprint_mismatch", "silk_overlap",

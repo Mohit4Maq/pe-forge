@@ -10,8 +10,6 @@ import sys
 
 from . import config
 
-KICAD_CLI = [os.environ.get("KICAD_CLI"), shutil.which("kicad-cli"),
-             "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli", "/usr/bin/kicad-cli"]
 LTSPICE = ["/Applications/LTspice.app", os.path.expanduser("~/.wine/drive_c/Program Files/ADI/LTspice/LTspice.exe"),
            os.path.expanduser("~/.wine/drive_c/Program Files/LTC/LTspiceXVII/XVIIx64.exe")]
 
@@ -32,7 +30,8 @@ def main(argv):
     ok = lambda c, name, note, feat: rows.append(("OK " if c else "-- ", name, note, feat))
     ok(sys.version_info >= (3, 11), "python ≥ 3.11", sys.version.split()[0], "everything (required)")
     ok(bool(shutil.which("git")), "git", run(["git", "--version"]), "projects, change watch (required)")
-    k = first(KICAD_CLI)
+    from .kicad import find_cli
+    k = find_cli()
     ok(bool(k), "kicad-cli (KiCad 10)", run([k, "version"]) if k else "install KiCad 10: kicad.org/download",
        "P6–P8: schematic drawing, ERC / DRC, release outputs")
     lt = first(LTSPICE)

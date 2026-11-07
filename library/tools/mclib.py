@@ -34,9 +34,11 @@ FP_DIR = ROOT / "footprints"
 MODEL_DIR = ROOT / "3dmodels"
 DBL_PATH = ROOT / "MC_Parts.kicad_dbl"
 
-KICAD_APP = Path("/Applications/KiCad/KiCad.app")
-KICAD_CLI = KICAD_APP / "Contents/MacOS/kicad-cli"
-STOCK = KICAD_APP / "Contents/SharedSupport"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kicad_paths  # noqa: E402
+
+KICAD_CLI = Path(kicad_paths.cli())
+STOCK = Path(kicad_paths.stock_symbols() or "/usr/share/kicad/symbols").parent   # .../symbols -> its parent
 ODBC_DRIVER = "/opt/homebrew/lib/libsqlite3odbc.dylib"
 
 # table -> (ID prefix, extra columns shown in the KiCad chooser)

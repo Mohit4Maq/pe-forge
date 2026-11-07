@@ -7,7 +7,12 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kicad_paths  # noqa: E402
+
+CLI = kicad_paths.cli()
 
 
 def parse_sexpr(text: str):

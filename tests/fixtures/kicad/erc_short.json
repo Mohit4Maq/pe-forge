@@ -1,0 +1,83 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-07T10:41:29",
+    "ignored_checks": [
+        {
+            "description": "Global label only appears once in the schematic",
+            "key": "single_global_label"
+        },
+        {
+            "description": "Four connection points are joined together",
+            "key": "four_way_junction"
+        },
+        {
+            "description": "SPICE model issue",
+            "key": "simulation_model_issue"
+        },
+        {
+            "description": "Assigned footprint doesn't match footprint filters",
+            "key": "footprint_filter"
+        }
+    ],
+    "included_severities": [
+        "error"
+    ],
+    "kicad_version": "10.0.6",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/5f928d76-4d41-4eac-b113-1702c97bd9db",
+            "violations": [
+                {
+                    "description": "Pins of type Power output and Power output are connected",
+                    "items": [
+                        {
+                            "description": "Symbol #FLG005 Pin 1 [Power output, Line]",
+                            "pos": {
+                                "x": 0.5588,
+                                "y": 0.7366
+                            },
+                            "uuid": "ba070c68-0f90-4d3a-978d-6c759b6b7b89"
+                        },
+                        {
+                            "description": "Symbol #FLG006 Pin 1 [Power output, Line]",
+                            "pos": {
+                                "x": 0.5588,
+                                "y": 0.762
+                            },
+                            "uuid": "78ba8a1c-5ece-41ee-810e-1afb899b1f4f"
+                        }
+                    ],
+                    "severity": "error",
+                    "type": "pin_to_pin"
+                },
+                {
+                    "description": "Unresolved text variable in drawing sheet",
+                    "items": [],
+                    "severity": "error",
+                    "type": "unresolved_variable"
+                },
+                {
+                    "description": "Unresolved text variable in drawing sheet",
+                    "items": [],
+                    "severity": "error",
+                    "type": "unresolved_variable"
+                },
+                {
+                    "description": "Unresolved text variable in drawing sheet",
+                    "items": [],
+                    "severity": "error",
+                    "type": "unresolved_variable"
+                },
+                {
+                    "description": "Unresolved text variable in drawing sheet",
+                    "items": [],
+                    "severity": "error",
+                    "type": "unresolved_variable"
+                }
+            ]
+        }
+    ],
+    "source": "short_circuit.kicad_sch"
+}

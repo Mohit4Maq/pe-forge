@@ -14,6 +14,8 @@
   forge bom check [file]            BoM completeness (alternates, price, stock)
   forge doctor                      check the toolchain
   forge kicad-setup [--apply]       register the library, MC_LIB path and ODBC driver in KiCad 10
+
+KiCad is found by forge/kicad.py ($KICAD_CLI, PATH, macOS app, Linux paths); ERC / DRC come from its JSON reports.
 """
 import os
 import sys

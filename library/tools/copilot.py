@@ -25,8 +25,10 @@ from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
-CLI = "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-KPY = "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3"
+import kicad_paths  # noqa: E402
+
+CLI = kicad_paths.cli()
+KPY = kicad_paths.python()
 GROUPED = ("ERC-", "DRC-")   # one entry per violation type; the count may change
 
 

@@ -25,14 +25,13 @@ _REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'
 MC = os.path.expanduser(os.environ.get('MC_LIB') or os.path.join(_REPO, 'library'))
 
 
-def _first(*c):
-    return next((x for x in c if x and os.path.exists(x)), c[-1])
 
+sys.path.insert(0, _REPO)
+from forge import kicad as _kc  # noqa: E402  one search order for kicad-cli and the stock symbols
 
-STOCK = _first(os.environ.get('KICAD_SYMBOL_DIR'), os.environ.get('KICAD10_SYMBOL_DIR'),
-               '/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols', '/usr/share/kicad/symbols')
-KCLI = _first(os.environ.get('KICAD_CLI'), shutil.which('kicad-cli'),
-              '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli', '/usr/bin/kicad-cli')
+STOCK = _kc.stock_symbols() or '/usr/share/kicad/symbols'
+KCLI = _kc.find_cli() or 'kicad-cli'
+
 SCRATCH = os.environ.get('SCH_PLACE_SCRATCH', os.path.join(os.environ.get('TMPDIR', '/tmp'), 'sch_place'))
 TABLE = {'CAP': 'Capacitors', 'RES': 'Resistors', 'MAG': 'Magnetics', 'IC': 'ICs', 'DIO': 'Diodes',
          'CON': 'Connectors', 'PRT': 'Protection'}

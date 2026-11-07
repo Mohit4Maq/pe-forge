@@ -17,3 +17,8 @@ their own licences:
 
 Benchmarks in `vendor/pwrlab/benchmarks/` quote published specification numbers from public vendor reference
 design documents (TI, ST) with their URLs; the documents themselves are not included.
+
+## Design ideas
+
+Design ideas adapted from copperhead (Apache-2.0), github.com/copperheadhq/copperhead: re-implemented in Python,
+no code copied. See `docs/PLAN_copperhead_features.md`.

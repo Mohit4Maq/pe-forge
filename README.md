@@ -129,7 +129,9 @@ forge schdraw check|apply|pins|new         forge bom check   forge doctor   forg
 
 ## Status and limits
 
-v0.1. The process, engine, drawing engine and library are in daily use on a real 11 kW product. Known limits:
+v0.1. The process, engine, drawing engine and library are in daily use on a real 11 kW product. ERC / DRC are read
+from KiCad's JSON reports through one layer (`forge/kicad.py`; set `KICAD_CLI` if KiCad is not in a standard place).
+Known limits:
 - pwrlab covers buck, DAB, H-bridge, T-type / NPC and totem-pole PFC; other topologies are hand-built netlists
   with the same checks done by hand (the skill says so).
 - `forge schdraw` draws new sheets or adds to a sheet. It does not yet rearrange parts already placed.

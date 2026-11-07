@@ -173,5 +173,98 @@ class SchematicEngine(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.tmp, "demo.kicad_sch.bak")))
 
 
+KFIX = os.path.join(FIX, "kicad")
+sys.path.insert(0, REPO)
+from forge import kicad as fk  # noqa: E402
+
+
+class KicadReports(unittest.TestCase):
+    """WP1: parser tests on JSON captured from KiCad 10.0.6 (no KiCad needed)."""
+
+    def load(self, name):
+        return json.load(open(os.path.join(KFIX, name)))
+
+    def test_erc_short_parsed_with_sheet_and_mm_position(self):
+        r = fk.parse(self.load("erc_short.json"), "erc", "short.kicad_sch", has_project=False)
+        self.assertTrue(r.tool_ok)
+        self.assertFalse(r.ok)
+        v = next(v for v in r.violations if v["type"] == "pin_to_pin")
+        self.assertEqual(v["sheet"], "/")
+        self.assertEqual(v["items"][0]["pos"], (55.88, 73.66))       # KiCad writes 0.5588: 100 mm units
+        self.assertEqual(v["items"][0]["ref"], "#FLG005")
+        self.assertFalse(any(v["type"] == "unresolved_variable" for v in r.violations))   # bare sheet
+
+    def test_erc_unresolved_variables_count_inside_a_project(self):
+        r = fk.parse(self.load("erc_clean.json"), "erc", "x.kicad_sch", has_project=False)
+        self.assertTrue(r.ok)
+        r = fk.parse(self.load("erc_clean.json"), "erc", "x.kicad_sch", has_project=True)
+        self.assertFalse(r.ok)
+
+    def test_drc_shapes(self):
+        clean = fk.parse(self.load("drc_clean.json"), "drc", "c.kicad_pcb")
+        self.assertTrue(clean.ok)
+        broken = fk.parse(self.load("drc_broken.json"), "drc", "b.kicad_pcb")
+        self.assertTrue(broken.ok)                      # only warnings at the default (error) level
+        self.assertEqual(len(broken.warnings), 2)
+        strict = fk.parse(self.load("drc_broken.json"), "drc", "b.kicad_pcb", severity=("error", "warning"))
+        self.assertFalse(strict.ok)
+        self.assertEqual(strict.violations[0]["items"][0]["pos"], (110.0, 90.0))
+        par = fk.parse(self.load("drc_parity.json"), "drc", "p.kicad_pcb")
+        self.assertEqual(len(par.parity), 6)
+        self.assertIn("Missing footprint C1", par.parity[0]["description"])
+
+    def test_wrong_report_shape_is_not_a_pass(self):
+        r = fk.parse({"foo": 1}, "erc", "x.kicad_sch")
+        self.assertFalse(r.tool_ok)
+        self.assertFalse(r.ok)
+
+    def test_stub_cli_without_report_fails_gate(self):
+        tmp = tempfile.mkdtemp(prefix="pe-forge-stub-")
+        try:
+            stub = os.path.join(tmp, "kicad-cli")
+            open(stub, "w").write("#!/bin/sh\nexit 0\n")
+            os.chmod(stub, 0o755)
+            ans = os.path.join(tmp, "a.json")
+            json.dump({"name": "Stub", "summary": "s", "owner": "T"}, open(ans, "w"))
+            prj = os.path.join(tmp, "p")
+            forge("new", prj, "--answers", ans)
+            env = dict(ENV, KICAD_CLI=stub)
+            r = subprocess.run(FORGE + ["gate", "check", "G6"], cwd=prj, capture_output=True, text=True, env=env)
+            self.assertEqual(r.returncode, 1)
+            self.assertRegex(r.stdout, r"FAIL ERC \S+\.kicad_sch: kicad-cli produced no report")
+            old = os.environ.get("KICAD_CLI")
+            os.environ["KICAD_CLI"] = stub
+            try:
+                rep = fk.erc(os.path.join(KFIX, "short_circuit.kicad_sch"))
+            finally:
+                os.environ.pop("KICAD_CLI") if old is None else os.environ.__setitem__("KICAD_CLI", old)
+            self.assertFalse(rep.tool_ok)
+            self.assertFalse(rep.ok)
+        finally:
+            shutil.rmtree(tmp, True)
+
+    def test_one_kicad_search_order(self):
+        hits = subprocess.run(["grep", "-rln", "Applications/KiCad", "forge", "library/tools", "skills",
+                               "--include=*.py"], cwd=REPO, capture_output=True, text=True).stdout.split()
+        self.assertEqual(sorted(hits), ["forge/kicad.py", "library/tools/kicad_paths.py"])
+
+
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class KicadLive(unittest.TestCase):
+    def test_erc_on_short_sheet(self):
+        r = fk.erc(os.path.join(KFIX, "short_circuit.kicad_sch"))
+        self.assertTrue(r.tool_ok, r.error)
+        self.assertFalse(r.ok)
+        it = r.violations[0]["items"][0]
+        self.assertEqual(r.violations[0]["sheet"], "/")
+        self.assertIsNotNone(it["pos"])
+
+    def test_netlist_and_clean_sheet(self):
+        r = fk.erc(os.path.join(KFIX, "input_protection.kicad_sch"))
+        self.assertTrue(r.ok, r.lines())
+        nets = fk.netlist(os.path.join(KFIX, "input_protection.kicad_sch"))
+        self.assertTrue(nets and any("J1.1" in p for p in nets.values()))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

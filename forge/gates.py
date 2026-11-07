@@ -7,8 +7,6 @@ import csv
 import glob
 import os
 import re
-import shutil
-import subprocess
 
 from . import consistency
 from .phases import GATE_OF, PHASE
@@ -105,16 +103,13 @@ def sims_ok(paths):
 
 
 def kicad(cmd, path):
-    cli = shutil.which("kicad-cli") or "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
-    if not os.path.exists(cli) and not shutil.which("kicad-cli"):
-        return False, "kicad-cli not found (run forge doctor)"
-    out = path + (".erc.rpt" if cmd == "erc" else ".drc.rpt")
-    kind = "sch" if cmd == "erc" else "pcb"
-    subprocess.run([cli, kind, cmd, "--severity-error", "-o", out, path], capture_output=True, text=True)
-    txt = open(out, errors="ignore").read() if os.path.exists(out) else ""
-    m = re.search(r"\*\* Found (\d+) (?:ERC|DRC) violations", txt) or re.search(r"Found (\d+)", txt)
-    n = int(m.group(1)) if m else -1
-    return n == 0, f"{cmd.upper()} {os.path.basename(path)}: {n if n >= 0 else '?'} error(s)"
+    """(ok, message) for ERC / DRC of one file. A report kicad-cli did not produce is a FAIL, never a pass."""
+    from . import kicad as kc
+    rep = kc.erc(path) if cmd == "erc" else kc.drc(path)
+    msg = rep.summary()
+    if rep.tool_ok and rep.violations:
+        msg += "; " + "; ".join(rep.lines(3))
+    return rep.ok, msg
 
 
 def check(prj, gate, mod=None):

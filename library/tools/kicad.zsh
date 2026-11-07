@@ -2,7 +2,7 @@
 # Project commands work from anywhere inside a project folder (they find the .kicad_pro).
 
 export MC_LIB="${MC_LIB:-${PE_FORGE:-$HOME/pe-forge}/library}"
-export KICAD_APP="/Applications/KiCad/KiCad.app"
+export KICAD_APP="${KICAD_APP:-/Applications/KiCad/KiCad.app}"   # macOS default; documented fallback (forge/kicad.py)
 alias kcli="$KICAD_APP/Contents/MacOS/kicad-cli"
 alias kpy="$KICAD_APP/Contents/Frameworks/Python.framework/Versions/Current/bin/python3"
 

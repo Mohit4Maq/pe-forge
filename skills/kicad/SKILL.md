@@ -10,8 +10,10 @@ equivalent (DbLib ↔ database library, OutJob ↔ jobset, Mech15 ↔ F.CrtYd, U
 Database ↔ Update Symbols from Library).
 
 ## Where things are
-- KiCad 10.0.6: `/Applications/KiCad/KiCad.app`. CLI: `.../Contents/MacOS/kicad-cli`.
-  KiCad Python with `pcbnew`: `.../Contents/Frameworks/Python.framework/Versions/Current/bin/python3`
+- KiCad 10 (tested on 10.0.6). pe-forge finds `kicad-cli`, KiCad's Python (`pcbnew`) and the stock symbols in one
+  place, `forge/kicad.py`: `$KICAD_CLI` / `$KICAD_PYTHON` / `$KICAD_SYMBOL_DIR` first, then PATH, the macOS app
+  (`/Applications/KiCad/KiCad.app`) and the usual Linux paths. ERC / DRC results come from KiCad's JSON reports
+  (`forge.kicad.erc()` / `drc()`); a report kicad-cli did not write is a failure, never a pass.
 - Library: `$MC_LIB` (git, env var `MC_LIB`). **Read `MC_Lib/CLAUDE.md` first.**
   - `tools/mclib.py find|show|add|set|import|check|lint-fp|stats|gen-dbl` (stdlib Python)
   - `tools/sch_check.py` (`sch-check`): schematic checks — LIB-* (not from MC_Parts, stale vs DB, status),
@@ -20,7 +22,7 @@ Database ↔ Update Symbols from Library).
   - `tools/bom.py` (`kibom`): BOM from netlist + DB, `--boards N`, DigiKey/Mouser upload CSVs
   - `tools/kicad.zsh`: shell commands sourced from ~/.zshrc (knew, kopen, kcheck, kerc, kdrc, kbom, kpdf, k3d,
     krel, kfind, kpart, kimport, kfp, klibsave; `khelp` lists them). Title-block vars: use ${PROJECTNAME}.
-  - `tools/fp_qa.py` runs KiCad DRC on every footprint (use KiCad's Python, via the shebang)
+  - `tools/fp_qa.py` runs KiCad DRC on every footprint (re-runs itself under KiCad's Python when `pcbnew` is missing)
   - Open issues: `MC_Lib/docs/TODO.md`
 - Project template: `$PE_FORGE/library/template/MC_Standard` (4-layer, net classes
   Default/Power/HV, HV clearance/creepage rules, MPN BOM preset, `Release.kicad_jobset`,

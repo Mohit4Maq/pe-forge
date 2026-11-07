@@ -39,6 +39,8 @@ import uuid
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "skills", "kicad-place", "scripts"))
 import sch_place as sp  # noqa: E402
+sys.path.insert(0, os.path.dirname(HERE))
+from forge import kicad as kc  # noqa: E402
 
 GRID = 1.27
 U = lambda: str(uuid.uuid4())
@@ -559,7 +561,7 @@ def pdf_lines(cli, sch, workdir):
 
 def text_check(text, sheet_path, sh, wires, workdir):
     """S13-S16 on the text KiCad really renders (PDF export), minus the frame / title block of an empty sheet."""
-    cli = sp.KCLI
+    cli = kc.find_cli()
     lines, (pw, ph) = pdf_lines(cli, sheet_path, workdir)
     if lines is None:
         return ["S13 could not export a PDF to check text placement"], []
@@ -612,30 +614,8 @@ def text_check(text, sheet_path, sh, wires, workdir):
 
 
 def kicad_netlist(cli, sch):
-    out = sch + ".net"
-    subprocess.run([cli, "sch", "export", "netlist", "--format", "kicadsexpr", "-o", out, sch], capture_output=True)
-    if not os.path.exists(out):
-        return None
-    t = open(out).read()
-    nets = {}
-    for m in re.finditer(r"\(net\s*\(code", t):
-        blk = sp.block_at(t, m.start())
-        name = re.search(r'\(name "([^"]*)"\)', blk).group(1).lstrip("/")
-        nodes = re.findall(r'\(node\s*\(ref "([^"]+)"\)\s*\(pin "([^"]+)"\)', blk)
-        nets[name] = {f"{r}.{p}" for r, p in nodes if not r.startswith("#")}
-    return nets
-
-
-def erc_errors(rpt, has_project):
-    """[(type, where)] of ERC errors; title-block variables are ignored on a bare sheet without a .kicad_pro."""
-    if not os.path.exists(rpt):
-        return None
-    out = []
-    for m in re.finditer(r"\[(\w+)\]: ([^\n]*)\n\s*; error(?:\n\s*(@[^\n]*))?", open(rpt).read()):
-        if m.group(1) == "unresolved_variable" and not has_project:
-            continue
-        out.append(f"{m.group(1)}: {m.group(2)} {m.group(3) or ''}".strip())
-    return out
+    """Kept for callers of the old signature; the implementation lives in forge.kicad."""
+    return kc.netlist(sch)
 
 
 def main(argv):
@@ -671,16 +651,17 @@ def main(argv):
     te, tw = text_check(text, dry, sh, wires, scratch)
     E += te; W += tw
     # second, independent check: KiCad's own netlist of the dry copy against the brief
-    kn = kicad_netlist(sp.KCLI, dry)
+    kn = kc.netlist(dry)
     if kn is not None:
         for net, pins in spec.get("netlist", {}).items():
             grp = next((g for g in kn.values() if set(pins) & g), set())
             if set(pins) - grp or grp - set(pins):
                 E.append(f"K1 KiCad netlist disagrees on {net}: expected {sorted(pins)}, KiCad has {sorted(grp)}")
-    erc = os.path.join(scratch, "erc.rpt")
-    subprocess.run([sp.KCLI, "sch", "erc", "--severity-error", "-o", erc, dry], capture_output=True)
-    ercs = erc_errors(erc, bool(glob.glob(os.path.join(proj, "*.kicad_pro"))))
-    E += [f"ERC {e}" for e in (ercs or [])]
+    erc = os.path.join(scratch, "erc.json")
+    rep = kc.erc(dry, out=erc)
+    ercs = [f"{v['type']}: {v['description']}" + "".join(f" @{i['ref'] or i['description']}" for i in v["items"][:2])
+            for v in rep.violations] if rep.tool_ok else None
+    E += [f"ERC {e}" for e in (ercs or [])] if rep.tool_ok else [f"ERC could not run: {rep.error}"]
     png = sp.render(dry, os.path.join(scratch, "sheet.png"))
     print(f"parts {len(spec.get('parts', []))} · nets drawn {len(nets)} · junctions {nj} · "
           f"errors {len(E)} (ERC {len(ercs) if ercs is not None else '?'}) · warnings {len(W)}")

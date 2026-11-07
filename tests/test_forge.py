@@ -7,6 +7,7 @@ geometry check and KiCad's own netlist). Schematic tests are skipped when kicad-
 """
 import csv
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -976,6 +977,55 @@ class McpTools(unittest.TestCase):
         r = self.T.forge_schdraw_apply(self.dir, spec)
         self.assertFalse(r["usable"])
         self.assertIn("forge cr new", r["output"])
+
+
+@unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+class Lint(unittest.TestCase):
+    """WP11: forge schdraw lint."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-lint-")
+        self.dir = new_project("Lnt", self.tmp)
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-qm", "base", "--no-verify")
+        self.sheet = os.path.join(self.dir, "08_PCB/lnt/demo.kicad_sch")
+        forge("schdraw", "new", self.sheet, "--title", "Input protection")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-qm", "sheet", "--no-verify")
+        spec = dict(json.load(open(os.path.join(FIX, "input_protection.json"))), sheet=self.sheet)
+        self.spec = os.path.join(self.dir, "00_Inbox/spec.json")
+        json.dump(spec, open(self.spec, "w"))
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-qm", "spec", "--no-verify")
+        forge("schdraw", "check", self.spec, cwd=self.dir)
+        forge("schdraw", "apply", self.spec, cwd=self.dir)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def lint(self):
+        r = forge("schdraw", "lint", self.sheet, "--json", cwd=self.dir, check=False)
+        return r.returncode, json.loads(r.stdout)
+
+    def test_engine_sheet_has_no_errors_and_score_is_stable(self):
+        rc, d = self.lint()
+        self.assertEqual(d["owner"], "engine")
+        self.assertEqual(d["errors"], [], d["findings"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.lint()[1]["score"], d["score"])
+
+    def test_user_moves_a_part_off_grid_advice_only(self):
+        t = open(self.sheet).read()
+        m = re.search(r'\n\t\(symbol\n\t\t\(lib_id "MC_Parts:[^"]+"\)\n\t\t\(at ([-\d.]+) ', t)
+        t = t[:m.start(1)] + str(round(float(m.group(1)) + 0.5, 2)) + t[m.end(1):]
+        open(self.sheet, "w").write(t)
+        rc, d = self.lint()
+        self.assertEqual(d["owner"], "user")
+        self.assertEqual(rc, 0)
+        self.assertTrue(any(f.startswith("S1 ") and "off the 1.27 mm grid" in f for f in d["findings"]), d["findings"])
+        c = json.loads(forge("check", "--only", "legibility", "--json", cwd=self.dir, check=False).stdout)
+        self.assertEqual(c["checks"]["legibility"]["status"], "warn")
+        self.assertTrue(c["ok"])
 
 
 if __name__ == "__main__":

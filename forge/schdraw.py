@@ -6,6 +6,7 @@ KiCad 10 sheet, from a drawing spec written by the pe-schematic-drafter agent fr
                                               dry run); re-checks the real project and rolls back on a new failure
   forge schdraw pins   <MC_ID> X Y ROT        where a part's pins land (for planning the layout)
   forge schdraw new    <file.kicad_sch> [--paper A3] [--title T]   empty root sheet from the template
+  forge schdraw lint   <file.kicad_sch> [--json]  legibility of any sheet + score (advice on user-owned sheets)
 
 Spec (JSON, coordinates in mm, sheet y down, 1.27 mm grid):
 {
@@ -406,7 +407,7 @@ def power_lib(net):
 def power_libblock(libid):
     name, blk = sp.source_symbol(libid)
     blk = blk.replace(f'(symbol "{name}"', f'(symbol "{libid}"', 1)
-    return "\t" + blk.replace("\n\t", "\n\t\t") + "\n"
+    return "\t\t" + blk.replace("\n\t", "\n\t\t") + "\n"
 
 
 def sx_power(p, n, project, path):
@@ -463,7 +464,7 @@ def build(spec, sheet):
         E += [e for e in perr if "coincide" not in e]   # pins meeting is how wires are avoided: checked above
     os.remove(tmp)
     body, newlib = "", ""
-    have = set(re.findall(r'\n\t\t\(symbol "([^"]+)"\n', text))
+    have = set(sp.existing(text)[1])
     n0 = max([int(x) for x in re.findall(r'"#(?:PWR|FLG)(\d+)"', text)] or [0])
     for i, p in enumerate(powers, 1):
         libid, t = sx_power(p, n0 + i, project, path)
@@ -620,6 +621,10 @@ def kicad_netlist(cli, sch):
 
 
 def main(argv):
+    if argv and argv[0] == "lint":
+        sys.path.insert(0, os.path.dirname(HERE))
+        from forge import lint
+        return lint.main(argv[1:])
     if not argv or argv[0] not in ("check", "apply", "pins", "new"):
         print(__doc__)
         return 1
@@ -754,6 +759,8 @@ def apply_verified(sheet, orig, text, spec):
             open(sheet, "wb").write(orig)
             print("restored the sheet from its backup" + (" (your open transaction stays open)" if prj else ""))
         sys.exit("not applied: the real project failed the post-apply check")
+    from forge import lint
+    lint.stamp(sheet)          # engine-owned until a person saves it in KiCad (forge schdraw lint)
     if auto:
         T.finish(prj, "applied; verified on the real project (no new ERC errors, KiCad netlist matches the brief). "
                       "Not committed: commit under your project's commit rule.")

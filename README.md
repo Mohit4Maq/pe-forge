@@ -98,6 +98,7 @@ written down.
   questions, then check your sheet (ERC, netlist against the brief, reviewers).
 - **Agents draw**: `pe-schematic-drafter` writes a drawing spec and `forge schdraw` turns it into a real KiCad 10
   sheet: real orthogonal wires, T-junctions, labels on stubs, ground down, supplies up, signal flow left to right.
+  `forge schdraw lint` scores any sheet, including yours, for readability (advice only on sheets you drew).
   It checks 16 style rules (grid, no diagonals, no wire over a pin or through a body, no four-way junctions, no
   overlapping text, measured on the text KiCad actually renders, …). It checks connectivity **twice**: its own
   geometry and KiCad's exported netlist must both match the brief exactly. It runs ERC and renders the sheet for

@@ -48,3 +48,16 @@ reviewer judge on the rendered sheet.
    for PWR_FLAGs.
 4. `forge schdraw check spec.json` → fix every ERROR, look at the render (crop at 3–4×) → repeat.
 5. Only a clean check is applied. The netlist must match the brief exactly (C1–C5 and KiCad's own netlist K1).
+
+## Linting any sheet, and who owns it
+
+`forge schdraw lint <sheet>` checks a saved sheet, hand drawn or engine drawn, against every rule above that needs
+no drawing spec (S1 to S9, S12 to S16), plus: L1 symbol outside the drawing area, L2 empty title block, L3 low
+utilization (advice only), L4 crowded symbols, L5 vertical label on a horizontal wire. It prints a score from 0 to
+100 (the same sheet always gets the same score) and the findings.
+
+Ownership decides what the findings mean. A sheet that `forge schdraw apply` wrote, and nobody has saved since, is
+**engine-owned**: its findings are errors, and the Stop hook keeps a legibility obligation open until they are
+fixed. Saving the sheet in KiCad is the deliberate one-way door to **user-owned**: from then on the findings are
+advice only and never block. The record lives in `.forge/schdraw_owned.json` (sheet path to the SHA-256 of what
+schdraw wrote), so nothing is added to the drawing itself.

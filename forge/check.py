@@ -12,6 +12,8 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   drift        BoM / brief / booklet vs schematic (forge drift)
   sch_lib      library/tools/sch_check.py: parts against MC_Parts, nets, decoupling, text variables
   pcb_extra    library/tools/pcb_check.py: layout checks DRC does not do (needs KiCad's pcbnew)
+  legibility   forge schdraw lint on every sheet: advice (warn) only; a sheet the engine drew and nobody has
+               saved since is held to it by the ledger instead
   fab          release readiness (only with --fab): routing, schematic/board match, BoM ready, outputs fresh
                (content hashes) and complete, power layout rules, release docs. See forge/fab.py
 
@@ -31,7 +33,7 @@ import time
 
 from . import config, consistency, gates, kicad, vmodel
 
-ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "pcb_extra"]
+ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "pcb_extra", "legibility"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
 
@@ -213,6 +215,20 @@ def c_pcb_extra(prj, opts):
     return result("fail" if F else "warn" if W else "pass", F + W)
 
 
+def c_legibility(prj, opts):
+    sheets = [f for f in glob.glob(os.path.join(prj.p("pcb"), "**", "*.kicad_sch"), recursive=True)
+              if "-backups" not in f and "/release/" not in f and has_content(f)]
+    if not sheets:
+        return result("skip", reason="no schematic yet")
+    from . import lint
+    F, scores = [], []
+    for s in sheets:
+        r = lint.lint(s)
+        scores.append(f"{os.path.basename(s)} {r['score']}/100 ({r['owner']})")
+        F += [finding("readable sheet (style guide)", x, prj.rel(s)) for x in r["findings"]]
+    return result("warn" if F else "pass", F, reason="; ".join(scores))
+
+
 def c_fab(prj, opts):
     try:
         from . import fab
@@ -222,7 +238,7 @@ def c_fab(prj, opts):
 
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
-          "drift": c_drift, "sch_lib": c_sch_lib, "pcb_extra": c_pcb_extra, "fab": c_fab}
+          "drift": c_drift, "sch_lib": c_sch_lib, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "fab": c_fab}
 
 
 def run(prj, only=None, fab=False, strict=False, module=None):

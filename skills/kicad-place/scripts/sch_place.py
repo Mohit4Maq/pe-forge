@@ -127,7 +127,7 @@ def lib_symbol(id_):
     head = head.replace(f'(symbol "{name}"', f'(symbol "MC_Parts:{t}/{id_}"', 1)
     body = body.replace(f'(symbol "{name}_', f'(symbol "{t}/{id_}_')
     out = head + '\n' + props.rstrip('\n') + body
-    return '\t' + out.replace('\n\t', '\n\t\t') + '\n'   # one level deeper than in .kicad_sym
+    return '\t\t' + out.replace('\n\t', '\n\t\t') + '\n'   # one level deeper than in .kicad_sym (as KiCad writes it)
 
 
 def lib_pins(block, unit=None):
@@ -175,8 +175,16 @@ def existing(s):
     libs = {}
     ls = s.index('\n\t(lib_symbols') + 1
     lsb = block_at(s, ls)
-    for m in re.finditer(r'\n\t\t\(symbol "([^"]+)"\n', lsb):
-        libs[m.group(1)] = block_at(lsb, m.start() + 3)
+    i = lsb.index('(lib_symbols') + 1   # direct children of (lib_symbols ...), whatever their indentation
+    while True:
+        j = lsb.find('(', i)
+        if j < 0:
+            break
+        b = block_at(lsb, j)
+        m = re.match(r'\(symbol "([^"]+)"', b)
+        if m:
+            libs[m.group(1)] = b
+        i = j + len(b)
     syms = []
     for m in re.finditer(r'\n\t\(symbol\n\t\t\(lib_id "([^"]+)"\)\n\t\t\(at ([-\d.]+) ([-\d.]+) ([-\d.]+)\)', s):
         b = block_at(s, m.start() + 2)

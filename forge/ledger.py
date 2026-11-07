@@ -96,6 +96,12 @@ def obligations_for(prj, rel, mods):
     out = []
     if rel.endswith(".kicad_sch"):
         out += [("erc", rel), ("drift", scope)]
+        try:
+            from .lint import engine_owned
+            if engine_owned(os.path.join(prj.root, rel)):
+                out.append(("legibility", rel))      # the engine drew it: its style is ours to keep
+        except Exception:
+            pass
     elif rel.endswith(".kicad_pcb"):
         out.append(("drc", rel))
     elif base in ("BOM.csv",) or rel == prj.paths["bom_csv"]:
@@ -182,6 +188,12 @@ def evaluate(prj, d):
                 rows_none = any("no rows" in m for _, m in res)
                 r = check.result("skip" if rows_none else "pass" if all(ok for ok, _ in res) else "fail",
                                  [check.finding("BoM complete", m, target) for ok, m in res if not ok])
+        elif kind == "legibility":
+            from .lint import lint
+            p = os.path.join(prj.root, target)
+            lr = lint(p) if os.path.exists(p) else {"blocking": False, "findings": []}
+            r = check.result("fail" if lr["blocking"] else "pass",
+                             [check.finding("engine-drawn sheet meets the style guide", x, target) for x in lr["findings"][:5]])
         elif kind == "changelog":
             today = dt.date.today().isoformat()
             m = next((m for m in _modules(prj) if m["id"] == target), None)

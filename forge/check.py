@@ -11,6 +11,10 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   bom          WIP BoM and module BoMs complete: price, stock, alternate (skip: no lines yet)
   drift        BoM / brief / booklet vs schematic (forge drift)
   sch_lib      library/tools/sch_check.py: parts against MC_Parts, nets, decoupling, text variables
+  insulation   INS-1/2/3, NET-4: HV-side nets in the HV class, no path across a barrier, barrier package
+               creepage, one island class per HV net (forge/insulation.py; skip: no HV net)
+  dru_rules    CLS-2: the .kicad_dru flags copper just closer than each [[insulation.rule]] (a generated test
+               board through KiCad's DRC; skip: no rule table)
   pcb_extra    library/tools/pcb_check.py: layout checks DRC does not do (needs KiCad's pcbnew)
   legibility   forge schdraw lint on every sheet: advice (warn) only; a sheet the engine drew and nobody has
                saved since is held to it by the ledger instead
@@ -35,7 +39,8 @@ import time
 
 from . import config, consistency, gates, kicad, vmodel
 
-ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "pcb_extra", "legibility", "spice", "parts_evidence"]
+ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "insulation", "dru_rules", "pcb_extra",
+       "legibility", "spice", "parts_evidence"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
 
@@ -231,6 +236,16 @@ def c_legibility(prj, opts):
     return result("warn" if F else "pass", F, reason="; ".join(scores))
 
 
+def c_insulation(prj, opts):
+    from . import insulation
+    return insulation.as_check(prj, opts)
+
+
+def c_dru_rules(prj, opts):
+    from . import insulation
+    return insulation.as_check_rules(prj, opts)
+
+
 def c_spice(prj, opts):
     from . import spice
     return spice.as_check(prj, opts)
@@ -250,7 +265,7 @@ def c_fab(prj, opts):
 
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
-          "drift": c_drift, "sch_lib": c_sch_lib, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
+          "drift": c_drift, "sch_lib": c_sch_lib, "insulation": c_insulation, "dru_rules": c_dru_rules, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
           "fab": c_fab}
 
 

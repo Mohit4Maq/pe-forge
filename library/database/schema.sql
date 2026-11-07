@@ -16,6 +16,9 @@
 --   Verified_Against  datasheet evidence: <sha256[:16]>#p<page>/<section> of a file in datasheets/ (tools/datasheets.py)
 --   Verified_By / Verified_On  who checked symbol and footprint against it, and when; Status Active needs all three
 --   Verified_Pads     <pad count>@<pitch mm> from that page, compared with the footprint by forge check
+--   Iso_Rating        set on parts that separate insulation domains (isolators, isolated DC-DC, Y-caps,
+--                     safety transformers), e.g. 'reinforced 5.7 kVrms (UL 1577)'; forge insulation cuts here
+--   Iso_Creepage_mm   package creepage across the barrier from the datasheet, e.g. '8.0'
 --   schema_version lives in table _meta (key, value); `mclib.py init` upgrades older databases in place
 
 CREATE TABLE IF NOT EXISTS _template (
@@ -50,6 +53,8 @@ CREATE TABLE IF NOT EXISTS _template (
     Verified_By      TEXT NOT NULL DEFAULT '',
     Verified_On      TEXT NOT NULL DEFAULT '',
     Verified_Pads    TEXT NOT NULL DEFAULT '',
+    Iso_Rating       TEXT NOT NULL DEFAULT '',
+    Iso_Creepage_mm  TEXT NOT NULL DEFAULT '',
     Lifecycle        TEXT NOT NULL DEFAULT '',
     Sourcing_Date    TEXT NOT NULL DEFAULT '',
     Alt_MPN          TEXT NOT NULL DEFAULT '',

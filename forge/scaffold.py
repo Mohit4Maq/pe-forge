@@ -49,6 +49,21 @@ def toml_table(name, d):
     return "\n".join(out) + "\n"
 
 
+INSULATION_EXAMPLE = """# Insulation checks (forge insulation; forge check runs them when the schematic has HV nets).
+# Uncomment and set from your insulation coordination (IEC 60664-1 / product standard). Values here are examples only.
+# [insulation]
+# hv_class = "HV"
+# barrier_creepage_mm = 10.0            # reinforced barrier on the board (INS-3)
+# islands = ["HV_DCP", "HV_DCN"]        # every HV net in exactly one (NET-4)
+# barriers = []                         # extra barrier parts by MPN, besides MC_Parts Iso_Rating
+# [[insulation.rule]]                   # CLS-2: the .kicad_dru must flag copper closer than this
+# a = "HV"
+# b = "!HV"
+# clearance_mm = 2.5
+# creepage_mm = 4.0
+"""
+
+
 def project_toml(a):
     slug = re.sub(r"[^a-z0-9]+", "-", a["name"].lower()).strip("-")
     proj = {"name": a["name"], "slug": slug, "summary": a.get("summary", ""), "owner": a.get("owner", "the owner"),
@@ -66,6 +81,7 @@ def project_toml(a):
              '[standards]\nlist = ' + toml_value(a.get("standards", [])) + "\n",
              "[budget]\ndaily_cap_units = 20000000\nwindow_5h_cap_units = 8000000\namber_fraction = 0.7\nred_fraction = 0.9\n",
              "[vmodel]\nl0_all = []\nl0_cert = []\ncompliance_sections = []\n",
+             INSULATION_EXAMPLE,
              "# ID families linked by `forge link` (Rule 9)\n",
              "[ids.D]\npattern = 'D-\\d{2,3}'\norigin = '01_Program/Master_Plan.md'\n",
              "[ids.E]\npattern = 'E-\\d{2,3}'\norigin = '01_Program/Master_Plan.md'\n",

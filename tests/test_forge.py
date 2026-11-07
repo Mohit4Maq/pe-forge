@@ -327,7 +327,7 @@ class ForgeCheck(unittest.TestCase):
     def test_no_network_or_model_imports(self):
         code = ("import sys; sys.path.insert(0, %r)\n"
                 "import forge.check, forge.gates, forge.kicad, forge.vmodel, forge.consistency\n"
-                "for m in ('forge.drift', 'forge.fab'):\n"
+                "for m in ('forge.drift', 'forge.fab', 'forge.insulation'):\n"
                 "    try: __import__(m)\n"
                 "    except ImportError: pass\n"
                 "net = ('socket', 'ssl', 'http', 'urllib.request', 'requests', 'httpx', 'anthropic', 'openai', 'mcp')\n"
@@ -1701,6 +1701,102 @@ class Vault(unittest.TestCase):
         self.assertEqual(subprocess.run(["bash", "-n", os.path.join(REPO, "install.sh")]).returncode, 0)
         r = subprocess.run(["bash", os.path.join(REPO, "install.sh"), "--help"], capture_output=True, text=True)
         self.assertIn("--update", r.stdout)
+
+
+def netlist_text(comps, nets):
+    """A minimal kicadsexpr netlist: comps {ref: (value, mpn, mc_id)}, nets {name: (class, [(ref, pin, fn)])}."""
+    c = "".join(f'\n\t\t(comp (ref "{r}") (value "{v}") (footprint "x:y")\n\t\t\t(fields (field (name "MPN") "{m}") '
+                f'(field (name "MC_ID") "{i}")))' for r, (v, m, i) in comps.items())
+    n = "".join(f'\n\t\t(net (code "{k}") (name "{name}") (class "{cls}")' +
+                "".join(f' (node (ref "{r}") (pin "{p}") (pinfunction "{f}") (pintype "passive"))' for r, p, f in pins) + ")"
+                for k, (name, (cls, pins)) in enumerate(nets.items(), 1))
+    return f'(export (version "E")\n\t(components{c})\n\t(nets{n}))'
+
+
+class Insulation(unittest.TestCase):
+    """INS-1/2/3, NET-4 on synthetic netlists; CLS-2 through KiCad's DRC."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, REPO)
+        from forge import insulation
+        cls.I = insulation
+
+    # an isolated gate driver U1: SELV side +5V / GND, HV side HV_DC_N and VCC2; R1 is a gate resistor on the HV side
+    COMPS = {"U1": ("ISO", "ISO-1", "IC-9001"), "R1": ("10", "R10", "RES-1"), "C1": ("100n", "C100N", "CAP-1"),
+             "Q1": ("SiC", "Q-1", "TRN-1")}
+
+    def nets(self, **extra):
+        n = {"+5V": ("Power", [("U1", "1", "VCC1"), ("C1", "1", "")]), "GND": ("Default", [("U1", "2", "GND1"), ("C1", "2", "")]),
+             "/HV_DC_N": ("HV", [("U1", "3", "VEE2"), ("Q1", "2", "S")]),
+             "/HV_DC_P": ("HV", [("Q1", "3", "D")]),
+             "Net-(U1-OUT)": ("Default", [("U1", "4", "OUT"), ("R1", "1", "")]),
+             "/HV_G": ("HV", [("R1", "2", ""), ("Q1", "1", "G")])}
+        n.update(extra)
+        return n
+
+    def run_(self, nets, cfg=None, db=None, comps=None):
+        parts, ns = self.I.parse(netlist_text(comps or self.COMPS, nets))
+        cfg = {"barriers": ["ISO-1"], **(cfg or {})}
+        return self.I.analyse(parts, ns, cfg, db)
+
+    def test_hv_side_net_without_hv_class_is_ins1(self):
+        f, info = self.run_(self.nets())
+        self.assertEqual([x["net"] for x in f["INS-1"]], ["Net-(U1-OUT)"])
+        self.assertEqual(f["INS-2"], [])
+        self.assertEqual(info["domains"], 2)
+
+    def test_no_barrier_part_means_one_domain(self):
+        f, _ = self.run_(self.nets(), cfg={"barriers": []})
+        self.assertTrue(f["INS-2"])                      # +5V and GND now sit with HV: a path across
+
+    def test_path_across_the_barrier_is_ins2_with_the_part(self):
+        comps = dict(self.COMPS, R9=("1M", "R1M", "RES-2"))
+        n = self.nets()
+        n["GND"] = ("Default", n["GND"][1] + [("R9", "1", "")])
+        n["/HV_DC_N"] = ("HV", n["/HV_DC_N"][1] + [("R9", "2", "")])
+        f, _ = self.run_(n, comps=comps)
+        hits = {x["net"]: x["actual"] for x in f["INS-2"]}
+        self.assertIn("GND", hits)
+        self.assertIn("via R9", hits["GND"])
+        self.assertNotIn("GND", [x["net"] for x in f["INS-1"]])   # reported once, as the breach
+
+    def test_allow_non_hv(self):
+        f, _ = self.run_(self.nets(), cfg={"allow_non_hv": ["Net-(U1-OUT)"]})
+        self.assertEqual(f["INS-1"], [])
+
+    def test_db_iso_rating_marks_barrier_and_ins3_creepage(self):
+        db = {"IC-9001": {"Iso_Rating": "reinforced 5 kVrms", "Iso_Creepage_mm": "8.0"}}
+        f, info = self.run_(self.nets(), cfg={"barriers": [], "barrier_creepage_mm": 10.0}, db=db)
+        self.assertIn("U1", info["barriers"])
+        self.assertEqual(f["INS-2"], [])
+        self.assertEqual(len(f["INS-3"]), 1)
+        self.assertIn("8 mm", f["INS-3"][0]["actual"])
+        f, _ = self.run_(self.nets(), cfg={"barriers": [], "barrier_creepage_mm": 10.0,
+                                           "package_path": {"ISO-1": "slot + coat"}}, db=db)
+        self.assertEqual(f["INS-3"], [])
+
+    def test_net4_one_island_each(self):
+        n = self.nets()
+        n["/HV_DC_N"] = ("HV,HV_DCN", n["/HV_DC_N"][1])
+        n["/HV_DC_P"] = ("HV,HV_DCP,HV_DCN", n["/HV_DC_P"][1])
+        f, _ = self.run_(n, cfg={"islands": ["HV_DCN", "HV_DCP"]})
+        got = {x["net"]: x["actual"] for x in f["NET-4"]}
+        self.assertEqual(got, {"HV_DC_P": "in HV_DCP, HV_DCN", "HV_G": "in none"})
+
+    @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_cls2_proves_the_dru_on_a_generated_board(self):
+        sys.path.insert(0, REPO)
+        from forge import kicad
+        if not kicad.find_python():
+            self.skipTest("KiCad's Python not found")
+        tpl = os.path.join(REPO, "library", "template", "MC_Standard")
+        dru, pro = os.path.join(tpl, "MC_Standard.kicad_dru"), os.path.join(tpl, "MC_Standard.kicad_pro")
+        cfg = {"rule": [{"a": "HV", "b": "!HV", "clearance_mm": 2.5, "creepage_mm": 4.0},
+                        {"a": "HV", "b": "!HV", "clearance_mm": 10.0}]}
+        res = self.I.test_rules(dru, pro, cfg)
+        self.assertEqual([(c["kind"], c["need"], ok) for c, ok, _ in res],
+                         [("clearance", 2.5, True), ("creepage", 4.0, True), ("clearance", 10.0, False)])
 
 
 if __name__ == "__main__":

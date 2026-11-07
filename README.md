@@ -173,6 +173,17 @@ written down.
 is compared with the schematic KiCad exports, and each disagreement is reported as `{doc, claim, actual}` (for
 example `BOM.csv: R5 = 10k, actual R5 = 4.7k in power.kicad_sch`). Values compare by meaning (`4u7` = `4.7 µF`).
 
+`forge insulation` checks the schematic's insulation from KiCad's own netlist. Nets are joined through every part
+that is not a barrier (an MC_Parts row with `Iso_Rating`: isolators, isolated DC-DC, Y-caps), and then:
+- every net on the HV side must be in the HV class (INS-1);
+- no SELV net may reach HV without a barrier, and the finding names the parts on the path (INS-2);
+- each barrier part's package creepage is compared with the board barrier (INS-3);
+- each HV net sits in exactly one island class (NET-4).
+
+`forge insulation --rules` (CLS-2) proves the project's `.kicad_dru` really enforces the decided creepage and
+clearance per class pair. It builds a two-pad test board 0.05 mm inside each value and runs KiCad's DRC on it.
+Set both up in `project.toml` `[insulation]`; new projects get a commented example. Both run in `forge check`.
+
 `forge check --fab --strict` answers "can I order this board today?": routing complete, schematic and board
 match, every placed part released with an alternate, the outputs still match the design by content hash, every
 Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8
@@ -212,6 +223,7 @@ forge module add NAME [--depends M-01]     forge gate check|pass G<n> [--module 
 forge vmodel build|check|impact|diff|cr|sync   forge link [--apply]   forge consistency
 forge schdraw check|apply|pins|new         forge bom check   forge doctor   forge kicad-setup [--apply]
 forge check [--json] [--strict] [--fab] [--only erc,drc,...]   forge hooks install [--chain] | --uninstall
+forge insulation [--rules] [--json]
 forge drift [--module M-xx]   forge explain U1 | NET | U1.7 | --pins MC_ID   forge txn begin|verify|commit|rollback
 forge cr new|validate|approve|close   forge ledger show|clear   forge fab manifest
 ```

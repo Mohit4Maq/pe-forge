@@ -41,12 +41,16 @@ apply`. The owner reviews the rendered PNG and the sheet in KiCad; their edits a
    the BoM, brief and booklet parts tables (value, MPN, MC_ID, footprint, DNP) with the drawn parts. Same contract
    in both modes (agent mode also runs it inside `schdraw check`). Put the sheet path in the brief's frontmatter
    (`kicad_sheet:`) so the module is compared against its own sheet.
-3. `forge schdraw lint <sheet>` (score and findings; advice on a user-drawn sheet, errors on an engine-drawn one),
+3. Power boards with HV nets: `forge insulation` (0 INS-1 / INS-2 / NET-4) and `forge insulation --rules`
+   (the `.kicad_dru` enforces every `[[insulation.rule]]`). An INS-1 net gets an `HV_` name; an INS-2 path is a
+   wiring error or an isolator missing its MC_Parts `Iso_Rating`. Never silence one with `allow_non_hv` without
+   a reason in the comment.
+4. `forge schdraw lint <sheet>` (score and findings; advice on a user-drawn sheet, errors on an engine-drawn one),
    then look at the rendered sheet (`kicad-cli sch export svg` → PNG): readability per the style guide.
-4. Reviews in parallel: `schematic-reviewer` (datasheet-backed), `power-reviewer` (power stages),
+5. Reviews in parallel: `schematic-reviewer` (datasheet-backed), `power-reviewer` (power stages),
    `pe-reviewer` (cold, against booklet and requirements); `pe-compliance` for insulation, protection, HV.
-5. `forge evidence sync` (copies every placed part's datasheet into `04_Hardware/Datasheets/`), then sync the BoM from the schematic (`$MC_LIB/tools/bom.py`) into the module BoM; propagate changes (Rule 4).
-6. Gate G6 for the module.
+6. `forge evidence sync` (copies every placed part's datasheet into `04_Hardware/Datasheets/`), then sync the BoM from the schematic (`$MC_LIB/tools/bom.py`) into the module BoM; propagate changes (Rule 4).
+7. Gate G6 for the module.
 
 ## Changing design files safely
 

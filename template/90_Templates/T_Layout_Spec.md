@@ -29,6 +29,11 @@ feeds: [08_PCB/<board>/<board>.kicad_pcb, 08_PCB/<board>/<board>.kicad_dru, 08_P
 | L-11b | Thermal relief | all pads join pours via thermal relief (gap <x> mm, spokes <x> mm); solid only: <part.pad, datasheet ref> | Rule 12 |
 | L-11 | Switch node / hot loop | <max area>; no SW copper on quiet layers | <datasheet layout guidelines> |
 
+## 2c. Edge connectors and terminals (project Rule 13)
+| # | Connector | Edge | Pin-1 row to mating face | Mated envelope (length × height, underside, tool access) | Source |
+|---|---|---|---|---|---|
+| L-13a | <J1> | <left> | <x mm> → flush | <plug 22 × 15 mm, underside at board surface; screws from top> | <datasheet, page> |
+
 ## 3. Critical-part layout rules (project Rule 11: the datasheet, strictly)
 Every rule of this spec has an L-number: the independent PCB review checks each one (`forge pcb rules`).
 One row per item of the datasheet's "Layout Guidelines" and "Layout Example", and its recommended land pattern.

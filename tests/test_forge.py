@@ -1989,6 +1989,21 @@ class PcbSync(unittest.TestCase):
         self.assertIn("J1.2 joins forge:fill through thermal relief", claims)   # solid TH pad without a reason
         self.assertNotIn("U1.9", claims)                                        # datasheet solid pad (placement.json)
 
+    def test_connector_findings_rule13(self):
+        sys.path.insert(0, REPO)
+        from forge import pcb
+
+        class P:
+            cfg = {"pcb": {}}
+        ok = {"ref": "J1", "declared": True, "side": "left", "overhang": 0, "source": "ds p5", "inboard": 0.0,
+              "outward": True, "blocked_by": [], "datasheet_face": True}
+        self.assertEqual(pcb.connector_findings(P, {"connectors": [ok]}), [])
+        bad = dict(ok, inboard=0.95, outward=False, blocked_by=["TP5"], datasheet_face=False)
+        claims = " | ".join(c for c, _, _ in pcb.connector_findings(P, {"connectors": [bad, {"ref": "J2", "declared": False, "near": 0.7}]}))
+        for s in ("J1 mating face on the left edge flush", "opening (plug / wire entry) faces", "corridor",
+                  "from the datasheet drawing", "J2 at the board edge is declared"):
+            self.assertIn(s, claims)
+
     def test_stackup_block_thickness(self):
         sys.path.insert(0, REPO)
         from forge import pcb

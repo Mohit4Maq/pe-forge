@@ -143,6 +143,24 @@ Clean DRC is the floor, not the goal (owner, 2026-11-08). On every board:
 - `forge pcb copper` measures coverage, plane continuity and stitching density (check `pcb_copper`); the
   independent PCB review judges the rest against the layout spec's EMI / thermal rows.
 
+## Rule 13: connectors and terminals at the board edge, placed to the datasheet and checked for mating
+Owner, 2026-11-08: edge connectors and terminals must sit exactly on the outline, and the mated plug or wire must fit.
+- **Position from the datasheet drawing:** the mating face (plug opening, wire entry) sits on the outline's centre
+  line, flush within 0.1 mm, or at the overhang the datasheet asks for. The distance from the pin-1 row to the face
+  comes from the manufacturer's drawing (footprint outlines can be off by 0.1 mm or more), cited by page.
+- **Orientation:** the opening faces out of the board; pin 1 and polarity marked on silk at the edge, matching the
+  enclosure label.
+- **Mating envelope:** the plug or wire's whole envelope is clear: plug body length, height and underside (does it
+  sit on the board surface?), latch and screw flanges, wire bend radius, and screwdriver or release-tool access from
+  the top. No part, test point, pad, hole or keep-out in front of the face; no tall part beside it in the tool path.
+- **Mechanical:** insertion and screw torque taken by the solder joints: thermal-relief through-hole pads (Rule 12)
+  with enough copper; a mounting hole or standoff near high-torque terminals; the datasheet's hole size.
+- **Mix-up proof:** input and output connectors differ (pitch, keying or gender) so a cable cannot go in the wrong one.
+- **Enclosure:** the outline and connector faces are the enclosure cut-out reference; record them in the layout spec.
+- Declared per connector in placement.json (`"edge": {"side", "overhang", "face_from_pin", "source"}`);
+  `forge pcb connectors` (check `pcb_connectors`) fails an undeclared edge connector, a face off the outline, an
+  opening facing in, a blocked corridor or a position not taken from the datasheet.
+
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |
 |---|---|

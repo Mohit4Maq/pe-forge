@@ -20,6 +20,8 @@ The owner (or a layout engineer) places and routes in KiCad; agents write the ru
    **Rule 12 (EMI, heat, shielding):** the spec has rows for outer-layer GND fill, the solid reference plane,
    stitching pitch, hot-loop and switch-node limits, sensitive routing and thermal copper; `forge pcb copper`
    must pass before a routing review.
+   **Rule 13 (edge connectors):** read each connector's drawing for the pin-to-face distance and the mated plug
+   envelope; declare it in placement.json; `forge pcb connectors` must pass.
 2. Encode what can be encoded: net classes and custom rules in the `.kicad_dru` (the template has a starting
    set), board setup from the fab's capabilities (`kicad-happy:jlcpcb` / `pcbway`).
    Start the spec from `90_Templates/T_Layout_Spec.md`. Board set-up from project.toml `[pcb]` with

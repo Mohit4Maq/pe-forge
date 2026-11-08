@@ -14,6 +14,8 @@
   forge pcb place <placement.json> [--dry-run]
       Place parts from a table {"REF": [x_mm, y_mm, rot_deg] or [x, y, rot, {"ref": [dx, dy(, angle)],
       "no_zone_pads": true}], ...}, x / y relative to the board origin ("ref" moves the reference text,
+      "edge": {"side": "left", "overhang": 0, "face_from_pin": 10.0, "source": "..."} declares an edge connector
+      (Rule 13; face_from_pin = datasheet distance from the pin-1 row to the mating face);
       "no_zone_pads" keeps pours off the part's pads, e.g. Kelvin test points; "solid_pads": ["9"] or true joins
       those pads solidly where the datasheet asks, e.g. an exposed thermal pad), then report
       courtyard overlaps from KiCad's DRC. Keep the table with the project (08_PCB/<board>/placement.json) and
@@ -47,6 +49,10 @@ project.toml
       Tracks and vias as data: {"tracks": [{"net", "layer", "w", "pts": [[x, y], ...]}], "vias": [{"net", "at":
       [x, y], "d": 0.6, "drill": 0.3}]}. They go in the board group "forge_route", which a re-run replaces; hand
       routing outside the group is never touched. Zones are re-filled and DRC reports unconnected items.
+  forge pcb connectors
+      Rule 13: every connector within 5 mm of the edge is declared in placement.json ({"edge": {"side", "overhang",
+      "source"}}); its mating face (F.Fab body) sits on the outline within [pcb] edge_tol_mm (0.1) or at the
+      datasheet overhang; the opening faces out; nothing in the corridor to the edge. Also check pcb_connectors.
   forge pcb copper
       Rule 12 metrics (percentages of the board area outside copper keep-outs): copper coverage per layer, GND reference plane coverage and pieces, GND via count, against
       project.toml [pcb] outer_copper_min_pct (60), ref_plane (In1.Cu), ref_plane_min_pct (85),
@@ -340,6 +346,13 @@ for ref, entry in s["place"].items():
     if opt.get("no_zone_pads"):          # e.g. a Kelvin test point: joined only by its own trace, not by pours
         for p in f.Pads():
             p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_NONE)
+    if "edge" in opt:                    # Rule 13: edge connector, checked by forge pcb connectors
+        e = opt["edge"]
+        val = f'{e["side"]}:{e.get("overhang", 0)}:{e.get("face_from_pin", "")}:{e.get("source", "")}'
+        f.SetField("Forge_Edge", val)
+        for fld in f.GetFields():
+            if fld.GetName() == "Forge_Edge":
+                fld.SetVisible(False); fld.SetLayer(b.GetLayerID("F.Fab"))
     sp = opt.get("solid_pads")           # datasheet asks for a solid joint (e.g. an exposed thermal pad): pad numbers or true
     if sp:
         for p in f.Pads():
@@ -542,6 +555,123 @@ for f in b.GetFootprints():
 out["solid_pads"] = solid
 print("REPORT" + json.dumps(out))
 '''
+
+
+CONNECTORS = r'''
+import json, sys, pcbnew
+s = json.load(open(sys.argv[1]))
+b = pcbnew.LoadBoard(s["board"])
+T = pcbnew.ToMM
+bb = b.GetBoardEdgesBoundingBox()
+w = max([T(d.GetWidth()) for d in b.GetDrawings() if d.GetLayer() == pcbnew.Edge_Cuts] or [0])
+h = w / 2                                         # the fab cuts on the outline's centre line, not its outer edge
+E = {"left": T(bb.GetX()) + h, "right": T(bb.GetRight()) - h, "top": T(bb.GetY()) + h, "bottom": T(bb.GetBottom()) - h}
+def box(f, lay):
+    L = b.GetLayerID(lay); r = None
+    for g in f.GraphicalItems():
+        if g.GetLayer() == L:
+            x = g.GetBoundingBox()
+            r = [T(x.GetX()), T(x.GetY()), T(x.GetRight()), T(x.GetBottom())] if r is None else \
+                [min(r[0], T(x.GetX())), min(r[1], T(x.GetY())), max(r[2], T(x.GetRight())), max(r[3], T(x.GetBottom()))]
+    return r
+out = []
+fps = list(b.GetFootprints())
+for f in fps:
+    ref = f.GetReference()
+    fld = f.GetFieldText("Forge_Edge") if f.HasField("Forge_Edge") else None
+    body = box(f, "F.Fab") or box(f, "F.Courtyard")
+    if body is None:
+        continue
+    near = min(body[0] - E["left"], E["right"] - body[2], body[1] - E["top"], E["bottom"] - body[3])
+    if fld is None:
+        if ref.startswith(("J", "P", "X", "CN")) and near < 5:
+            out.append({"ref": ref, "declared": False, "near": round(near, 2)})
+        continue
+    side, oh, ffp, src = (fld.split(":", 3) + ["", "", ""])[:4]
+    oh = float(oh or 0)
+    fab_face = {"left": body[0], "right": body[2], "top": body[1], "bottom": body[3]}[side]
+    face = fab_face
+    p1 = [p for p in f.Pads() if p.GetNumber() == "1"]
+    if ffp and p1:                       # datasheet distance from the pin row to the mating face is final
+        x1, y1 = T(p1[0].GetPosition().x), T(p1[0].GetPosition().y)
+        face = {"left": x1 - float(ffp), "right": x1 + float(ffp), "top": y1 - float(ffp), "bottom": y1 + float(ffp)}[side]
+    inboard = (face - E[side]) if side in ("left", "top") else (E[side] - face)   # + = face inside the board
+    pads = [(T(p.GetPosition().x), T(p.GetPosition().y)) for p in f.Pads()]
+    cx = sum(x for x, _ in pads) / len(pads); cy = sum(y for _, y in pads) / len(pads)
+    mid = ((body[0] + body[2]) / 2, (body[1] + body[3]) / 2)
+    # the opening faces out: the pins sit on the inboard side of the body centre
+    outward = {"left": cx >= mid[0], "right": cx <= mid[0], "top": cy >= mid[1], "bottom": cy <= mid[1]}[side]
+    # corridor between the face and the edge, widened 1 mm each side for the plug / wire body
+    if side in ("left", "right"):
+        cor = [min(face, E[side]), body[1] - 1, max(face, E[side]), body[3] + 1]
+    else:
+        cor = [body[0] - 1, min(face, E[side]), body[2] + 1, max(face, E[side])]
+    block = []
+    for g in fps:
+        if g is f:
+            continue
+        c = box(g, "F.Courtyard")
+        if c and c[0] < cor[2] and c[2] > cor[0] and c[1] < cor[3] and c[3] > cor[1] and cor[2] - cor[0] > 0.05 and cor[3] - cor[1] > 0.05:
+            block.append(g.GetReference())
+    out.append({"ref": ref, "declared": True, "side": side, "overhang": oh, "source": src,
+                "inboard": round(inboard, 3), "outward": outward, "datasheet_face": bool(ffp),
+                "fab_vs_datasheet": round(abs(fab_face - face), 3), "blocked_by": block, "body": body})
+print("REPORT" + json.dumps({"edges": E, "connectors": out}))
+'''
+
+
+def connectors(prj, board):
+    out, err = _run(CONNECTORS, {"board": os.path.abspath(board)})
+    m = re.search(r"REPORT(\{.*\})", out)
+    if not m:
+        raise SystemExit("pcbnew connector check failed: " + (err or out)[-600:])
+    return json.loads(m.group(1))
+
+
+def connector_findings(prj, rep):
+    """Rule 13: edge connectors exactly on the outline, opening outward, mating corridor clear, every edge connector
+    declared. Tolerance [pcb] edge_tol_mm (0.1)."""
+    tol = prj.cfg.get("pcb", {}).get("edge_tol_mm", 0.1)
+    F = []
+    for c in rep["connectors"]:
+        if not c["declared"]:
+            F.append((f"{c['ref']} at the board edge is declared (side, datasheet overhang) in placement.json",
+                      f"body {c['near']} mm from the edge, no edge entry",
+                      '{"edge": {"side": "left", "overhang": 0, "source": "<datasheet page>"}}'))
+            continue
+        want = -c["overhang"]              # overhang beyond the edge = negative inboard
+        if abs(c["inboard"] - want) > tol:
+            F.append((f"{c['ref']} mating face on the {c['side']} edge "
+                      + (f"overhanging {c['overhang']:g} mm" if c["overhang"] else "flush") + f" (+/- {tol:g} mm, Rule 13)",
+                      f"face {c['inboard']:+.2f} mm " + ("inside" if c["inboard"] > 0 else "outside") + " the outline",
+                      f"move it {c['inboard'] - want:+.2f} mm toward the {c['side']} edge" if c["inboard"] > want
+                      else f"move it {want - c['inboard']:.2f} mm inboard"))
+        if not c["outward"]:
+            F.append((f"{c['ref']} opening (plug / wire entry) faces the {c['side']} edge", "pins are on the outer side: "
+                      "it faces into the board", "rotate it 180 degrees"))
+        if c["blocked_by"]:
+            F.append((f"{c['ref']} mating corridor to the edge is clear", "blocked by " + ", ".join(c["blocked_by"]),
+                      "move those parts out of the plug / wire path"))
+        if not c["source"] or not c.get("datasheet_face"):
+            F.append((f"{c['ref']} edge position comes from the datasheet drawing (face_from_pin + source)",
+                      "footprint outline only" if not c.get("datasheet_face") else "no source",
+                      'add "face_from_pin": <mm from pin 1 row to the mating face> and "source": "<datasheet page>"'))
+    return F
+
+
+def as_check_connectors(prj, opts):
+    from .check import finding, result, roots, has_content
+    pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
+    if not pcbs:
+        return result("skip", reason="no board yet")
+    if not kicad.find_python():
+        return result("skip", reason="KiCad's Python (pcbnew) not found", missing_tool=True)
+    rep = connectors(prj, pcbs[0])
+    if not rep["connectors"]:
+        return result("skip", reason="no connector at the board edge")
+    F = connector_findings(prj, rep)
+    return result("fail" if F else "pass", [finding(c, a, prj.rel(pcbs[0]), f) for c, a, f in F],
+                  reason=f"{len(rep['connectors'])} edge connector(s)")
 
 
 def copper(prj, board):
@@ -872,7 +1002,7 @@ def main(prj, argv):
         print(json.dumps(rs, indent=1) if "--json" in argv else
               "\n".join(f"{i}  {txt}" for i, txt in rs) or f"no L-rules in {prj.paths['layout_spec']}")
         return 0 if rs else 1
-    if not argv or argv[0] not in ("sync", "setup", "place", "zones", "route", "copper", "review-new", "review-status"):
+    if not argv or argv[0] not in ("sync", "setup", "place", "zones", "route", "copper", "connectors", "review-new", "review-status"):
         print(__doc__)
         return 1
     from . import check
@@ -882,6 +1012,20 @@ def main(prj, argv):
         if not pcbs:
             raise SystemExit("no board file under 08_PCB")
         board = pcbs[0]
+    if argv[0] == "connectors":
+        rep = connectors(prj, board)
+        for c in rep["connectors"]:
+            if c["declared"]:
+                print(f"  {c['ref']:4s} {c['side']:6s} face {c['inboard']:+.2f} mm inside the edge (want {-c['overhang']:+.2f}"
+                      + (f"; footprint outline differs from the datasheet by {c['fab_vs_datasheet']:.2f} mm" if c.get("fab_vs_datasheet", 0) > 0.05 else "") + "), "
+                      f"opening {'out' if c['outward'] else 'IN'}, corridor {'clear' if not c['blocked_by'] else c['blocked_by']}")
+            else:
+                print(f"  {c['ref']:4s} {c['near']} mm from the edge, not declared")
+        F = connector_findings(prj, rep)
+        for c, a_, f in F:
+            print(f"  FAIL {c}: {a_} ({f})")
+        print("PASS (Rule 13)" if not F else f"{len(F)} finding(s)")
+        return 1 if F else 0
     if argv[0] == "copper":
         rep = copper(prj, board)
         for k, v in rep["layers"].items():

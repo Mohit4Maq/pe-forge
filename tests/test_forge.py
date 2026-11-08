@@ -1993,6 +1993,14 @@ class PcbSync(unittest.TestCase):
         self.assertEqual(board.count("(stackup"), 1)
         forge("pcb", "setup", cwd=d)                       # re-run replaces, never stacks a second block
         self.assertEqual(open(os.path.join(d, "08_PCB/pl/pl.kicad_pcb")).read().count("(stackup"), 1)
+        board_t = open(os.path.join(d, "08_PCB/pl/pl.kicad_pcb")).read()
+        self.assertEqual(board_t.count('"forge-keepout:H'), 4)   # copper keep-out at each mounting hole
+        zones = os.path.join(d, "zones.json")
+        json.dump([{"name": "gnd", "layer": "B.Cu", "net": "GND", "rect": [0.5, 0.5, 39.5, 29.5]}], open(zones, "w"))
+        forge("pcb", "zones", zones, cwd=d, check=False)
+        board_t = open(os.path.join(d, "08_PCB/pl/pl.kicad_pcb")).read()
+        self.assertEqual(board_t.count('"forge-keepout:H'), 4)   # a pours run must not remove them
+        self.assertEqual(board_t.count('"forge:gnd"'), 1)
         table = os.path.join(d, "placement.json")
         json.dump({"U1": [20, 15, 0], "R1": [20, 15, 0]}, open(table, "w"))   # R1 on top of U1
         r = forge("pcb", "place", table, cwd=d, check=False)

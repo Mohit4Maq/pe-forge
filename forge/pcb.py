@@ -25,6 +25,8 @@ project.toml
   min_hole_mm = 0.2              # thermal-via footprints use 0.2 mm
   hole_footprint = "MountingHole:MountingHole_3.2mm_M3"
   hole_inset_mm = 3.5            # hole centres from each corner; 0 or absent = no holes
+  hole_keepout_mm = 3.5          # copper keep-out radius around each hole, all layers (screw head / standoff);
+                                 # default 3.5 mm for M3 (5.5 mm head + margin); 0 = none
   fiducials = [[6, 25], [44, 46]]   # board-only fiducials (mm from the origin), Fiducial:Fiducial_1mm_Mask2mm
   marking = [{ t = "BUCK48TO12 REV A", x = 25, y = 2, size = 1.0 }]   # silkscreen text (re-runs replace it)
 
@@ -257,6 +259,23 @@ if s["hole_dir"] and s["inset"]:
         if f is None:
             f = pcbnew.FootprintLoad(s["hole_dir"], s["hole_name"]); f.SetReference(f"H{i}"); b.Add(f)
         f.SetPosition(pcbnew.VECTOR2I(mm(X0 + hx), mm(Y0 + hy)))
+# copper keep-out around each mounting hole, all copper layers: a screw head, washer or standoff sits there
+for z in list(b.Zones()):
+    if z.GetZoneName().startswith("forge-keepout:"):
+        KEEP.append(z); b.Remove(z)
+import math
+if s["inset"] and s["keepout"]:
+    i_ = s["inset"]
+    for i, (hx, hy) in enumerate(((i_, i_), (W - i_, i_), (i_, H - i_), (W - i_, H - i_)), 1):
+        z = pcbnew.ZONE(b); z.SetIsRuleArea(True); z.SetZoneName(f"forge-keepout:H{i}")
+        z.SetDoNotAllowTracks(True); z.SetDoNotAllowVias(True); z.SetDoNotAllowZoneFills(True)
+        z.SetDoNotAllowPads(False); z.SetDoNotAllowFootprints(False)
+        z.SetLayerSet(pcbnew.LSET.AllCuMask())
+        ol = z.Outline(); ol.NewOutline()
+        for k in range(32):
+            a_ = 2 * math.pi * k / 32
+            ol.Append(mm(X0 + hx + s["keepout"] * math.cos(a_)), mm(Y0 + hy + s["keepout"] * math.sin(a_)))
+        b.Add(z)
 if s["fid_dir"]:
     for i, (fx, fy) in enumerate(s["fiducials"], 1):
         ref = f"FID{i}"
@@ -466,7 +485,8 @@ def setup(prj, board):
             "fid_name": fname, "marking": marking, "mark_keys": [m["t"] for m in marking],
             "board": os.path.abspath(board), "outline": cfg["outline_mm"], "origin": cfg.get("origin_mm", [100, 100]),
             "layers": len(oz), "min_hole": cfg.get("min_hole_mm", 0.2), "thickness": cfg.get("thickness_mm", 1.6),
-            "hole_dir": lib_dirs().get(lib), "hole_name": name, "inset": cfg.get("hole_inset_mm", 0)}
+            "hole_dir": lib_dirs().get(lib), "hole_name": name, "inset": cfg.get("hole_inset_mm", 0),
+            "keepout": cfg.get("hole_keepout_mm", 3.5)}
     out, err = _run(SETUP, spec)
     if "OK" not in out:
         raise SystemExit("pcbnew set-up failed: " + (err or out)[-600:])

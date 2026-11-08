@@ -35,7 +35,8 @@
           "B.SilkS",
           "F.Mask",
           "B.Mask",
-          "Edge.Cuts"
+          "Edge.Cuts",
+          "Dwgs.User"
         ]
       }
     },

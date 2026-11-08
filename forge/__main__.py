@@ -81,6 +81,9 @@ def main(argv):
     if cmd == "spice":
         from forge import spice
         return spice.main(need(), rest)
+    if cmd == "hp" and rest[:1] == ["rules"]:           # the rule book itself needs no project
+        from forge import hp
+        return hp.main(None, rest)
     if cmd == "panel" and config.find_root() is None:
         print('{"ok": false, "error": "not inside a pe-forge project"}')
         return 0

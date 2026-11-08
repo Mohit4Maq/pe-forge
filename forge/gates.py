@@ -169,4 +169,6 @@ def check(prj, gate, mod=None):
     from .phases import GATE_REVIEWERS
     if GATE_REVIEWERS.get(gate):
         res.append(review_ok(prj, gate, mod))
+    from . import learn
+    learn.record_gate(prj, gate, res)
     return res

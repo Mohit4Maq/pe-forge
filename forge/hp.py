@@ -354,6 +354,8 @@ def as_check(prj, opts):
         _, rows = evaluate(prj, pcbs[0] if pcbs else None)
     except SystemExit as e:
         return result("skip", reason=str(e), missing_tool=True)
+    from . import learn
+    learn.record_hp(prj, rows)
     F = [finding(f"{r['id']} ({r['strength']}): {r['text'][:110]}", r["evidence"], prj.paths.get("layout_spec", ""),
                  "fix the layout, or waive it in project.toml [hp.waive] with the reason (a Must needs the owner's OK)")
          for r in rows if r["status"] in ("AUTO FAIL", "WAIVER INVALID")]
@@ -377,6 +379,8 @@ def main(prj, argv):
     from .check import roots, has_content
     pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
     prof, rows = evaluate(prj, pcbs[0] if pcbs else None)
+    from . import learn
+    learn.record_hp(prj, rows)
     if "--json" in argv:
         print(json.dumps({"profile": prof, "rules": rows}, indent=1))
         return 0

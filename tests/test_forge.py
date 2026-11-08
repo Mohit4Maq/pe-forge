@@ -2216,5 +2216,109 @@ class Protection(unittest.TestCase):
         self.assertEqual(f["PROT-2"], [])
 
 
+class Learn(unittest.TestCase):
+    """forge learn / feedback / issue: local learning, one-step issues, redaction, opt-out."""
+
+    def setUp(self):
+        self.cfg = tempfile.mkdtemp(prefix="pe-forge-learn-")
+        self.env = dict(ENV, PE_FORGE_CONFIG_DIR=self.cfg, PE_FORGE_NO_BROWSER="1")
+        self.cwd = tempfile.mkdtemp(prefix="pe-forge-nowhere-")
+
+    def run_forge(self, *args, env=None, stdin=None):
+        return subprocess.run(FORGE + list(args), cwd=self.cwd, capture_output=True, text=True,
+                              env=env or self.env, input=stdin)
+
+    def fake_gh(self, auth_ok=True):
+        d = tempfile.mkdtemp(prefix="fake-gh-")
+        log = os.path.join(d, "calls.txt")
+        open(os.path.join(d, "gh"), "w").write(
+            "#!/bin/sh\n"
+            f'echo "$@" >> "{log}"\n'
+            'if [ "$1" = "auth" ]; then exit ' + ("0" if auth_ok else "1") + "; fi\n"
+            'if [ "$1" = "issue" ]; then echo https://github.com/me/fb/issues/7; exit 0; fi\n')
+        os.chmod(os.path.join(d, "gh"), 0o755)
+        return d, log
+
+    def test_crash_is_saved_and_reported_in_one_step(self):
+        env = dict(self.env, PE_FORGE_TEST_CRASH="doctor")
+        r = self.run_forge("doctor", env=env)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("forge issue --last", r.stderr)                    # the one-step hint
+        err = json.load(open(os.path.join(self.cfg, "last_error.json")))
+        self.assertEqual((err["command"], err["type"]), ("doctor", "RuntimeError"))
+        r = self.run_forge("issue", "--last", "--dry-run")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("Title: [bug] doctor: RuntimeError: test crash", r.stdout)
+        self.assertIn('File "pe-forge/forge/__main__.py"', r.stdout)     # the trace inside pe-forge, readable
+        self.assertNotIn(os.path.expanduser("~"), r.stdout)               # no home path
+        self.assertIn("issues/new?title=%5Bbug%5D", r.stdout)
+
+    def test_issue_filed_with_gh(self):
+        d, log = self.fake_gh(auth_ok=True)
+        env = dict(self.env, PATH=d + os.pathsep + self.env["PATH"])
+        r = self.run_forge("issue", "--kind", "rule", "--rule", "SW-05", "--note", "50 mm board, see /VIN",
+                           "--repo", "me/fb", "--yes", env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("Filed: https://github.com/me/fb/issues/7", r.stdout)
+        calls = open(log).read()
+        self.assertIn("issue create --repo me/fb --title [rule] SW-05 does not fit this board", calls)
+        self.assertIn("<net>", r.stdout)                                  # net names redacted
+        self.assertNotIn("/VIN", r.stdout)
+
+    def test_issue_falls_back_to_browser_and_needs_a_yes(self):
+        d, log = self.fake_gh(auth_ok=False)
+        env = dict(self.env, PATH=d + os.pathsep + self.env["PATH"])
+        r = self.run_forge("issue", "--kind", "idea", "--note", "panel button", "--repo", "me/fb", env=env)
+        self.assertEqual(r.returncode, 1)                                 # not a terminal and no --yes: nothing filed
+        self.assertIn("add --yes", r.stdout)
+        r = self.run_forge("issue", "--kind", "idea", "--note", "panel button", "--repo", "me/fb", "--yes", env=env)
+        self.assertIn("Opened the pre-filled issue page", r.stdout)
+        self.assertIn("https://github.com/me/fb/issues/new?title=%5Bidea%5D+panel+button", r.stdout)
+        self.assertNotIn("issue create", open(log).read())               # gh not logged in: never used
+
+    def test_learning_log_summary_and_opt_out(self):
+        sys.path.insert(0, REPO)
+        os.environ["PE_FORGE_CONFIG_DIR"] = self.cfg
+        from forge import learn
+        root = tempfile.mkdtemp(prefix="pe-forge-prj-")
+        open(os.path.join(root, "project.toml"), "w").write('[project]\nname = "Acme Inverter"\n')
+        learn.record("rule", root, rule="SW-05", strength="Must", status="WAIVED", reason="small board (owner OK)")
+        learn.record("rule", root, rule="SW-02", strength="Must", status="AUTO FAIL", reason="")
+        learn.record("gate", root, gate="G7", ok=False, failed=2)
+        s = learn.summary(learn.events(root))
+        self.assertEqual(s["waivers"], {"SW-05": "small board (owner OK)"})
+        self.assertEqual(s["failing_rules"], {"SW-02": 1})
+        self.assertEqual(s["gates"]["G7"], {"runs": 1, "passed": 0})
+        form = os.path.join(root, "PCB_routing_x.md")
+        open(form, "w").write("| R-12 | x | FAIL | y |\n## Other findings\n### Major\n- **M-1: TP4** ...\n"
+                              "- **m-34 (new)** EN ...\n| m-13 | OPEN, raised | ... |\nNo Critical findings.\n")
+
+        class P:
+            pass
+        P.root = root
+        learn.record_review(P, form, "READY WITH FIXES")
+        learn.record_review(P, form, "READY WITH FIXES")                  # recorded once per form and verdict
+        rv = [e for e in learn.events(root) if e["kind"] == "review"]
+        self.assertEqual(len(rv), 1)
+        self.assertEqual(rv[0]["escaped"], {"Critical": 0, "Major": 1, "Minor": 1})
+        self.assertEqual(rv[0]["failed_rules"], ["R-12"])
+        self.assertIn("<project>", learn.redact("Acme Inverter fails at /SW", "Acme Inverter"))
+        os.environ["PE_FORGE_LEARN"] = "0"
+        try:
+            learn.record("gate", root, gate="G8", ok=True, failed=0)
+        finally:
+            del os.environ["PE_FORGE_LEARN"]
+        self.assertFalse(any(e.get("gate") == "G8" for e in learn.events(root)))   # opted out: nothing recorded
+
+    def test_feedback_is_shown_and_never_sent(self):
+        r = self.run_forge("feedback", "--note", "the rule book is great")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("## pe-forge feedback", r.stdout)
+        self.assertIn("Nothing was sent", r.stdout)
+        r = self.run_forge("learn", "off")
+        self.assertIn("learning off", r.stdout)
+        self.assertFalse(json.load(open(os.path.join(self.cfg, "config.json")))["learn"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,6 +1,6 @@
 {
   "name": "pe-forge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Power-electronics product development with Claude Code: a supervisor that takes a project from idea through market survey, literature, requirements, topology, BoM, verified simulation, datasheet-checked schematics (drawn by you or by agents), PCB and manufacturing files.",
   "author": {
     "name": "Veltara Innovations"

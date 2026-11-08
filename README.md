@@ -261,6 +261,19 @@ approve one.
 Profiles: `full` (all of the above) or `lite` (one reviewer per gate, same automated checks) for small
 low-voltage boards. Lite projects get warnings instead of blocks from change control (`process.change_control`).
 
+## Making pe-forge better from your use
+
+pe-forge learns where it fits and where it does not, on your machine, without taking your design:
+- `forge learn` shows what it recorded: rules that fail or are waived (with your reason), findings reviews caught
+  that no check did, gate results and tool errors. Command names, rule IDs and counts only; never netlists,
+  geometry, part lists or files. `forge learn off` (or `PE_FORGE_LEARN=0`) stops it.
+- `forge issue` files a GitHub issue in one step with the context filled in (pe-forge, OS, Python and KiCad
+  versions, the error trace inside pe-forge, the rule and its last result). It shows you the issue first, then
+  creates it with `gh`, or opens the pre-filled page in your browser for you to Submit. After an internal error
+  pe-forge prints the exact command: `forge issue --last`. In Claude Code just say "report this" (`/pe-issue`).
+- `forge feedback` writes a redacted summary for the pe-forge team and shows it; nothing is ever sent by itself.
+Paths, net names, e-mail addresses and the project name are redacted unless you add `--keep-names`.
+
 ## Command line
 
 ```
@@ -273,6 +286,7 @@ forge insulation [--rules] [--json]   forge protection [--json]   forge hp [--al
 forge pcb sync|setup|place|zones|route|rules|copper|connectors|crosstalk|review-new|review-status
 forge drift [--module M-xx]   forge explain U1 | NET | U1.7 | --pins MC_ID   forge txn begin|verify|commit|rollback
 forge cr new|validate|approve|close   forge ledger show|clear   forge fab manifest
+forge learn [show|off|on|clear]   forge feedback [--note T]   forge issue [--last] [--kind K] [--rule ID] [--dry-run]
 ```
 
 `forge check` is one deterministic command (no model, no network, seconds) over the whole project: ERC, DRC with

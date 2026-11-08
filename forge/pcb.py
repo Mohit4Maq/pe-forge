@@ -1139,6 +1139,9 @@ def review_status(prj, board):
         probs.append("the board changed after the review: review again")
     m = re.search(r"^verdict:\s*(.+)$", t, re.M)
     v = (m.group(1).strip() if m else "OPEN").upper()
+    if v != "OPEN":
+        from . import learn
+        learn.record_review(prj, f, v)
     if v != "READY":           # READY WITH FIXES needs the fixes and a fresh review before a gate
         probs.append(f"review verdict {v}" + (": fix the findings and review again" if v.startswith("READY") else ""))
     return not probs, probs, os.path.relpath(f, prj.root)

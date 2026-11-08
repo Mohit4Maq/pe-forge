@@ -320,12 +320,17 @@ def run(prj, only=None, fab=False, strict=False, module=None):
         try:
             out[n] = CHECKS[n](prj, opts)
         except Exception as e:     # a check that crashes is a failure with the reason, never silent
-            out[n] = result("fail", [finding(f"{n} check runs", f"{type(e).__name__}: {e}")])
+            out[n] = result("fail", [finding(f"{n} check runs", f"{type(e).__name__}: {e}",
+                                             fix="a tool error: report it with forge issue --last")])
+            from . import learn
+            learn.record_error(f"check {n}", e)
     bad = lambda r: r["status"] == "fail" or (strict and (r["status"] == "warn" or
                                                           (r["status"] == "skip" and r["missing_tool"])))
     ok = not any(bad(r) for r in out.values())
     res = {"ok": ok, "checks": out, "duration_s": round(time.time() - t0, 2)}
     cache(prj, res, full=only is None)
+    from . import learn
+    learn.record_check(prj, res)
     return res
 
 

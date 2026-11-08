@@ -34,6 +34,10 @@
                                     .kicad_dru enforces [[insulation.rule]] (CLS-2)
   forge txn begin "<what>" [--allow-dirty] | status | verify | commit [-m MSG] | close | rollback [--reason T]
                                     transactional design edits: verify before commit, lossless rollback
+  forge learn [summary|show|off|on|clear]   what the tool learned here (local only; opt out any time)
+  forge feedback [--note T]         redacted summary for the pe-forge team, shown first, never sent by itself
+  forge issue [--last] [--kind bug|rule|check|idea] [--rule ID] [--dry-run] [--yes]
+                                    one-step GitHub issue with the context filled in (gh, or the browser)
   forge doctor                      check the toolchain
   forge update [--yes]              update every tool, pe-forge and its plugins (runs install.sh --update)
   forge vault init|open [dir]       the project folder as an Obsidian vault (settings, register, open)
@@ -54,6 +58,30 @@ def need():
 
 
 def main(argv):
+    """Run one command; record it for `forge learn`; an unexpected error is saved for `forge issue --last`."""
+    import time
+    from forge import learn
+    cmd = argv[0] if argv else "help"
+    t0 = time.time()
+    try:
+        if os.environ.get("PE_FORGE_TEST_CRASH") == cmd:        # test hook: an unexpected error in this command
+            raise RuntimeError("test crash")
+        rc = _dispatch(argv)
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception as e:
+        learn.record_error(cmd, e)
+        import traceback
+        traceback.print_exc()
+        print(f"\npe-forge hit an internal error in `forge {cmd}`. Report it in one step: forge issue --last",
+              file=sys.stderr)
+        return 2
+    if cmd not in ("learn", "feedback", "issue", "statusline", "meter", "panel", "help", "-h", "--help"):
+        learn.record("command", command=cmd, rc=rc or 0, s=round(time.time() - t0, 1))
+    return rc
+
+
+def _dispatch(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(__doc__)
         return 0
@@ -81,6 +109,14 @@ def main(argv):
     if cmd == "spice":
         from forge import spice
         return spice.main(need(), rest)
+    if cmd in ("learn", "feedback", "issue"):                   # work inside or outside a project
+        from forge import learn
+        if cmd == "learn":
+            return learn.main_learn(rest)
+        if cmd == "feedback":
+            return learn.main_feedback(rest)
+        root = config.find_root()
+        return learn.main_issue(rest, config.Project().cfg if root else None)
     if cmd == "hp" and rest[:1] == ["rules"]:           # the rule book itself needs no project
         from forge import hp
         return hp.main(None, rest)

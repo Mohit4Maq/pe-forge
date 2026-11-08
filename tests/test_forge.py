@@ -2387,6 +2387,12 @@ class Supply(unittest.TestCase):
             self.assertIn(want, got)
         self.assertIn("Z", [m for _, c, _, m in F if c == "SC-3"][0])   # the maker's replacement is suggested
 
+    def test_prices_with_currency(self):
+        self.assertEqual(self.s._num("₹92.67"), 92.67)
+        self.assertEqual(self.s._num("$1,234.50"), 1234.5)
+        self.assertIsNone(self.s._num(""))
+        self.assertEqual(self.s._cur("₹92.67"), "₹")
+
     def test_gate_and_check_from_the_last_assessment(self):
         d = tempfile.mkdtemp()
 

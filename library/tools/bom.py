@@ -65,6 +65,8 @@ def main():
             continue
         pid = c.fields.get("MC_ID", "")
         row = db.get(pid)
+        if row and str(row.get("Exclude_BOM") or "").strip().lower() in ("1", "true", "yes", "y"):
+            continue                       # a PCB feature (probe pads, fiducial): nothing to order
         if row:
             key = pid
             if row["Status"] in ("Seed", "Legacy", "NRND", "Obsolete"):

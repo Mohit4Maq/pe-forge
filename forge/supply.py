@@ -3,7 +3,8 @@ supply-chain risk assessment.
 
   forge bom build [--boards N] [--spares N] [--offline] [--jlcpcb]
       1. groups the drawn schematic into BoM lines (MC_Parts is authoritative) and writes the order files
-         (DigiKey / Mouser upload, optional JLCPCB BoM + CPL) into 09_Release/bom/
+         (DigiKey / Mouser upload, optional JLCPCB BoM + CPL) into 09_Release/<REVISION>/bom/ (REVISION from the
+         KiCad project's text variables, default A)
       2. checks every line's primary MPN and its alternate (MC_Parts Alt_MPN / Alt_Manufacturer) at each source:
          Mouser (API key: MOUSER_API_KEY, Keychain "mouser-api" or ~/.mouser_key) and LCSC (jlcsearch, no key);
          DigiKey when DIGIKEY_CLIENT_ID / DIGIKEY_CLIENT_SECRET are set
@@ -48,6 +49,21 @@ LEVEL = {"HIGH": 3, "MEDIUM": 2, "LOW": 1, "OK": 0}
 EOL = ("nrnd", "not recommended", "end of life", "eol", "obsolete", "discontinued", "last time buy")
 COMMODITY = re.compile(r"^(R|C|FB|RN)\d", re.I)          # many makers, same footprint: single source is LOW
 ACTIVE = re.compile(r"^(U|Q|IC|K|Y|X)\d", re.I)           # ICs, transistors, relays, crystals: single source is HIGH
+
+
+def _num(v):
+    """A price as a number: 92.67, "92.67", "₹92.67", "$1,234.5" -> float; None when there is none."""
+    if v in (None, ""):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    m = re.search(r"\d[\d,]*(?:\.\d+)?", str(v))
+    return float(m.group(0).replace(",", "")) if m else None
+
+
+def _cur(v):
+    m = re.match(r"\s*([^\d\s.,]+)", str(v or ""))
+    return m.group(1) if m else ""
 
 
 def _weeks(lead):
@@ -118,7 +134,8 @@ def availability(mpn, mfr, row, offline):
             out[name] = r
     if offline and row and row.get("MPN") == mpn and row.get("Mouser_Stock") not in (None, ""):
         out["Mouser (DB)"] = {"found": True, "stock": int(float(row.get("Mouser_Stock") or 0)),
-                              "price_1": row.get("Mouser_Price_1"), "lead_time": row.get("Mouser_Lead_Time") or "",
+                              "price_1": _num(row.get("Mouser_Price_1")), "currency": _cur(row.get("Mouser_Price_1")),
+                              "lead_time": row.get("Mouser_Lead_Time") or "",
                               "lifecycle": row.get("Lifecycle") or "", "min": 1, "on_order": [],
                               "as_of": row.get("Sourcing_Date") or "?"}
     return out
@@ -130,7 +147,8 @@ def bom_lines(prj, boards, spares, jlcpcb=False):
     sch = root_sheet(prj)
     if not sch:
         raise SystemExit("no schematic yet: the BoM is built from the drawn sheets")
-    out = prj.p("release_bom") if "release_bom" in prj.paths else os.path.join(prj.root, "09_Release", "bom")
+    from .fab import revision                         # order files go with the release: 09_Release/<REVISION>/bom/
+    out = os.path.join(prj.p("release"), revision(os.path.dirname(sch)), "bom")
     os.makedirs(out, exist_ok=True)
     cmd = [sys.executable, os.path.join(TOOLS, "bom.py"), sch, "-o", out, "--boards", str(boards), "--spares", str(spares)]
     if jlcpcb:
@@ -231,11 +249,12 @@ def run(prj, boards=None, spares=0, offline=False, jlcpcb=False):
         need = int(l.get(f"Qty x{boards}") or int(l["Qty"]) * boards)
         prim = availability(l["MPN"], l.get("Manufacturer"), row, offline)
         alt = availability(l.get("Alt_MPN", ""), row.get("Alt_Manufacturer"), None, offline) if l.get("Alt_MPN") else {}
-        price = next((float(v["price_1"]) for s, v in prim.items() if v.get("found") and v.get("price_1") not in (None, "")), None)
+        price = next((_num(v["price_1"]) for s, v in prim.items() if v.get("found") and _num(v.get("price_1")) is not None), None)
         res.append({"line": l, "row_status": row.get("Status", ""), "alt_mfr": row.get("Alt_Manufacturer", ""),
                     "alt_match": _alt_match(row), "need": need, "prim": prim, "alt": alt, "price_1": price,
                     "ext": price * need if price is not None else None, "row": row})
-    total = sum(r["ext"] or 0 for r in res)
+    total = sum(r["ext"] or 0 for r in res)                    # the order: build quantity plus spares
+    per_board = sum((r["price_1"] or 0) * int(r["line"]["Qty"]) for r in res)
     for r in res:
         F = assess(r["line"], r["prim"], r["alt"], r["alt_match"], r["row"], r["need"], total, r["ext"])
         refs = r["line"]["Refs"]
@@ -246,7 +265,7 @@ def run(prj, boards=None, spares=0, offline=False, jlcpcb=False):
         r.pop("row")
     summary = {"date": dt.datetime.now().isoformat(timespec="seconds"), "boards": boards, "spares": spares,
                "offline": offline, "lines": len(res), "cost_total": round(total, 2),
-               "cost_per_board": round(total / boards, 2) if boards else None,
+               "cost_per_board": round(per_board, 2),
                "currency": next((v.get("currency") for r in res for v in r["prim"].values() if v.get("currency")), ""),
                "levels": {k: sum(1 for r in res if r["level"] == k and not r["waived"]) for k in LEVEL},
                "waived": sum(1 for r in res if r["waived"]), "order_files": os.path.relpath(outdir, prj.root),
@@ -285,9 +304,28 @@ def write(prj, res, s):
                         "Risk": ("WAIVED " if r["waived"] else "") + r["level"],
                         "Risk factors": "; ".join(f"{c}: {e}" for _, c, e, _ in r["findings"]), "MC_ID": l.get("MC_ID", "")})
     cur = s["currency"]
+    B = ["---", "type: bom", f"generated: {s['date']}", "source: forge bom build (do not edit by hand: edit MC_Parts or the schematic)",
+         "---", f"# BoM: {prj.cfg.get('project', {}).get('name', '')}", "",
+         f"Build of {s['boards']} board(s)" + (f" + {s['spares']} spares per line" if s.get("spares") else "")
+         + f" · {s['lines']} lines · **{cur}{s['cost_per_board']:,.2f} per board** · order {cur}{s['cost_total']:,.2f}"
+         " (Mouser 1-off prices; volume breaks are lower)", "",
+         "| Refs | Qty | MPN | Manufacturer | Description | Price (1) | Order qty | Line cost | Stock | Alternate | Alt match | Risk |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in res:
+        l = r["line"]
+        best = max([v.get("stock") or 0 for v in r["prim"].values() if v.get("found")] or [0])
+        price = "" if r["price_1"] is None else f"{cur}{r['price_1']:,.2f}"
+        ext = "" if r["ext"] is None else f"{cur}{r['ext']:,.2f}"
+        B.append(f"| {l['Refs']} | {l['Qty']} | {l['MPN']} | {l['Manufacturer']} | {l['Description'][:60]} | "
+                 f"{price} | {r['need']} | {ext} | {best} | {l.get('Alt_MPN') or '—'} | "
+                 f"{r['alt_match'] or ('—' if not l.get('Alt_MPN') else 'not graded')} | {('WAIVED ' if r['waived'] else '') + r['level']} |")
+    if s.get("not_purchased"):
+        B += ["", "Not purchased (PCB features): " + ", ".join(s["not_purchased"])]
+    B += ["", "Supply-chain risk and mitigations: [[Supply_Risk]]. Order files: `" + s["order_files"] + "/`."]
+    open(os.path.splitext(prj.p("bom_csv"))[0] + ".md", "w").write("\n".join(B) + "\n")
     L = [f"# Supply-chain risk: {prj.cfg.get('project', {}).get('name', '')}", "",
-         f"{s['date']} · build of {s['boards']} board(s) · {s['lines']} lines · BoM cost {cur}{s['cost_total']:,.2f} "
-         f"({cur}{s['cost_per_board']:,.2f} per board, Mouser 1-off prices)" + (" · OFFLINE (database / cache only)" if s["offline"] else ""),
+         f"{s['date']} · build of {s['boards']} board(s)" + (f" + {s['spares']} spares per line" if s.get("spares") else "")
+         + f" · {s['lines']} lines · order {cur}{s['cost_total']:,.2f} · {cur}{s['cost_per_board']:,.2f} per board (Mouser 1-off prices)" + (" · OFFLINE (database / cache only)" if s["offline"] else ""),
          "", f"**HIGH {s['levels']['HIGH']} · MEDIUM {s['levels']['MEDIUM']} · LOW {s['levels']['LOW']} · OK {s['levels']['OK']}**"
          + (f" · waived {s['waived']}" if s["waived"] else ""), "",
          "| Risk | Refs | MPN | Stock (by source) | Alternate | Findings | Mitigation |", "|---|---|---|---|---|---|---|"]
@@ -324,7 +362,7 @@ def as_check(prj, opts):
         return result("skip", reason="no supply assessment yet (forge bom build)")
     s = d["summary"]
     F = [finding(f"{r['line']['Refs']} {r['line']['MPN']}: supply risk {r['level']}",
-                 "; ".join(f"{c}: {e}" for _, c, e, _ in r["findings"] if _ == r["level"]),
+                 "; ".join(f"{c}: {e}" for lv, c, e, m in r["findings"] if lv == r["level"]),
                  "04_Hardware/BOM/Supply_Risk.md", r["findings"][0][3] if r["findings"] else "")
          for r in d["lines"] if r["level"] in ("HIGH", "MEDIUM") and not r["waived"]]
     high = any(r["level"] == "HIGH" and not r["waived"] for r in d["lines"])
@@ -353,7 +391,8 @@ def main(prj, argv):
         print(json.dumps({"summary": s, "lines": res}, indent=1, default=str))
         return 0
     cur = s["currency"]
-    print(f"BoM: {s['lines']} lines · build of {s['boards']} · {cur}{s['cost_total']:,.2f} ({cur}{s['cost_per_board']:,.2f} / board)"
+    print(f"BoM: {s['lines']} lines · build of {s['boards']}" + (f" + {s['spares']} spares" if s.get("spares") else "")
+          + f" · order {cur}{s['cost_total']:,.2f} · {cur}{s['cost_per_board']:,.2f} per board"
           + (" · OFFLINE" if s["offline"] else ""))
     for r in sorted(res, key=lambda r: -LEVEL[r["level"]]):
         l = r["line"]

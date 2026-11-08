@@ -306,8 +306,11 @@ def analyse(parts, nets, cfg, db):
 
 
 # ------------------------------------------------------------------ forge check sub-check
+SAFETY_BASIS = ("standard", "pd", "ovc", "altitude_m", "cti")   # HV-01 record (forge hp), not an HV set-up
+
+
 def project_cfg(prj):
-    return prj.cfg.get("insulation", {})
+    return {k: v for k, v in prj.cfg.get("insulation", {}).items() if k not in SAFETY_BASIS}
 
 
 def root_sheet(prj):

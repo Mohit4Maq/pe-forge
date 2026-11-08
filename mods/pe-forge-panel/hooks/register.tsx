@@ -97,7 +97,8 @@ function resample(vals: number[], w: number): number[] {
     const x = (i / (w - 1)) * (vals.length - 1)
     const k = Math.floor(x)
     const f = x - k
-    return k + 1 < vals.length ? vals[k] * (1 - f) + vals[k + 1] * f : vals[k]
+    const a = vals[k] ?? 0
+    return k + 1 < vals.length ? a * (1 - f) + (vals[k + 1] ?? a) * f : a
   })
 }
 
@@ -112,7 +113,7 @@ const fmt = (v: number | null | undefined) =>
   v === null || v === undefined ? '–' : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toPrecision(3)
 const pad = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s.padEnd(n))
 const gradeColor = (g?: string) => (g === 'ACCEPTED' ? GREEN : g === 'PROVISIONAL' ? AMBER : g === 'REJECTED' ? PINK : undefined)
-const gradeIcon = (g?: string) => (g === 'ACCEPTED' ? '✓' : g === 'PROVISIONAL' ? '?' : g === 'REJECTED' ? '✗' : '–')
+const gradeIcon = (g?: string) => (g === 'ACCEPTED' ? '✓' : g === 'PROVISIONAL' ? '◐' : g === 'REJECTED' ? '✗' : '–')
 const statusIcon = (s: string) => (s === 'passed' ? '✓' : s === 'active' ? '▶' : s === 'in-review' ? '?' : s === 'skipped' ? '–' : '·')
 
 export const register: Register = on => {
@@ -190,17 +191,19 @@ export const register: Register = on => {
         <Box flexDirection="row" gap={1}>
           <Text color={ACCENT} bold italic>maq</Text>
           <Text color={ACCENT}>▸</Text>
-          <Text bold>{d.project}</Text>
-          <Text dimColor>· {d.phase} · next: {d.next}</Text>
+          <Text bold wrap="truncate-end">{d.project}</Text>
         </Box>
-        <Box flexDirection="row" gap={1}>
+        <Text wrap="wrap"><Text color={ACCENT} bold>{d.phase}</Text><Text dimColor>   next  </Text>{d.next}</Text>
+        <Text dimColor>{RULE}</Text>
+        <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
           {tabs.map(([id, key, label]) => (
             <Button key={`tab-${id}`} hotkey={key} label={label} onPress={() => void update($, tab, () => id)}>
-              <Text color={id === t ? ACCENT : undefined} bold={id === t} dimColor={id !== t}>{key} {label}</Text>
+              <Text color={id === t ? ACCENT : undefined} bold={id === t} dimColor={id !== t}>{id === t ? '▌' : ''}{key} {label}</Text>
             </Button>
           ))}
         </Box>
-        {working ? <Text color={AMBER}>{working}</Text> : null}
+        <Text dimColor>{RULE}</Text>
+        {working ? <Text color={AMBER}>⟳ {working}</Text> : null}
       </Box>
     )
 
@@ -212,7 +215,7 @@ export const register: Register = on => {
     if (t === 'parts') body = partsTab($, d, Box, Text, Button)
 
     return (
-      <Box flexDirection="column" gap={1}>
+      <Box flexDirection="column" gap={1} paddingX={1}>
         {header}
         {body}
         {output && t !== 'sims' ? (
@@ -223,6 +226,13 @@ export const register: Register = on => {
       </Box>
     )
   })
+}
+
+// ------------------------------------------------------------------ layout helpers
+const RULE = '─'.repeat(60)
+
+function title(Text: any, s: string, extra?: string) {
+  return <Text><Text bold color={ACCENT}>{s}</Text>{extra ? <Text dimColor>   {extra}</Text> : null}</Text>
 }
 
 // ------------------------------------------------------------------ tabs
@@ -245,14 +255,16 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
   const current = v.current ?? 'concept'
   const chosen = (await read($, stage)) || current
   const s = nodes[chosen] ?? nodes[current]
+  if (!s) return <Text color={PINK}>V-cycle: no stage {chosen}</Text>
+  const node = (id: string): Stage => nodes[id] ?? { ...s, id, title: id }
   const label = (id: string) => {
-    const [m] = stageMark(nodes[id], current)
-    return `${m} ${nodes[id].title}`
+    const [m] = stageMark(node(id), current)
+    return `${m} ${node(id).title}`
   }
   const btn = (id: string) => {
-    const [, color] = stageMark(nodes[id], current)
+    const [, color] = stageMark(node(id), current)
     return (
-      <Button key={`v-${id}`} label={nodes[id].title} onPress={() => void update($, stage, () => id)}>
+      <Button key={`v-${id}`} label={node(id).title} onPress={() => void update($, stage, () => id)}>
         <Text color={color} bold={id === current || id === chosen} underline={id === chosen}>{label(id)}</Text>
       </Button>
     )
@@ -260,6 +272,7 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
   const pair = nodes[s.pair]
   return (
     <Box flexDirection="column" gap={1}>
+      {title(Text, 'V-cycle', `${v.phase} · ${(nodes[current] ?? { title: '' }).title}`)}
       <Box flexDirection="column">
         <Text dimColor>{pad('definition', V_W - 14)}verification</Text>
         {V_ROWS.map(([l, r], i) => {
@@ -273,18 +286,20 @@ async function vTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
             </Box>
           )
         })}
-        <Text dimColor>✓ done  ▶ now  ⚠ attention  · started  ○ not started</Text>
-        <Text dimColor>{v.phase}: {v.next}</Text>
       </Box>
-      <Box flexDirection="column">
-        <Text bold color={ACCENT}>{s.title} <Text dimColor>· {s.level} {s.side === 'left' ? 'definition' : s.side === 'right' ? 'verification' : 'build / unit'} · {s.phases.join(', ')} · {s.id === current ? 'working here now' : s.status}</Text></Text>
-        {s.facts.map((f, k) => <Text key={`fa${k}`}>{f}</Text>)}
-        {s.items.length ? s.items.slice(0, 8).map((it, k) => <Text key={`it${k}`} dimColor>  • {it}</Text>) : null}
+      <Text dimColor>✓ done    ▶ now    ⚠ attention    · started    ○ not started</Text>
+      <Box flexDirection="column" borderStyle="round" borderColor={ACCENT} paddingX={1}>
+        <Text bold color={ACCENT}>{s.title}</Text>
+        <Text dimColor>{s.level} · {s.side === 'left' ? 'definition' : s.side === 'right' ? 'verification' : 'build / unit'} · {s.phases.join(', ')} · {s.id === current ? 'working here now' : s.status}</Text>
+        <Text> </Text>
+        {s.facts.map((f, k) => <Text key={`fa${k}`}>• {f}</Text>)}
+        {s.items.length ? s.items.slice(0, 8).map((it, k) => <Text key={`it${k}`} dimColor>    {it}</Text>) : null}
         {s.issues.map((f, k) => <Text key={`is${k}`} color={AMBER}>⚠ {f}</Text>)}
-        {pair ? <Text dimColor>{s.side === 'left' ? 'Checked by' : s.side === 'right' ? 'Checks' : 'Pairs with'}: {pair.title} ({pair.level})</Text> : null}
-        {s.docs.length ? <Text dimColor>Docs: {s.docs.slice(0, 4).join(' · ')}</Text> : null}
+        {pair || s.docs.length ? <Text> </Text> : null}
+        {pair ? <Text dimColor>{s.side === 'left' ? 'Checked by' : s.side === 'right' ? 'Checks' : 'Pairs with'}  {pair.title} ({pair.level})</Text> : null}
+        {s.docs.length ? <Text dimColor>Docs  {s.docs.slice(0, 4).join(' · ')}</Text> : null}
       </Box>
-      <Box flexDirection="row" gap={1}>
+      <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
         <Button label="a Ask Claude" hotkey="a" onPress={() => void $.prompt.fill({ text: s.ask, mode: 'replace' })} />
         <Button label="n Ask now" hotkey="n" onPress={() => void $.prompt.submit({ text: s.ask })} />
         {pair ? <Button label={`p ↔ ${pair.title.split(':')[0]}`} hotkey="p" onPress={() => void update($, stage, () => pair.id)} /> : null}
@@ -301,7 +316,8 @@ async function simsTab($: any, d: PanelData, Box: any, Text: any, Button: any, S
     return <Text dimColor>No simulation results yet. They appear here when a simulation finishes.</Text>
   }
   const i = Math.min(await read($, sel), list.length - 1)
-  const r: Result = list[i]
+  const r = list[i]
+  if (!r) return <Text dimColor>No simulation results yet.</Text>
   const corners = r.corners ?? []
   const cw = 8
   return (
@@ -312,18 +328,18 @@ async function simsTab($: any, d: PanelData, Box: any, Text: any, Button: any, S
           onSelect={(v: string) => void update($, sel, () => Number(v))} />
       ) : null}
       <Box flexDirection="column">
-        <Text bold>{r.title ?? r.id}</Text>
+        <Text bold color={ACCENT}>{r.title ?? r.id}</Text>
         <Text dimColor>{r.module ?? 'system'} · {r.tool} · {(r.date ?? '').replace('T', ' ').slice(0, 16)}</Text>
-        <Text color={gradeColor(r.grade)}>{gradeIcon(r.grade)} {r.grade}</Text>
+        <Text color={gradeColor(r.grade)} bold>{gradeIcon(r.grade)} {r.grade}</Text>
         {r.stale ? <Text color={AMBER}>⚠ {r.stale}</Text> : null}
         {(r.problems ?? []).map((p, k) => <Text key={`p${k}`} color={PINK}>✗ {p}</Text>)}
       </Box>
       {(r.metrics ?? []).length ? (
         <Box flexDirection="column">
-          <Text dimColor>{pad('Result', 22)}{corners.map(c => pad(c, cw)).join('')}{pad('', 5)}vs calc</Text>
+          <Text dimColor>{pad('Result', 26)}{corners.map(c => pad(c, cw)).join('')}{pad('', 9)}vs calc</Text>
           {(r.metrics ?? []).map((m, k) => (
             <Box key={`m${k}`} flexDirection="row">
-              <Text>{pad(m.name, 22)}{(m.values ?? []).map(v => pad(fmt(v), cw)).join('')}{pad(m.unit ?? '', 5)}</Text>
+              <Text>{pad(m.name, 26)}{(m.values ?? []).map(v => pad(fmt(v), cw)).join('')}{pad(m.unit ?? '', 9)}</Text>
               <Text dimColor>{m.err_pct === null || m.err_pct === undefined ? pad('no calc', 8) : pad(`${m.err_pct > 0 ? '+' : ''}${m.err_pct.toFixed(1)} %`, 8)}</Text>
               <Text color={gradeColor(m.grade)}>{gradeIcon(m.grade)}</Text>
             </Box>
@@ -336,7 +352,7 @@ async function simsTab($: any, d: PanelData, Box: any, Text: any, Button: any, S
           {(r.notes ?? []).map((n, k) => <Text key={`n${k}`} dimColor>• {n}</Text>)}
         </Box>
       ) : null}
-      <Box flexDirection="row" gap={1}>
+      <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
         {r.record ? <Button label="o Open record" hotkey="o" onPress={() => void openPath($, `${d.root}/${r.record}`)} /> : null}
         <Button label="r Full report ↗" hotkey="r" onPress={() => void run($, 'Writing the report', ['report', '--open'])} />
         <Button label="u Refresh" hotkey="u" onPress={() => void refresh($)} />
@@ -352,7 +368,7 @@ function chart(c: Chart, k: number, Box: any, Text: any) {
     const total = items.reduce((s, it) => s + it.value, 0)
     return (
       <Box key={`c${k}`} flexDirection="column">
-        <Text bold>{c.title}{(c as any).total === false ? '' : <Text dimColor> ({fmt(total)} {c.unit ?? ''} total)</Text>}</Text>
+        <Text bold color={ACCENT}>{c.title}{(c as any).total === false ? '' : <Text dimColor> ({fmt(total)} {c.unit ?? ''} total)</Text>}</Text>
         {items.map((it, j) => (
           <Box key={`b${k}-${j}`} flexDirection="row">
             <Text dimColor>{pad(it.name, 17)}</Text>
@@ -372,16 +388,16 @@ function chart(c: Chart, k: number, Box: any, Text: any) {
   const colors = [ACCENT, '#e8590c', GREEN, AMBER]
   return (
     <Box key={`c${k}`} flexDirection="column">
-      <Text bold>{c.title}</Text>
+      <Text bold color={ACCENT}>{c.title}</Text>
       {series.map((s, j) => (
         <Box key={`s${k}-${j}`} flexDirection="row">
-          <Text dimColor>{pad(s.name, 7)}</Text>
+          <Text dimColor>{pad(s.name, 12)}</Text>
           <Text color={colors[j % colors.length]}>{spark(s.vals, lo, hi, CHART_W)}</Text>
           <Text dimColor> {fmt(Math.min(...s.vals))}–{fmt(Math.max(...s.vals))} {c.y?.unit ?? ''}</Text>
         </Box>
       ))}
       {xs.length ? (
-        <Text dimColor>{pad('', 7)}{pad(`${fmt(xs[0])}`, CHART_W - 8)}{fmt(xs[xs.length - 1])} {c.x?.unit ?? ''}</Text>
+        <Text dimColor>{pad('', 12)}{pad(`${fmt(xs[0])}`, CHART_W - 8)}{fmt(xs[xs.length - 1])} {c.x?.unit ?? ''}</Text>
       ) : null}
     </Box>
   )
@@ -396,17 +412,18 @@ function checksTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
     <Box flexDirection="column" gap={1}>
       {ck ? (
         <Box flexDirection="column">
-          <Text>forge check · {(ck.at ?? '').replace('T', ' ')} · <Text color={ck.ok ? GREEN : PINK} bold>{ck.ok ? 'OK' : 'FAILED'}</Text></Text>
+          <Text><Text bold color={ACCENT}>forge check</Text><Text dimColor>   {(ck.at ?? '').replace('T', ' ')}   </Text><Text color={ck.ok ? GREEN : PINK} bold>{ck.ok ? '✓ OK' : '✗ FAILED'}</Text></Text>
+          <Text> </Text>
           {Object.entries(ck.checks).map(([name, c]) => (
             <Box key={`k-${name}`} flexDirection="column">
-              <Text>
+              <Text wrap="truncate-end">
                 <Text color={icon[c.status][1]}>{icon[c.status][0]} </Text>
-                {pad(name, 15)}
+                {pad(name, 17)}
                 <Text dimColor>{c.status === 'skip' ? `skipped: ${c.reason ?? ''}` : c.reason ?? ''}</Text>
               </Text>
               {c.status === 'fail' || c.status === 'warn'
                 ? c.findings.slice(0, 2).map((f, j) => (
-                  <Text key={`f-${name}-${j}`} dimColor>    {f.location ? `${f.location}: ` : ''}{f.claim}, {f.actual}</Text>
+                  <Text key={`f-${name}-${j}`} dimColor wrap="truncate-end">      ↳ {f.actual}{f.claim ? `  · ${f.claim}` : ''}</Text>
                 ))
                 : null}
             </Box>
@@ -417,14 +434,14 @@ function checksTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
       )}
       {(d.obligations ?? []).length ? (
         <Box flexDirection="column">
-          <Text bold>Open re-checks (they block finishing)</Text>
+          {title(Text, 'Open re-checks', 'they block finishing')}
           {(d.obligations ?? []).map((o, j) => (
             <Text key={`ob${j}`} color={AMBER}>⚠ {o.kind}:{o.target} <Text dimColor>({o.opened_by})</Text></Text>
           ))}
         </Box>
       ) : null}
       {d.txn ? <Text color={AMBER}>Transaction open: {d.txn.what}</Text> : null}
-      <Box flexDirection="row" gap={1}>
+      <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
         <Button label="c Run forge check" hotkey="c" onPress={() => void run($, 'Running forge check', ['check'], 'checks')} />
         <Button label="r Full report ↗" hotkey="r" onPress={() => void run($, 'Writing the report', ['report', '--open'])} />
       </Box>
@@ -437,6 +454,7 @@ function gatesTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
   const args = gate ? ['gate', 'check', gate, ...(d.scope && d.scope !== 'system' ? ['--module', d.scope] : [])] : []
   return (
     <Box flexDirection="column" gap={1}>
+      {title(Text, 'Phases and gates')}
       <Box flexDirection="column">
         {(d.phases ?? []).map(p => (
           <Text key={`ph-${p.id}`} color={p.status === 'passed' ? GREEN : p.status === 'active' ? ACCENT : undefined}
@@ -448,7 +466,7 @@ function gatesTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
       </Box>
       {(d.modules ?? []).length ? (
         <Box flexDirection="column">
-          <Text bold>Modules</Text>
+          {title(Text, 'Modules')}
           {(d.modules ?? []).map(m => (
             <Text key={`mo-${m.id}`}>
               {statusIcon(m.status)} {m.id} {pad(m.name, 20)}
@@ -457,7 +475,7 @@ function gatesTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
           ))}
         </Box>
       ) : null}
-      <Text>Next: {d.next}</Text>
+      <Text><Text bold color={ACCENT}>Next</Text>   {d.next}</Text>
       {gate ? (
         <Button label={`g Check ${gate}${args.includes('--module') ? ` (${d.scope})` : ''}`} hotkey="g"
           onPress={() => void run($, `Checking ${gate}`, args, 'gates')} />
@@ -473,7 +491,8 @@ function partsTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
       {p ? (
         p.groups.length ? (
           <Box flexDirection="column">
-            <Text>{p.parts} placed part(s) in {p.groups.length} family / families still need datasheet work</Text>
+            {title(Text, 'Datasheet work', `${p.parts} placed part(s) · ${p.groups.length} famil${p.groups.length === 1 ? 'y' : 'ies'} to finish`)}
+            <Text> </Text>
             {p.groups.slice(0, 14).map((g, j) => (
               <Text key={`g${j}`}>
                 <Text color={AMBER}>• </Text>{pad(g.family, 26)}<Text dimColor>{g.count}× {g.refs.slice(0, 6).join(', ')} · {g.need}</Text>
@@ -486,7 +505,7 @@ function partsTab($: any, d: PanelData, Box: any, Text: any, Button: any) {
       ) : (
         <Text dimColor>No work list yet.</Text>
       )}
-      <Box flexDirection="row" gap={1}>
+      <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
         <Button label="t Refresh work list" hotkey="t" onPress={() => void run($, 'Reading the board', ['evidence', 'todo', '--json'], 'parts')} />
         <Button label="s Copy datasheets" hotkey="s" onPress={() => void run($, 'Copying datasheets', ['evidence', 'sync'], 'parts')} />
       </Box>

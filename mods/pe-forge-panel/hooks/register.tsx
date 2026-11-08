@@ -352,7 +352,7 @@ function chart(c: Chart, k: number, Box: any, Text: any) {
     const total = items.reduce((s, it) => s + it.value, 0)
     return (
       <Box key={`c${k}`} flexDirection="column">
-        <Text bold>{c.title} <Text dimColor>({fmt(total)} {c.unit ?? ''} total)</Text></Text>
+        <Text bold>{c.title}{(c as any).total === false ? '' : <Text dimColor> ({fmt(total)} {c.unit ?? ''} total)</Text>}</Text>
         {items.map((it, j) => (
           <Box key={`b${k}-${j}`} flexDirection="row">
             <Text dimColor>{pad(it.name, 17)}</Text>

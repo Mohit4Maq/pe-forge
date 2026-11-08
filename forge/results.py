@@ -16,7 +16,7 @@ A result file sits next to its record (<module>/Simulations/<id>.result.json or 
                "closed_form": [92.5, 90.9], "err_pct": 0.6, "grade": "ACCEPTED", "note": ""}],
   "charts": [{"type": "line", "title": "Efficiency vs load", "x": {"label": "Load", "unit": "A", "values": [...]},
               "y": {"label": "Efficiency", "unit": "%"}, "series": [{"name": "36 V", "values": [...]}]},
-             {"type": "bars", "title": "Losses at 60 V, 1 A", "unit": "W",
+             {"type": "bars", "title": "Losses at 60 V, 1 A", "unit": "W",   # "total": false for comparisons
               "items": [{"name": "Q1 switching", "value": 0.42}]}],
   "notes": ["Soft-start is PROVISIONAL: no hand calculation; bench test added to the DVP&R"]
 }
@@ -220,6 +220,8 @@ def _svg_bars(c, w=560):
                    f'<text x={L + bw + 6:.1f} y={y + 16} class=tick>{float(it["value"]):g} {html.escape(c.get("unit", ""))}</text>')
     total = sum(float(it["value"]) for it in items)
     out.append("</svg>")
+    if c.get("total") is False:          # comparisons (values against a limit) have no meaningful total
+        return "".join(out)
     return "".join(out) + f'<div class=legend>total {total:.3g} {html.escape(c.get("unit", ""))}</div>'
 
 

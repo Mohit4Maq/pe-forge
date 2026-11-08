@@ -15,8 +15,22 @@ Every review is against the project's layout rules, one by one, and is recorded 
    a routing rule at the placement milestone). Evidence: refs, nets, coordinates (mm), distances you measured, the
    report or image used. Critical parts are checked against their datasheet's own layout guidance (Rule 11):
    open the datasheet section the rule cites and compare.
-3. Then the general checks below, as ranked findings under "Other findings".
-4. Set `verdict:` in the form's header (READY / READY WITH FIXES / NOT READY) and add a QC register row
+3. **Project rules R-11..R-14 are enforced on every review, not advisory.** The form has a row for each; give each
+   a verdict with evidence. Run the tools yourself and look at the board as well (a tool PASS is evidence, not
+   the verdict):
+   - R-11 datasheet strictly: each critical part against its datasheet's layout guidelines, land pattern and
+     example layout, page cited.
+   - R-12 EMI / heat / shielding: `forge pcb copper` (outer-layer GND fill, one-piece reference plane, stitching,
+     pads solid without a datasheet reason); by eye: hot loop and SW node minimal, sensitive nets over plane, thermal
+     relief on through-hole pads.
+   - R-13 edge connectors: `forge pcb connectors` (face on the outline from the datasheet drawing, opening out,
+     corridor clear); open the connector drawing and check the mated plug / wire envelope, tool access from the
+     top, swap-proofing.
+   - R-14 orthogonal signal layers: `forge pcb crosstalk` (adjacent signal layers without a plane between run
+     H / V, no broadside parallel runs, declared layer directions held); by eye on the layer renders.
+   Any FAIL on R-11..R-14 means the verdict cannot be READY.
+4. Then the general checks below, as ranked findings under "Other findings".
+5. Set `verdict:` in the form's header (READY / READY WITH FIXES / NOT READY) and add a QC register row
    (gate G7, the form's path). `forge pcb review-status` must then say PASS for the gate to pass; any later
    change to the board makes the review stale.
 
@@ -36,6 +50,7 @@ Every review is against the project's layout rules, one by one, and is recorded 
   feedback/sense nets; feedback taken at the load; Kelvin sense on shunts.
 - Decoupling: caps at pins, vias at the cap pad, not shared.
 - Return paths: continuous reference plane under fast/sensitive nets, no splits crossed; stitching vias.
+- Crosstalk: adjacent signal layers orthogonal (R-14); sensitive nets not parallel to switching nets on the same layer.
 - Power/HV: widths vs current (IPC-2152), creepage/clearance across the isolation gap (slots where needed),
   HV nets on the correct class.
 - Thermal: exposed-pad via arrays, copper area for hot parts, keeping hot parts off sensitive analog.

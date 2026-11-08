@@ -161,6 +161,17 @@ Owner, 2026-11-08: edge connectors and terminals must sit exactly on the outline
   `forge pcb connectors` (check `pcb_connectors`) fails an undeclared edge connector, a face off the outline, an
   opening facing in, a blocked corridor or a position not taken from the datasheet.
 
+## Rule 14: route signal layers orthogonally (horizontal / vertical) to limit crosstalk
+Owner, 2026-11-08: a standard for every board.
+- Each signal layer has a declared direction in `project.toml` `[pcb] layer_direction` (e.g. L1 H, L3 H, L4 V)
+  and carries at least 70 % of its signal length (segments over 2 mm; pad fan-out excluded) in that direction.
+- Two signal layers next to each other with no plane between them run one horizontal and one vertical. Where they
+  must cross, they cross at 90 degrees; no broadside parallel runs (parallel, < 1 mm apart, > 2 mm long).
+- A solid plane between two layers shields them; the declared directions still hold.
+- Power pours and wide power tracks are not signals (width > `signal_max_width_mm`, 0.4 mm by default).
+- `forge pcb crosstalk` (check `pcb_crosstalk`) enforces it; the independent PCB review grades R-11..R-14 on every
+  review, and gates G7 / G8 fail while any of Rules 12–14 fails.
+
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |
 |---|---|

@@ -84,8 +84,9 @@ def main():
         add("WARN", "PCB-OUTLINE", "No board outline on Edge.Cuts yet", "Draw the outline (or import a DXF from mechanical)")
     else:
         bb = board.GetBoardEdgesBoundingBox()
+        # an edge connector declared with forge (Rule 13, field Forge_Edge) is meant to sit on the outline
         off = [f.GetReference() for f in fps if not bb.Contains(f.GetBoundingBox(False))
-               and f.GetReference()[:1] not in "#"]
+               and f.GetReference()[:1] not in "#" and not f.HasField("Forge_Edge")]
         if off:
             add("WARN", "PCB-OFFBOARD", f"{len(off)} footprints outside the outline: {', '.join(sorted(off)[:15])}"
                 + (" …" if len(off) > 15 else ""), "Place them on the board (or they are still in the F8 import pile)")

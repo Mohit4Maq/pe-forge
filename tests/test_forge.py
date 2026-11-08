@@ -2004,6 +2004,33 @@ class PcbSync(unittest.TestCase):
                   "from the datasheet drawing", "J2 at the board edge is declared"):
             self.assertIn(s, claims)
 
+    def test_xtalk_rule14(self):
+        sys.path.insert(0, REPO)
+        from forge import pcb
+
+        class P:
+            cfg = {"pcb": {"layer_direction": {"In2.Cu": "H", "B.Cu": "V"}}}
+        seg = lambda net, a, b_, w=0.25: {"net": net, "w": w, "a": a, "b": b_}
+        rep = {"layers": [
+            {"name": "F.Cu", "fill_pct": 70, "segs": []},
+            {"name": "In1.Cu", "fill_pct": 90, "segs": []},
+            {"name": "In2.Cu", "fill_pct": 50, "segs": [seg("EN", [0, 10], [20, 10])]},
+            {"name": "B.Cu", "fill_pct": 85, "segs": [seg("EN", [0, 10], [0, 40]), seg("PWR", [5, 0], [5, 30], w=1.0)]}]}
+        stats, pairs, F = pcb.xtalk_analyse(P, rep)
+        self.assertEqual(F, [])                                       # L3 H / L4 V, power track not a signal
+        self.assertTrue(stats[1]["plane"])
+        self.assertEqual(pairs, [{"a": "In2.Cu", "b": "B.Cu", "shielded": False}])
+        rep["layers"][3]["segs"].append(seg("FB", [2, 10.4], [18, 10.4]))   # parallel under EN, 0.4 mm away
+        stats, pairs, F = pcb.xtalk_analyse(P, rep)
+        claims = " | ".join(c for c, _, _ in F)
+        self.assertIn("B.Cu signal routing mostly vertical", claims)
+        self.assertIn("no broadside parallel signal runs between In2.Cu and B.Cu", claims)
+
+    def test_review_form_has_project_rules(self):
+        sys.path.insert(0, REPO)
+        from forge import pcb
+        self.assertEqual([i for i, _ in pcb.PROJECT_RULES], ["R-11", "R-12", "R-13", "R-14"])
+
     def test_stackup_block_thickness(self):
         sys.path.insert(0, REPO)
         from forge import pcb
@@ -2083,7 +2110,10 @@ class PcbSync(unittest.TestCase):
         self.assertIn("| L-01 |", t)
         self.assertIn("board_sha:", t)
         r = forge("pcb", "review-status", cwd=d, check=False)
-        self.assertIn("rules without a verdict: L-01, L-02", r.stdout)
+        self.assertIn("rules without a verdict: L-01, L-02, R-11, R-12, R-13, R-14", r.stdout)   # project rules enforced
+        self.assertIn("| R-14 |", t)
+        import re as _re
+        t = _re.sub(r"^\| (R-1[1-4]) \| ([^|]*) \| \| ([^|]*)\|$", r"| \1 | \2 | PASS | \3|", t, flags=_re.M)
         t = t.replace("| L-01 | cap at VIN | | |", "| L-01 | cap at VIN | PASS | C4 1.0 mm from pin 3 |")
         t = t.replace("| L-02 | GND plane | | |", "| L-02 | GND plane | FAIL | L2 split under U1 |")
         open(form, "w").write(t.replace("verdict: OPEN", "verdict: READY"))

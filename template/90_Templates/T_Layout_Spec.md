@@ -34,6 +34,14 @@ feeds: [08_PCB/<board>/<board>.kicad_pcb, 08_PCB/<board>/<board>.kicad_dru, 08_P
 |---|---|---|---|---|---|
 | L-13a | <J1> | <left> | <x mm> → flush | <plug 22 × 15 mm, underside at board surface; screws from top> | <datasheet, page> |
 
+## 2d. Signal layer directions (project Rule 14)
+| # | Layer | Role | Direction | Note |
+|---|---|---|---|---|
+| L-14a | L1 | parts, short signals | <H> | fan-out stubs exempt |
+| L-14b | L2 | solid GND plane | — | shields L1 from L3 |
+| L-14c | L3 | signals | <H> | |
+| L-14d | L4 | signals | <V> | orthogonal to L3 (adjacent, no plane between) |
+
 ## 3. Critical-part layout rules (project Rule 11: the datasheet, strictly)
 Every rule of this spec has an L-number: the independent PCB review checks each one (`forge pcb rules`).
 One row per item of the datasheet's "Layout Guidelines" and "Layout Example", and its recommended land pattern.

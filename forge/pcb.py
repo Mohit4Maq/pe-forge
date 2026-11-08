@@ -49,6 +49,10 @@ project.toml
       Tracks and vias as data: {"tracks": [{"net", "layer", "w", "pts": [[x, y], ...]}], "vias": [{"net", "at":
       [x, y], "d": 0.6, "drill": 0.3}]}. They go in the board group "forge_route", which a re-run replaces; hand
       routing outside the group is never touched. Zones are re-filled and DRC reports unconnected items.
+  forge pcb crosstalk
+      Rule 14: signal tracks (width <= [pcb] signal_max_width_mm, 0.4) per layer by direction; adjacent signal layers
+      with no plane between must be orthogonal (one mostly H, the other mostly V, >= 70 %), no broadside parallel
+      runs between them; [pcb] layer_direction declares the standard per layer. Also check pcb_crosstalk.
   forge pcb connectors
       Rule 13: every connector within 5 mm of the edge is declared in placement.json ({"edge": {"side", "overhang",
       "source"}}); its mating face (F.Fab body) sits on the outline within [pcb] edge_tol_mm (0.1) or at the
@@ -674,6 +678,126 @@ def as_check_connectors(prj, opts):
                   reason=f"{len(rep['connectors'])} edge connector(s)")
 
 
+XTALK = r'''
+import json, sys, pcbnew
+s = json.load(open(sys.argv[1]))
+b = pcbnew.LoadBoard(s["board"])
+T = pcbnew.ToMM
+bb = b.GetBoardEdgesBoundingBox()
+area = T(bb.GetWidth()) * T(bb.GetHeight())
+layers = []
+for lay in pcbnew.LSET.AllCuMask().CuStack():
+    if not b.IsLayerEnabled(lay):
+        continue
+    best = {}
+    for z in b.Zones():
+        if not z.GetIsRuleArea() and z.IsOnLayer(lay):
+            best[z.GetNetname()] = best.get(z.GetNetname(), 0) + z.GetFilledPolysList(lay).Area() / 1e12
+    segs = [{"net": tr.GetNetname(), "w": T(tr.GetWidth()), "a": [T(tr.GetStart().x), T(tr.GetStart().y)],
+             "b": [T(tr.GetEnd().x), T(tr.GetEnd().y)]}
+            for tr in b.GetTracks() if tr.GetClass() == "PCB_TRACK" and tr.GetLayer() == lay]
+    layers.append({"name": b.GetLayerName(lay), "fill_pct": round(100 * max(best.values() or [0]) / area, 1), "segs": segs})
+print("REPORT" + json.dumps({"layers": layers}))
+'''
+
+
+def xtalk(prj, board):
+    out, err = _run(XTALK, {"board": os.path.abspath(board)})
+    m = re.search(r"REPORT(\{.*\})", out)
+    if not m:
+        raise SystemExit("pcbnew crosstalk check failed: " + (err or out)[-600:])
+    return json.loads(m.group(1))
+
+
+def _dir(s):
+    import math
+    dx, dy = s["b"][0] - s["a"][0], s["b"][1] - s["a"][1]
+    a = abs(math.degrees(math.atan2(dy, dx))) % 180
+    a = min(a, 180 - a)
+    return ("H" if a <= 22.5 else "V" if a >= 67.5 else "D"), math.hypot(dx, dy), a
+
+
+def xtalk_analyse(prj, rep):
+    """Rule 14. Signal tracks: width <= [pcb] signal_max_width_mm (0.4) or net in signal_nets. Per layer: length by
+    direction (segments shorter than fanout_mm, 2.0, are pad fan-out and not judged). A layer is a plane when one
+    net fills >= plane_fill_pct (80) and it carries no signal. Adjacent signal layers with no plane between them
+    must run orthogonally (dominant direction >= dominance_pct, 70, and opposite); broadside overlaps (parallel within
+    20 deg, offset < xtalk_offset_mm 1.0, overlap > xtalk_len_mm 2.0) on such a pair fail. Declared directions
+    ([pcb] layer_direction = {"In2.Cu" = "H"}) must hold on every layer that carries signals."""
+    import math
+    cfg = prj.cfg.get("pcb", {})
+    wmax, fan = cfg.get("signal_max_width_mm", 0.4), cfg.get("fanout_mm", 2.0)
+    nets = set(cfg.get("signal_nets", []))
+    dom, decl = cfg.get("dominance_pct", 70), cfg.get("layer_direction", {})
+    off, ovl = cfg.get("xtalk_offset_mm", 1.0), cfg.get("xtalk_len_mm", 2.0)
+    stats, F = [], []
+    for L in rep["layers"]:
+        sig = [s for s in L["segs"] if s["w"] <= wmax + 1e-6 or s["net"] in nets]
+        ln = {"H": 0.0, "V": 0.0, "D": 0.0}
+        for s in sig:
+            d, l, _ = _dir(s)
+            if l >= fan:
+                ln[d] += l
+        tot = sum(ln.values())
+        d0 = max(ln, key=ln.get) if tot else None
+        st = {"layer": L["name"], "signal": bool(sig), "plane": not sig and L["fill_pct"] >= cfg.get("plane_fill_pct", 80),
+              "len": {k: round(v, 1) for k, v in ln.items()}, "dir": d0,
+              "dom_pct": round(100 * ln[d0] / tot, 0) if tot else None, "declared": decl.get(L["name"]), "segs": sig}
+        stats.append(st)
+        if st["declared"] and tot >= 5 and (d0 != st["declared"] or st["dom_pct"] < dom):
+            F.append((f"{L['name']} signal routing mostly {'horizontal' if st['declared'] == 'H' else 'vertical'} "
+                      f"(declared, >= {dom} %, Rule 14)", f"{st['len']} mm by direction",
+                      "re-route the off-direction runs on the orthogonal neighbour layer through vias"))
+    pairs = []
+    sigl = [i for i, s in enumerate(stats) if s["signal"]]
+    for i, j in zip(sigl, sigl[1:]):
+        shield = any(stats[k]["plane"] for k in range(i + 1, j))
+        pairs.append({"a": stats[i]["layer"], "b": stats[j]["layer"], "shielded": shield})
+        if shield:
+            continue
+        A, B = stats[i], stats[j]
+        for X in (A, B):
+            if not X["declared"] and sum(X["len"].values()) >= 5 and (X["dom_pct"] or 0) < dom:
+                F.append((f"{X['layer']} has one dominant signal direction (>= {dom} %, Rule 14)",
+                          f"{X['len']} mm by direction", 'declare [pcb] layer_direction and re-route'))
+        if A["dir"] and A["dir"] == B["dir"] and A["dir"] != "D":
+            F.append((f"{A['layer']} and {B['layer']} (adjacent, no plane between) route orthogonally (Rule 14)",
+                      f"both mostly {A['dir']}", "make one layer horizontal and the other vertical"))
+        hits = []
+        for s in A["segs"]:
+            for u in B["segs"]:
+                d1, l1, a1 = _dir(s); d2, l2, a2 = _dir(u)
+                if l1 < fan or l2 < fan or abs(a1 - a2) > 20 or s["net"] == u["net"]:
+                    continue
+                ux, uy = (s["b"][0] - s["a"][0]) / l1, (s["b"][1] - s["a"][1]) / l1
+                p = lambda q: (q[0] - s["a"][0]) * ux + (q[1] - s["a"][1]) * uy
+                lo, hi = max(0, min(p(u["a"]), p(u["b"]))), min(l1, max(p(u["a"]), p(u["b"])))
+                mid = (u["a"][0] + u["b"][0]) / 2, (u["a"][1] + u["b"][1]) / 2
+                dist = abs((mid[0] - s["a"][0]) * uy - (mid[1] - s["a"][1]) * ux)
+                if hi - lo > ovl and dist < off:
+                    hits.append(f"{s['net']} / {u['net']} {hi - lo:.1f} mm at {dist:.2f} mm")
+        if hits:
+            F.append((f"no broadside parallel signal runs between {A['layer']} and {B['layer']} (Rule 14)",
+                      "; ".join(hits[:4]), "cross at 90 degrees, or put a plane between the layers"))
+    for st in stats:
+        st.pop("segs")
+    return stats, pairs, F
+
+
+def as_check_xtalk(prj, opts):
+    from .check import finding, result, roots, has_content
+    pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
+    if not pcbs:
+        return result("skip", reason="no board yet")
+    if not kicad.find_python():
+        return result("skip", reason="KiCad's Python (pcbnew) not found", missing_tool=True)
+    stats, pairs, F = xtalk_analyse(prj, xtalk(prj, pcbs[0]))
+    if not any(s["signal"] for s in stats):
+        return result("skip", reason="no signal tracks yet")
+    return result("fail" if F else "pass", [finding(c, a, prj.rel(pcbs[0]), f) for c, a, f in F],
+                  reason=", ".join(f"{s['layer']} {s['dir'] or '-'}" + (" plane" if s["plane"] else "") for s in stats))
+
+
 def copper(prj, board):
     """Copper coverage per layer, GND plane pieces, GND via count (Rule 12 metrics)."""
     out, err = _run(COPPER, {"board": os.path.abspath(board), "net": prj.cfg.get("pcb", {}).get("gnd_net", "GND")})
@@ -904,6 +1028,14 @@ def review_new(prj, board, milestone, by="pcb-reviewer"):
     while os.path.exists(path):
         path = os.path.join(d, f"PCB_{milestone}_{day}_{n}.md"); n += 1
     rows = "\n".join(f"| {i} | {txt[:90]} | | |" for i, txt in rs)
+    tool = {}
+    for rid, fn in (("R-12", as_check_copper), ("R-13", as_check_connectors), ("R-14", as_check_xtalk)):
+        try:
+            r = fn(prj, {})
+            tool[rid] = f"tool: {r['status'].upper()} ({r.get('reason') or ''})"
+        except SystemExit as e:
+            tool[rid] = f"tool: did not run ({e})"
+    prows = "\n".join(f"| {rid} | {txt} | | {tool.get(rid, '')} |" for rid, txt in PROJECT_RULES)
     open(path, "w").write(f"""---
 type: pcb-review
 milestone: {milestone}
@@ -925,12 +1057,25 @@ coordinates in mm, the image or report used. The board is never edited by the re
 |---|---|---|---|
 {rows}
 
+## Project rules (enforced on every review; the tool result is evidence, the reviewer still checks by eye)
+| Rule | Requirement | Verdict | Evidence |
+|---|---|---|---|
+{prows}
+
 ## Other findings (ranked Critical / Major / Minor)
 
 ## Verdict
 Set `verdict:` above to READY, READY WITH FIXES or NOT READY.
 """)
     return path
+
+
+PROJECT_RULES = [
+    ("R-11", "Critical parts follow the datasheet layout strictly (land pattern, placement order, loops, values), page cited"),
+    ("R-12", "Best EMI / heat / shielding: outer GND fill, one-piece reference plane, stitching, minimal hot loop and SW node, thermal relief on pads (solid only by datasheet)"),
+    ("R-13", "Edge connectors on the outline from the datasheet drawing; opening out; mating envelope and tool access clear; not swappable"),
+    ("R-14", "Signal layers orthogonal: adjacent signal layers without a plane between run H / V; no broadside parallel runs"),
+]
 
 
 def latest_review(prj):
@@ -946,6 +1091,7 @@ def review_status(prj, board):
     rs = [i for i, _ in rules(prj)]
     if not rs:
         return False, [f"no L-rules in {prj.paths['layout_spec']}: there is nothing to review against"]
+    rs = rs + [i for i, _ in PROJECT_RULES]
     f = latest_review(prj)
     if not f:
         return False, ["no independent PCB review yet (forge pcb review-new <milestone>, then the pcb-reviewer agent)"]
@@ -953,7 +1099,7 @@ def review_status(prj, board):
     probs = []
     got = {}
     for line in t.splitlines():
-        m = re.match(r"^\|\s*(L-\d+[A-Za-z]?)\s*\|[^|]*\|\s*([^|]*?)\s*\|", line)
+        m = re.match(r"^\|\s*([LR]-\d+[A-Za-z]?)\s*\|[^|]*\|\s*([^|]*?)\s*\|", line)
         if m:
             got[m.group(1)] = m.group(2).upper()
     missing = [i for i in rs if not got.get(i)]
@@ -992,8 +1138,17 @@ def gate_items(prj):
     if not pcbs:
         return [(False, "PCB review: no board")]
     ok, probs, *where = review_status(prj, pcbs[0])
-    return [(ok, "independent PCB review against the layout rules" + (f" ({where[0]})" if where else "")
-             + ("" if ok else ": " + "; ".join(probs)))]
+    res = [(ok, "independent PCB review against the layout rules and R-11..R-14" + (f" ({where[0]})" if where else "")
+            + ("" if ok else ": " + "; ".join(probs)))]
+    for name, fn in (("Rule 12 copper / thermal relief", as_check_copper), ("Rule 13 edge connectors", as_check_connectors),
+                     ("Rule 14 orthogonal signal layers", as_check_xtalk)):
+        try:
+            r = fn(prj, {})
+        except SystemExit as e:
+            res.append((False, f"{name}: did not run ({e})")); continue
+        good = r["status"] == "pass" or (r["status"] == "skip" and not r.get("missing_tool"))
+        res.append((good, f"{name}: {r['status']}" + ("".join(f"; {f['claim']}: {f['actual']}" for f in r["findings"][:2]))))
+    return res
 
 
 def main(prj, argv):
@@ -1002,7 +1157,7 @@ def main(prj, argv):
         print(json.dumps(rs, indent=1) if "--json" in argv else
               "\n".join(f"{i}  {txt}" for i, txt in rs) or f"no L-rules in {prj.paths['layout_spec']}")
         return 0 if rs else 1
-    if not argv or argv[0] not in ("sync", "setup", "place", "zones", "route", "copper", "connectors", "review-new", "review-status"):
+    if not argv or argv[0] not in ("sync", "setup", "place", "zones", "route", "copper", "connectors", "crosstalk", "review-new", "review-status"):
         print(__doc__)
         return 1
     from . import check
@@ -1012,6 +1167,19 @@ def main(prj, argv):
         if not pcbs:
             raise SystemExit("no board file under 08_PCB")
         board = pcbs[0]
+    if argv[0] == "crosstalk":
+        stats, pairs, F = xtalk_analyse(prj, xtalk(prj, board))
+        for s in stats:
+            kind = "plane" if s["plane"] else ("signal" if s["signal"] else "pours only")
+            print(f"  {s['layer']:7s} {kind:10s} H {s['len']['H']:5.1f}  V {s['len']['V']:5.1f}  D {s['len']['D']:5.1f} mm"
+                  + (f"  -> {s['dir']} {s['dom_pct']:.0f} %" if s["dom_pct"] is not None else "")
+                  + (f" (declared {s['declared']})" if s["declared"] else ""))
+        for p_ in pairs:
+            print(f"  pair {p_['a']} / {p_['b']}: " + ("shielded by a plane" if p_["shielded"] else "adjacent, must be orthogonal"))
+        for c, a_, f in F:
+            print(f"  FAIL {c}: {a_} ({f})")
+        print("PASS (Rule 14)" if not F else f"{len(F)} finding(s)")
+        return 1 if F else 0
     if argv[0] == "connectors":
         rep = connectors(prj, board)
         for c in rep["connectors"]:

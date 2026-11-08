@@ -11,6 +11,7 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   bom          WIP BoM and module BoMs complete: price, stock, alternate (skip: no lines yet)
   drift        BoM / brief / booklet vs schematic (forge drift)
   sch_lib      library/tools/sch_check.py: parts against MC_Parts, nets, decoupling, text variables
+  pcb_copper   Rule 12 metrics: outer-layer copper coverage, reference plane in one piece, GND stitching (warn)
   protection   PROT-1..4: surge clamps sized to the system (VRWM >= max operating V) and to every protected pin
                (clamp V <= margin x abs max from MC_Parts Abs_Max_V); forge/protection.py
   insulation   INS-1/2/3, NET-4: HV-side nets in the HV class, no path across a barrier, barrier package
@@ -44,7 +45,7 @@ import time
 from . import config, consistency, gates, kicad, vmodel
 
 ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "insulation", "dru_rules", "pcb_extra",
-       "pcb_review", "protection",
+       "pcb_review", "pcb_copper", "protection",
        "legibility", "spice", "parts_evidence"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
@@ -256,6 +257,11 @@ def c_pcb_review(prj, opts):
     return pcb.as_check_review(prj, opts)
 
 
+def c_pcb_copper(prj, opts):
+    from . import pcb
+    return pcb.as_check_copper(prj, opts)
+
+
 def c_protection(prj, opts):
     from . import protection
     return protection.as_check(prj, opts)
@@ -281,7 +287,7 @@ def c_fab(prj, opts):
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
           "drift": c_drift, "sch_lib": c_sch_lib, "insulation": c_insulation, "dru_rules": c_dru_rules,
-          "pcb_review": c_pcb_review, "protection": c_protection, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
+          "pcb_review": c_pcb_review, "pcb_copper": c_pcb_copper, "protection": c_protection, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
           "fab": c_fab}
 
 

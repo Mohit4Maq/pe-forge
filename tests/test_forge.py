@@ -1965,6 +1965,24 @@ class PcbSync(unittest.TestCase):
         finally:
             pcb.glob_kicad_prefs = old
 
+    def test_copper_findings_rule12(self):
+        sys.path.insert(0, REPO)
+        from forge import pcb
+
+        class P:
+            cfg = {"pcb": {}}
+        rep = {"board_mm2": 2500.0, "gnd_vias": 14, "layers": {
+            "F.Cu": {"copper_pct": 22.4, "gnd_pct": 10.4, "gnd_pieces": 3},
+            "In1.Cu": {"copper_pct": 86.0, "gnd_pct": 86.0, "gnd_pieces": 1},
+            "B.Cu": {"copper_pct": 84.0, "gnd_pct": 84.0, "gnd_pieces": 1}}}
+        claims = " | ".join(c for c, _, _ in pcb.copper_findings(P, rep))
+        self.assertIn("F.Cu copper coverage", claims)              # the empty top layer is flagged
+        self.assertIn("GND stitching", claims)
+        rep["layers"]["F.Cu"]["copper_pct"], rep["gnd_vias"] = 78.4, 68
+        rep["layers"]["In1.Cu"]["gnd_pieces"] = 2
+        claims = " | ".join(c for c, _, _ in pcb.copper_findings(P, rep))
+        self.assertEqual(claims, "In1.Cu reference plane is one piece")   # a split reference plane is flagged
+
     def test_stackup_block_thickness(self):
         sys.path.insert(0, REPO)
         from forge import pcb
@@ -2001,6 +2019,14 @@ class PcbSync(unittest.TestCase):
         board_t = open(os.path.join(d, "08_PCB/pl/pl.kicad_pcb")).read()
         self.assertEqual(board_t.count('"forge-keepout:H'), 4)   # a pours run must not remove them
         self.assertEqual(board_t.count('"forge:gnd"'), 1)
+        json.dump({"zones": [{"name": "gnd", "layer": "B.Cu", "net": "GND", "rect": [0.5, 0.5, 39.5, 29.5]},
+                             {"name": "gndt", "layer": "F.Cu", "net": "GND", "rect": [0.5, 0.5, 39.5, 29.5]},
+                             {"name": "gnd2", "layer": "In1.Cu", "net": "GND", "rect": [0.5, 0.5, 39.5, 29.5]},
+                             {"name": "gnd3", "layer": "In2.Cu", "net": "GND", "rect": [0.5, 0.5, 39.5, 29.5]}],
+                   "stitch": {"net": "GND", "pitch": 4.0}}, open(zones, "w"))
+        r = forge("pcb", "zones", zones, cwd=d, check=False)
+        self.assertRegex(r.stdout, r"\d+ stitching via")            # stitched where GND covers every layer
+        self.assertNotIn("clearance", r.stdout)                    # no stitching via breaks a clearance
         table = os.path.join(d, "placement.json")
         json.dump({"U1": [20, 15, 0], "R1": [20, 15, 0]}, open(table, "w"))   # R1 on top of U1
         r = forge("pcb", "place", table, cwd=d, check=False)

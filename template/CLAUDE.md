@@ -122,6 +122,24 @@ placement, hot loop, SW node area, BOOT / FB placement, thermal pad and vias, gr
   wins for that part. Encode it as a rule scoped to that part (e.g. a `.kicad_dru` rule on
   `memberOfFootprint('U1')`) and note it next to the generic rule, citing the datasheet page.
 
+## Rule 12: design every board for the best EMI, heat and shielding it allows
+Clean DRC is the floor, not the goal (owner, 2026-11-08). On every board:
+- **Copper fill:** every unused area of the outer layers is poured with GND (lowest priority, so power and
+  switch copper keep their shapes); inner layers carry solid planes. The datasheets of power ICs ask for it
+  (e.g. "as much copper as possible on the top and bottom layers").
+- **Reference plane:** a solid, unbroken GND plane on the layer next to the switching layer; no slots or splits
+  under fast or sensitive nets; via clearance holes that merge into slots are fixed.
+- **Stitching:** GND layers tied with a via grid (≤ 5 mm pitch, `forge pcb zones` stitch block), plus vias at
+  every decoupling and bulk capacitor ground and around power pours and board edges.
+- **Loops and nodes:** hot loops (input cap to switch to return) smallest possible on one layer; switch nodes
+  short, wide and no bigger than needed; no switch-node copper on quiet layers (SMD test pads on SW).
+- **Sensitive routing:** feedback, sense and gate-drive returns over solid plane, away from the switch node and
+  inductor; Kelvin sense joined only by its own trace.
+- **Heat:** hot parts get copper area and via arrays to inner and bottom planes; 2 oz outer copper where the
+  datasheet asks.
+- `forge pcb copper` measures coverage, plane continuity and stitching density (check `pcb_copper`); the
+  independent PCB review judges the rest against the layout spec's EMI / thermal rows.
+
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |
 |---|---|

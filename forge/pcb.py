@@ -12,7 +12,9 @@
       Board set-up from project.toml [pcb]: outline, mounting holes (marked "not in schematic"), copper layer
       count and stack-up (copper weight per layer), minimum hole, values moved to the fab layer.
   forge pcb place <placement.json> [--dry-run]
-      Place parts from a table {"REF": [x_mm, y_mm, rot_deg], ...}, x / y relative to the board origin, then report
+      Place parts from a table {"REF": [x_mm, y_mm, rot_deg] or [x, y, rot, {"ref": [dx, dy(, angle)],
+      "no_zone_pads": true}], ...}, x / y relative to the board origin ("ref" moves the reference text,
+      "no_zone_pads" keeps pours off the part's pads, e.g. Kelvin test points), then report
       courtyard overlaps from KiCad's DRC. Keep the table with the project (08_PCB/<board>/placement.json) and
       note the datasheet rule behind each critical position (project Rule 11) in the layout spec.
 
@@ -29,15 +31,24 @@ project.toml
                                  # default 3.5 mm for M3 (5.5 mm head + margin); 0 = none
   fiducials = [[6, 25], [44, 46]]   # board-only fiducials (mm from the origin), Fiducial:Fiducial_1mm_Mask2mm
   marking = [{ t = "BUCK48TO12 REV A", x = 25, y = 2, size = 1.0 }]   # silkscreen text (re-runs replace it)
+  copper_finish = "ENIG"         # written into the stack-up (fab reads it); "None" until chosen
+                                 # fab notes: marking entries with layer = "Dwgs.User" (or "Cmts.User")
 
   forge pcb zones <zones.json>
       Copper pours as data: [{"name", "layer" (F.Cu / In1.Cu / ...), "net", "rect": [x1, y1, x2, y2] or "pts":
       [[x, y], ...], "priority": n}], mm from the board origin. Pours named forge:<name> are replaced on a re-run;
-      pours drawn by hand are kept. All zones are filled afterwards.
+      pours drawn by hand are kept. All zones are filled afterwards. The file may instead be {"zones": [...],
+      "stitch": {"net": "GND", "pitch": 4.0, "d": 0.6, "drill": 0.3, "avoid": [[x1, y1, x2, y2], ...]}}: after the
+      fill, vias of that net on a grid wherever the net's copper covers the via on every copper layer (clear of
+      other nets, pads and vias; avoid boxes for hot loops), in group forge_stitch, replaced on a re-run.
   forge pcb route <routes.json>
       Tracks and vias as data: {"tracks": [{"net", "layer", "w", "pts": [[x, y], ...]}], "vias": [{"net", "at":
       [x, y], "d": 0.6, "drill": 0.3}]}. They go in the board group "forge_route", which a re-run replaces; hand
       routing outside the group is never touched. Zones are re-filled and DRC reports unconnected items.
+  forge pcb copper
+      Rule 12 metrics: copper coverage per layer, GND reference plane coverage and pieces, GND via count, against
+      project.toml [pcb] outer_copper_min_pct (60), ref_plane (In1.Cu), ref_plane_min_pct (85),
+      stitch_pitch_max_mm (5). Also forge check sub-check pcb_copper.
   forge pcb rules [--json]
       The layout rules the board is reviewed against: every row whose first cell is an L-number (L-01, L-02, ...)
       in the layout spec (project.toml paths.layout_spec).
@@ -312,11 +323,21 @@ mm = pcbnew.FromMM
 X0, Y0 = s["origin"]
 done, missing = [], []
 refs = {f.GetReference(): f for f in b.GetFootprints()}
-for ref, (x, y, rot) in s["place"].items():
+for ref, entry in s["place"].items():
+    x, y, rot = entry[:3]
+    opt = entry[3] if len(entry) > 3 else {}
     f = refs.get(ref)
     if f is None:
         missing.append(ref); continue
     f.SetPosition(pcbnew.VECTOR2I(mm(X0 + x), mm(Y0 + y))); f.SetOrientationDegrees(rot); done.append(ref)
+    if "ref" in opt:                     # reference text offset from the footprint origin (mm), e.g. out of a stack
+        dx, dy = opt["ref"][:2]
+        f.Reference().SetPosition(pcbnew.VECTOR2I(mm(X0 + x + dx), mm(Y0 + y + dy)))
+        if len(opt["ref"]) > 2:
+            f.Reference().SetTextAngleDegrees(opt["ref"][2])
+    if opt.get("no_zone_pads"):          # e.g. a Kelvin test point: joined only by its own trace, not by pours
+        for p in f.Pads():
+            p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_NONE)
 if not s["dry"]:
     b.Save(s["board"])
 print("REPORT" + json.dumps({"placed": done, "missing": missing,
@@ -331,11 +352,19 @@ s = json.load(open(sys.argv[1]))
 b = pcbnew.LoadBoard(s["board"])
 mm = pcbnew.FromMM
 X0, Y0 = s["origin"]
+data = s["zones"]
+zl = data["zones"] if isinstance(data, dict) else data
+stitch = data.get("stitch") if isinstance(data, dict) else None
 for z in list(b.Zones()):
     if z.GetZoneName().startswith("forge:"):
         KEEP.append(z); b.Remove(z)
+for g in list(b.Groups()):                     # stitching vias from a previous run
+    if g.GetName() == "forge_stitch":
+        for it in list(g.GetItems()):
+            KEEP.append(it); b.Remove(it)
+        KEEP.append(g); b.Remove(g)
 missing = []
-for d in s["zones"]:
+for d in zl:
     lay = b.GetLayerID(d["layer"])
     ni = b.FindNet(d["net"])
     if ni is None:
@@ -350,9 +379,49 @@ for d in s["zones"]:
     if d.get("solid"):
         z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
     b.Add(z)
-pcbnew.ZONE_FILLER(b).Fill(b.Zones())
+b.BuildConnectivity(); pcbnew.ZONE_FILLER(b).Fill(b.Zones())   # fresh connectivity, or the fill keeps stale knock-outs
+n_st = 0
+if stitch:
+    import math
+    ni = b.FindNet(stitch.get("net", "GND"))
+    r = stitch.get("d", 0.6) / 2.0
+    margin = mm(r + stitch.get("clearance", 0.3))
+    layers = [l for l in pcbnew.LSET.AllCuMask().CuStack() if b.IsLayerEnabled(l)]
+    polys = []
+    for lay in layers:                                  # the net's fill on every copper layer
+        ps = pcbnew.SHAPE_POLY_SET()
+        for z in b.Zones():
+            if not z.GetIsRuleArea() and z.GetNetCode() == ni.GetNetCode() and z.IsOnLayer(lay):
+                ps.Append(z.GetFilledPolysList(lay))
+        polys.append(ps)
+    ring = [(math.cos(2 * math.pi * k / 16), math.sin(2 * math.pi * k / 16)) for k in range(16)]
+    vias = [v.GetPosition() for v in b.GetTracks() if v.GetClass() == "PCB_VIA"]
+    pads = [p.GetPosition() for f in b.GetFootprints() for p in f.Pads()]
+    avoid = [[mm(X0 + a[0]), mm(Y0 + a[1]), mm(X0 + a[2]), mm(Y0 + a[3])] for a in stitch.get("avoid", [])]
+    g = pcbnew.PCB_GROUP(b); g.SetName("forge_stitch"); b.Add(g)
+    pitch = stitch.get("pitch", 4.0)
+    W, H = s.get("outline", [0, 0])
+    gx = pitch / 2
+    while gx < (W or 200):
+        gy = pitch / 2
+        while gy < (H or 200):
+            c = pcbnew.VECTOR2I(mm(X0 + gx), mm(Y0 + gy))
+            ok = not any(a[0] <= c.x <= a[2] and a[1] <= c.y <= a[3] for a in avoid)
+            ok = ok and all(math.hypot(c.x - v.x, c.y - v.y) > mm(1.2) for v in vias)
+            ok = ok and all(math.hypot(c.x - p.x, c.y - p.y) > mm(1.5) for p in pads)
+            if ok:
+                for ps in polys:
+                    if not all(ps.Contains(pcbnew.VECTOR2I(int(c.x + margin * dx), int(c.y + margin * dy))) for dx, dy in ring) \
+                            or not ps.Contains(c):
+                        ok = False; break
+            if ok:
+                v = pcbnew.PCB_VIA(b); v.SetPosition(c); v.SetWidth(mm(2 * r)); v.SetDrill(mm(stitch.get("drill", 0.3)))
+                v.SetNet(ni); b.Add(v); g.AddItem(v); vias.append(c); n_st += 1
+            gy += pitch
+        gx += pitch
+    b.BuildConnectivity(); pcbnew.ZONE_FILLER(b).Fill(b.Zones())   # fresh connectivity, or the fill keeps stale knock-outs
 b.Save(s["board"])
-print("REPORT" + json.dumps({"zones": len(s["zones"]) - len(missing), "missing_nets": missing}))
+print("REPORT" + json.dumps({"zones": len(zl) - len(missing), "missing_nets": missing, "stitch_vias": n_st}))
 '''
 
 ROUTE = r'''
@@ -383,17 +452,99 @@ for v in s["route"].get("vias", []):
         missing.append(v["net"]); continue
     via = pcbnew.PCB_VIA(b); via.SetPosition(P(v["at"])); via.SetWidth(mm(v.get("d", 0.6))); via.SetDrill(mm(v.get("drill", 0.3)))
     via.SetNet(ni); b.Add(via); g.AddItem(via); n_v += 1
-pcbnew.ZONE_FILLER(b).Fill(b.Zones())
+b.BuildConnectivity(); pcbnew.ZONE_FILLER(b).Fill(b.Zones())   # fresh connectivity, or the fill keeps stale knock-outs
 b.Save(s["board"])
 print("REPORT" + json.dumps({"tracks": n_t, "vias": n_v, "missing_nets": sorted(set(missing))}))
 '''
+
+
+COPPER = r'''
+import json, sys, pcbnew
+s = json.load(open(sys.argv[1]))
+b = pcbnew.LoadBoard(s["board"])
+mm2 = lambda a: a / 1e12                          # nm^2 -> mm^2
+box = b.GetBoardEdgesBoundingBox()
+area = pcbnew.ToMM(box.GetWidth()) * pcbnew.ToMM(box.GetHeight())
+out = {"board_mm2": area, "layers": {}}
+gnd = b.FindNet(s.get("net", "GND"))
+for lay in pcbnew.LSET.AllCuMask().CuStack():
+    if not b.IsLayerEnabled(lay):
+        continue
+    allc, g, pieces = 0.0, 0.0, 0
+    for z in b.Zones():
+        if z.GetIsRuleArea() or not z.IsOnLayer(lay):
+            continue
+        fp = z.GetFilledPolysList(lay)
+        a_ = mm2(fp.Area())
+        allc += a_
+        if gnd and z.GetNetCode() == gnd.GetNetCode():
+            g += a_; pieces += fp.OutlineCount()
+    out["layers"][b.GetLayerName(lay)] = {"copper_pct": round(100 * allc / area, 1), "gnd_pct": round(100 * g / area, 1),
+                                          "gnd_pieces": pieces}
+vias = [v for v in b.GetTracks() if v.GetClass() == "PCB_VIA" and gnd and v.GetNetCode() == gnd.GetNetCode()]
+out["gnd_vias"] = len(vias)
+print("REPORT" + json.dumps(out))
+'''
+
+
+def copper(prj, board):
+    """Copper coverage per layer, GND plane pieces, GND via count (Rule 12 metrics)."""
+    out, err = _run(COPPER, {"board": os.path.abspath(board), "net": prj.cfg.get("pcb", {}).get("gnd_net", "GND")})
+    m = re.search(r"REPORT(\{.*\})", out)
+    if not m:
+        raise SystemExit("pcbnew copper metrics failed: " + (err or out)[-600:])
+    return json.loads(m.group(1))
+
+
+def copper_findings(prj, rep):
+    """[(claim, actual, fix)] against project.toml [pcb] thresholds (defaults: outer 60 %, plane 85 % in one piece,
+    stitching pitch 5 mm)."""
+    cfg = prj.cfg.get("pcb", {})
+    outer_min = cfg.get("outer_copper_min_pct", 60)
+    plane, plane_min = cfg.get("ref_plane", "In1.Cu"), cfg.get("ref_plane_min_pct", 85)
+    pitch = cfg.get("stitch_pitch_max_mm", 5.0)
+    L = rep["layers"]
+    F = []
+    for name in ("F.Cu", "B.Cu"):
+        if name in L and L[name]["copper_pct"] < outer_min:
+            F.append((f"{name} copper coverage >= {outer_min} % (Rule 12)", f"{L[name]['copper_pct']} %",
+                      "Pour the unused area with GND at the lowest priority"))
+    if plane in L:
+        pl = L[plane]
+        if pl["gnd_pct"] < plane_min:
+            F.append((f"{plane} reference plane covers >= {plane_min} % of the board", f"{pl['gnd_pct']} %",
+                      "Fill the plane; remove splits and merged clearance holes"))
+        if pl["gnd_pieces"] > 1:
+            F.append((f"{plane} reference plane is one piece", f"{pl['gnd_pieces']} pieces",
+                      "Join the islands: no slots or splits in the reference plane"))
+    need = int(rep["board_mm2"] / (pitch * pitch) * 0.5)
+    if rep["gnd_vias"] < need:
+        F.append((f"GND stitching about one via per {pitch:g} x {pitch:g} mm", f"{rep['gnd_vias']} GND vias (want >= {need})",
+                  "Add a stitch block to zones.json (forge pcb zones)"))
+    return F
+
+
+def as_check_copper(prj, opts):
+    from .check import finding, result, roots, has_content
+    pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
+    if not pcbs:
+        return result("skip", reason="no board yet")
+    if not kicad.find_python():
+        return result("skip", reason="KiCad's Python (pcbnew) not found", missing_tool=True)
+    rep = copper(prj, pcbs[0])
+    if not any(v["copper_pct"] for v in rep["layers"].values()):
+        return result("skip", reason="no copper pours yet")
+    F = copper_findings(prj, rep)
+    summary = ", ".join(f"{k} {v['copper_pct']} %" for k, v in rep["layers"].items()) + f"; {rep['gnd_vias']} GND vias"
+    return result("warn" if F else "pass", [finding(c, a, prj.rel(pcbs[0]), f) for c, a, f in F], reason=summary)
 
 
 def _data_cmd(prj, board, script, key, path):
     board_only(board)
     cfg = prj.cfg.get("pcb", {})
     data = json.load(open(path))
-    out, err = _run(script, {"board": os.path.abspath(board), "origin": cfg.get("origin_mm", [100, 100]), key: data})
+    out, err = _run(script, {"board": os.path.abspath(board), "origin": cfg.get("origin_mm", [100, 100]), key: data,
+                             "outline": cfg.get("outline_mm", [0, 0])})
     m = re.search(r"REPORT(\{.*\})", out)
     if not m:
         raise SystemExit("pcbnew failed: " + (err or out)[-800:])
@@ -406,7 +557,7 @@ def _data_cmd(prj, board, script, key, path):
     return rep
 
 
-def stackup_block(copper_oz, thickness):
+def stackup_block(copper_oz, thickness, finish="None"):
     """KiCad (stackup ...) text: copper per layer from oz (1 oz = 35 um), FR-4 dielectrics sharing the rest of
     the thickness (prepreg 0.2 mm next to each outer layer; ESTIMATE until the fab's stack-up is chosen)."""
     names = ["F.Cu"] + [f"In{i}.Cu" for i in range(1, len(copper_oz) - 1)] + ["B.Cu"]
@@ -425,14 +576,14 @@ def stackup_block(copper_oz, thickness):
                      '(epsilon_r 4.5) (loss_tangent 0.02))')
     L += ['\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (thickness 0.01))',
           '\t\t\t(layer "B.Paste" (type "Bottom Solder Paste"))', '\t\t\t(layer "B.SilkS" (type "Bottom Silk Screen"))',
-          '\t\t\t(copper_finish "None")', '\t\t\t(dielectric_constraints no)', '\t\t)']
+          f'\t\t\t(copper_finish "{finish}")', '\t\t\t(dielectric_constraints no)', '\t\t)']
     return "\n".join(L) + "\n"
 
 
-def write_stackup(board, copper_oz, thickness):
+def write_stackup(board, copper_oz, thickness, finish="None"):
     t = open(board).read()
     t = re.sub(r"\n\t\t\(stackup\n.*?\n\t\t\)\n", "\n", t, count=1, flags=re.S)
-    t = re.sub(r"(\n\t\(setup\n)", lambda m: m.group(1) + stackup_block(copper_oz, thickness), t, count=1)
+    t = re.sub(r"(\n\t\(setup\n)", lambda m: m.group(1) + stackup_block(copper_oz, thickness, finish), t, count=1)
     open(board, "w").write(t)
 
 
@@ -490,7 +641,7 @@ def setup(prj, board):
     out, err = _run(SETUP, spec)
     if "OK" not in out:
         raise SystemExit("pcbnew set-up failed: " + (err or out)[-600:])
-    write_stackup(board, oz, spec["thickness"])
+    write_stackup(board, oz, spec["thickness"], cfg.get("copper_finish", "None"))
     return spec
 
 
@@ -658,7 +809,7 @@ def main(prj, argv):
         print(json.dumps(rs, indent=1) if "--json" in argv else
               "\n".join(f"{i}  {txt}" for i, txt in rs) or f"no L-rules in {prj.paths['layout_spec']}")
         return 0 if rs else 1
-    if not argv or argv[0] not in ("sync", "setup", "place", "zones", "route", "review-new", "review-status"):
+    if not argv or argv[0] not in ("sync", "setup", "place", "zones", "route", "copper", "review-new", "review-status"):
         print(__doc__)
         return 1
     from . import check
@@ -668,11 +819,21 @@ def main(prj, argv):
         if not pcbs:
             raise SystemExit("no board file under 08_PCB")
         board = pcbs[0]
+    if argv[0] == "copper":
+        rep = copper(prj, board)
+        for k, v in rep["layers"].items():
+            print(f"  {k:7s} copper {v['copper_pct']:5.1f} %   GND {v['gnd_pct']:5.1f} % in {v['gnd_pieces']} piece(s)")
+        print(f"  GND vias: {rep['gnd_vias']}")
+        F = copper_findings(prj, rep)
+        for c, a_, f in F:
+            print(f"  WARN {c}: {a_} ({f})")
+        print("PASS (Rule 12 metrics)" if not F else f"{len(F)} finding(s)")
+        return 1 if F else 0
     if argv[0] in ("zones", "route"):
         if len(argv) < 2:
             raise SystemExit(f"forge pcb {argv[0]} <{argv[0]}.json>")
         rep = _data_cmd(prj, board, ZONES if argv[0] == "zones" else ROUTE, argv[0], argv[1])
-        what = f"{rep['zones']} pour(s)" if argv[0] == "zones" else f"{rep['tracks']} track segment(s), {rep['vias']} via(s)"
+        what = (f"{rep['zones']} pour(s)" + (f", {rep['stitch_vias']} stitching via(s)" if rep.get("stitch_vias") else "")) if argv[0] == "zones" else f"{rep['tracks']} track segment(s), {rep['vias']} via(s)"
         print(f"{what} written and zones filled" + (f"; nets not on the board: {', '.join(rep['missing_nets'])}" if rep["missing_nets"] else ""))
         print(f"  DRC: {len(rep['drc_errors'])} error(s), {rep['unconnected']} unconnected, parity {rep['parity']}")
         for e in rep["drc_errors"][:25]:

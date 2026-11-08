@@ -17,6 +17,9 @@ The owner (or a layout engineer) places and routes in KiCad; agents write the ru
    Guidelines" and "Layout Example" into the spec as numbered rules (datasheet revision, page, section), and the
    recommended land pattern and copper weight. Placement and routing follow them strictly; a deviation needs a
    reason and the owner's OK, written next to the rule.
+   **Rule 12 (EMI, heat, shielding):** the spec has rows for outer-layer GND fill, the solid reference plane,
+   stitching pitch, hot-loop and switch-node limits, sensitive routing and thermal copper; `forge pcb copper`
+   must pass before a routing review.
 2. Encode what can be encoded: net classes and custom rules in the `.kicad_dru` (the template has a starting
    set), board setup from the fab's capabilities (`kicad-happy:jlcpcb` / `pcbway`).
    Start the spec from `90_Templates/T_Layout_Spec.md`. Board set-up from project.toml `[pcb]` with

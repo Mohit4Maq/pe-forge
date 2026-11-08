@@ -150,7 +150,13 @@ def panel(prj):
         v = vcycle.build(prj)
     except Exception as e:      # the V view must never take the panel down
         v = {"error": f"{type(e).__name__}: {e}"}
+    from . import ui
+    try:
+        logo = ui.panel_logo(prj.cfg.get("ui", {}))
+    except Exception:
+        logo = []
     return {"ok": True, "vcycle": v, "project": prj.name, "root": prj.root, "profile": prj.process.get("profile", "full"),
+            "logo": logo, "accent": prj.cfg.get("ui", {}).get("accent", ""),
             "phase": pid, "scope": scope, "next": nxt, "phases": phases, "modules": modules,
             "results": results, "results_stamp": stamp,
             "check": full, "check_stamp": (full or {}).get("at", ""),

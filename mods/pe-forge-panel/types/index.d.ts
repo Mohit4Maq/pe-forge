@@ -73,6 +73,8 @@ export type PanelData = {
   vcycle?: VCycle
   error?: string
   project?: string
+  /** The "maq" mark as block-art rows (forge ui.MAQ_LOGO); empty when [ui] logo = false */
+  logo?: string[]
   root?: string
   phase?: string
   scope?: string

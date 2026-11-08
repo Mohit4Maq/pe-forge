@@ -186,14 +186,31 @@ export const register: Register = on => {
     const tabs: [Tab, string, string][] = [['vcycle', '1', 'V-cycle'], ['sims', '2', `Simulations (${(d.results ?? []).length})`],
       ['checks', '3', 'Checks'], ['gates', '4', 'Gates'], ['parts', '5', 'Parts']]
 
+    const logo = d.logo ?? []
+    const brand = logo.length ? (
+      <Box flexDirection="row" columnGap={3}>
+        <Box flexDirection="column">
+          {logo.map((row, i) => <Text key={`lg${i}`} color={ACCENT} bold>{row}</Text>)}
+        </Box>
+        <Box flexDirection="column" justifyContent="center">
+          <Text bold wrap="truncate-end">{d.project}</Text>
+          <Text dimColor wrap="truncate-end">pe-forge · power electronics</Text>
+          <Text> </Text>
+          <Text><Text color={ACCENT} bold>{d.phase}</Text><Text dimColor>  {d.scope && d.scope !== 'system' ? d.scope : 'system'}</Text></Text>
+        </Box>
+      </Box>
+    ) : (
+      <Box flexDirection="row" gap={1}>
+        <Text color={ACCENT} bold italic>maq</Text>
+        <Text color={ACCENT}>▸</Text>
+        <Text bold wrap="truncate-end">{d.project}</Text>
+      </Box>
+    )
     const header = (
       <Box flexDirection="column">
-        <Box flexDirection="row" gap={1}>
-          <Text color={ACCENT} bold italic>maq</Text>
-          <Text color={ACCENT}>▸</Text>
-          <Text bold wrap="truncate-end">{d.project}</Text>
-        </Box>
-        <Text wrap="wrap"><Text color={ACCENT} bold>{d.phase}</Text><Text dimColor>   next  </Text>{d.next}</Text>
+        {brand}
+        <Text> </Text>
+        <Text wrap="wrap"><Text dimColor>next  </Text>{d.next}</Text>
         <Text dimColor>{RULE}</Text>
         <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
           {tabs.map(([id, key, label]) => (

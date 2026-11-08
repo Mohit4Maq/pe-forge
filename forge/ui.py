@@ -33,6 +33,15 @@ LOGO = [   # the MaqLabs wordmark ("maq Labs"), traced from the logo artwork int
     "                        ▐█▛",
 ]
 ASCII_LOGO = ["maq Labs"]
+# the "maq" mark alone, cut from the wordmark (first 28 columns, the 6 rows that carry ink incl. the q descender):
+# the results panel draws it big in its header
+MAQ_LOGO = [r[:28].rstrip() for r in LOGO[1:7]]
+
+
+def panel_logo(cfg=None):
+    """Rows for the panel's header logo, [] when [ui] logo = false or glyphs = ascii (then the panel shows 'maq')."""
+    th = Theme(cfg)
+    return [] if (not th.logo or th.ascii) else MAQ_LOGO
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 

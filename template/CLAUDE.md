@@ -135,6 +135,9 @@ Clean DRC is the floor, not the goal (owner, 2026-11-08). On every board:
   short, wide and no bigger than needed; no switch-node copper on quiet layers (SMD test pads on SW).
 - **Sensitive routing:** feedback, sense and gate-drive returns over solid plane, away from the switch node and
   inductor; Kelvin sense joined only by its own trace.
+- **Thermal relief:** every pad (through-hole and SMD) joins a pour or plane through thermal-relief spokes so it
+  can be soldered and reworked; spokes sized for the pad's current. A solid joint only where the datasheet asks
+  (an exposed thermal pad, a high-current pad), set per part in placement.json and cited.
 - **Heat:** hot parts get copper area and via arrays to inner and bottom planes; 2 oz outer copper where the
   datasheet asks.
 - `forge pcb copper` measures coverage, plane continuity and stitching density (check `pcb_copper`); the

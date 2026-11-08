@@ -14,7 +14,8 @@
   forge pcb place <placement.json> [--dry-run]
       Place parts from a table {"REF": [x_mm, y_mm, rot_deg] or [x, y, rot, {"ref": [dx, dy(, angle)],
       "no_zone_pads": true}], ...}, x / y relative to the board origin ("ref" moves the reference text,
-      "no_zone_pads" keeps pours off the part's pads, e.g. Kelvin test points), then report
+      "no_zone_pads" keeps pours off the part's pads, e.g. Kelvin test points; "solid_pads": ["9"] or true joins
+      those pads solidly where the datasheet asks, e.g. an exposed thermal pad), then report
       courtyard overlaps from KiCad's DRC. Keep the table with the project (08_PCB/<board>/placement.json) and
       note the datasheet rule behind each critical position (project Rule 11) in the layout spec.
 
@@ -37,7 +38,8 @@ project.toml
   forge pcb zones <zones.json>
       Copper pours as data: [{"name", "layer" (F.Cu / In1.Cu / ...), "net", "rect": [x1, y1, x2, y2] or "pts":
       [[x, y], ...], "priority": n}], mm from the board origin. Pours named forge:<name> are replaced on a re-run;
-      pours drawn by hand are kept. All zones are filled afterwards. The file may instead be {"zones": [...],
+      pours drawn by hand are kept. Pads join through thermal relief (Rule 12) unless the zone says
+      "pads": "solid" | "smd_solid" | "none" ("relief_gap", "spoke_width" in mm). All zones are filled afterwards. The file may instead be {"zones": [...],
       "stitch": {"net": "GND", "pitch": 4.0, "d": 0.6, "drill": 0.3, "avoid": [[x1, y1, x2, y2], ...]}}: after the
       fill, vias of that net on a grid wherever the net's copper covers the via on every copper layer (clear of
       other nets, pads and vias; avoid boxes for hot loops), in group forge_stitch, replaced on a re-run.
@@ -46,7 +48,7 @@ project.toml
       [x, y], "d": 0.6, "drill": 0.3}]}. They go in the board group "forge_route", which a re-run replaces; hand
       routing outside the group is never touched. Zones are re-filled and DRC reports unconnected items.
   forge pcb copper
-      Rule 12 metrics: copper coverage per layer, GND reference plane coverage and pieces, GND via count, against
+      Rule 12 metrics (percentages of the board area outside copper keep-outs): copper coverage per layer, GND reference plane coverage and pieces, GND via count, against
       project.toml [pcb] outer_copper_min_pct (60), ref_plane (In1.Cu), ref_plane_min_pct (85),
       stitch_pitch_max_mm (5). Also forge check sub-check pcb_copper.
   forge pcb rules [--json]
@@ -338,6 +340,11 @@ for ref, entry in s["place"].items():
     if opt.get("no_zone_pads"):          # e.g. a Kelvin test point: joined only by its own trace, not by pours
         for p in f.Pads():
             p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_NONE)
+    sp = opt.get("solid_pads")           # datasheet asks for a solid joint (e.g. an exposed thermal pad): pad numbers or true
+    if sp:
+        for p in f.Pads():
+            if sp is True or p.GetNumber() in [str(x) for x in sp]:
+                p.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_FULL)
 if not s["dry"]:
     b.Save(s["board"])
 print("REPORT" + json.dumps({"placed": done, "missing": missing,
@@ -376,8 +383,12 @@ for d in zl:
     for x, y in pts:
         ol.Append(mm(X0 + x), mm(Y0 + y))
     z.SetMinThickness(mm(d.get("min_width", 0.25)))
-    if d.get("solid"):
-        z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+    # Rule 12: pads join pours through thermal relief (solderable); "solid" only for a datasheet reason
+    conn = d.get("pads", "solid" if d.get("solid") else "thermal")
+    z.SetPadConnection({"thermal": pcbnew.ZONE_CONNECTION_THERMAL, "solid": pcbnew.ZONE_CONNECTION_FULL,
+                        "smd_solid": pcbnew.ZONE_CONNECTION_THT_THERMAL, "none": pcbnew.ZONE_CONNECTION_NONE}[conn])
+    z.SetThermalReliefGap(mm(d.get("relief_gap", 0.3)))
+    z.SetThermalReliefSpokeWidth(mm(d.get("spoke_width", 0.5)))
     b.Add(z)
 b.BuildConnectivity(); pcbnew.ZONE_FILLER(b).Fill(b.Zones())   # fresh connectivity, or the fill keeps stale knock-outs
 n_st = 0
@@ -452,9 +463,28 @@ for v in s["route"].get("vias", []):
         missing.append(v["net"]); continue
     via = pcbnew.PCB_VIA(b); via.SetPosition(P(v["at"])); via.SetWidth(mm(v.get("d", 0.6))); via.SetDrill(mm(v.get("drill", 0.3)))
     via.SetNet(ni); b.Add(via); g.AddItem(via); n_v += 1
+# stitching vias (forge pcb zones) that a new track touches would join that track's net: remove them;
+# a later `forge pcb zones` re-stitches around the routing
+import math
+dropped = 0
+new_tracks = [it for it in g.GetItems() if it.GetClass() == "PCB_TRACK"]
+for sg in [x for x in b.Groups() if x.GetName() == "forge_stitch"]:
+    for v in list(sg.GetItems()):
+        if v.GetClass() != "PCB_VIA":
+            continue
+        c = v.GetPosition()
+        for tr in new_tracks:
+            a_, e_ = tr.GetStart(), tr.GetEnd()
+            dx, dy = e_.x - a_.x, e_.y - a_.y
+            L2 = dx * dx + dy * dy
+            u = 0 if L2 == 0 else max(0, min(1, ((c.x - a_.x) * dx + (c.y - a_.y) * dy) / L2))
+            d = math.hypot(c.x - (a_.x + u * dx), c.y - (a_.y + u * dy))
+            if d < v.GetWidth(pcbnew.F_Cu) / 2 + tr.GetWidth() / 2 + mm(0.3):
+                KEEP.append(v); b.Remove(v); dropped += 1
+                break
 b.BuildConnectivity(); pcbnew.ZONE_FILLER(b).Fill(b.Zones())   # fresh connectivity, or the fill keeps stale knock-outs
 b.Save(s["board"])
-print("REPORT" + json.dumps({"tracks": n_t, "vias": n_v, "missing_nets": sorted(set(missing))}))
+print("REPORT" + json.dumps({"tracks": n_t, "vias": n_v, "missing_nets": sorted(set(missing)), "stitch_dropped": dropped}))
 '''
 
 
@@ -479,10 +509,37 @@ for lay in pcbnew.LSET.AllCuMask().CuStack():
         allc += a_
         if gnd and z.GetNetCode() == gnd.GetNetCode():
             g += a_; pieces += fp.OutlineCount()
-    out["layers"][b.GetLayerName(lay)] = {"copper_pct": round(100 * allc / area, 1), "gnd_pct": round(100 * g / area, 1),
-                                          "gnd_pieces": pieces}
+    ko = pcbnew.SHAPE_POLY_SET()                   # copper keep-outs (rule areas) do not count against coverage
+    for z in b.Zones():
+        if z.GetIsRuleArea() and z.GetDoNotAllowZoneFills() and z.IsOnLayer(lay):
+            ko.Append(z.Outline())
+    ko.Simplify()
+    usable = max(area - mm2(ko.Area()), 1e-9)
+    out["layers"][b.GetLayerName(lay)] = {"copper_pct": round(100 * allc / usable, 1), "gnd_pct": round(100 * g / usable, 1),
+                                          "gnd_pieces": pieces, "keepout_mm2": round(mm2(ko.Area()), 1)}
 vias = [v for v in b.GetTracks() if v.GetClass() == "PCB_VIA" and gnd and v.GetNetCode() == gnd.GetNetCode()]
 out["gnd_vias"] = len(vias)
+CU = [l for l in pcbnew.LSET.AllCuMask().CuStack() if b.IsLayerEnabled(l)]
+solid = []                                         # pads joined solidly to a pour (no thermal relief)
+INH = pcbnew.ZONE_CONNECTION_INHERITED
+for f in b.GetFootprints():
+    for p in f.Pads():
+        if p.GetNetCode() <= 0:
+            continue
+        th = p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH
+        for z in b.Zones():
+            if z.GetIsRuleArea() or z.GetNetCode() != p.GetNetCode() or not any(z.IsOnLayer(l) and p.IsOnLayer(l) for l in CU):
+                continue
+            c = p.GetLocalZoneConnection()
+            if c == INH:
+                c = f.GetLocalZoneConnection()
+            if c == INH:
+                c = z.GetPadConnection()
+            if c == pcbnew.ZONE_CONNECTION_FULL or (c == pcbnew.ZONE_CONNECTION_THT_THERMAL and not th):
+                solid.append({"pad": f"{f.GetReference()}.{p.GetNumber()}", "th": th, "zone": z.GetZoneName(),
+                              "local": p.GetLocalZoneConnection() == pcbnew.ZONE_CONNECTION_FULL})
+                break
+out["solid_pads"] = solid
 print("REPORT" + json.dumps(out))
 '''
 
@@ -517,6 +574,12 @@ def copper_findings(prj, rep):
         if pl["gnd_pieces"] > 1:
             F.append((f"{plane} reference plane is one piece", f"{pl['gnd_pieces']} pieces",
                       "Join the islands: no slots or splits in the reference plane"))
+    for sp in rep.get("solid_pads", []):
+        if sp["local"]:
+            continue                                   # set per part in placement.json (datasheet reason)
+        F.append((f"{sp['pad']} joins {sp['zone']} through thermal relief (Rule 12: solderable"
+                  + (", through-hole" if sp["th"] else "") + ")", "solid connection",
+                  'Zone "pads": "thermal" (default); a datasheet-required solid joint goes in placement.json solid_pads'))
     need = int(rep["board_mm2"] / (pitch * pitch) * 0.5)
     if rep["gnd_vias"] < need:
         F.append((f"GND stitching about one via per {pitch:g} x {pitch:g} mm", f"{rep['gnd_vias']} GND vias (want >= {need})",
@@ -834,6 +897,8 @@ def main(prj, argv):
             raise SystemExit(f"forge pcb {argv[0]} <{argv[0]}.json>")
         rep = _data_cmd(prj, board, ZONES if argv[0] == "zones" else ROUTE, argv[0], argv[1])
         what = (f"{rep['zones']} pour(s)" + (f", {rep['stitch_vias']} stitching via(s)" if rep.get("stitch_vias") else "")) if argv[0] == "zones" else f"{rep['tracks']} track segment(s), {rep['vias']} via(s)"
+        if rep.get("stitch_dropped"):
+            print(f"  {rep['stitch_dropped']} stitching via(s) under the new tracks removed: run forge pcb zones again to re-stitch")
         print(f"{what} written and zones filled" + (f"; nets not on the board: {', '.join(rep['missing_nets'])}" if rep["missing_nets"] else ""))
         print(f"  DRC: {len(rep['drc_errors'])} error(s), {rep['unconnected']} unconnected, parity {rep['parity']}")
         for e in rep["drc_errors"][:25]:

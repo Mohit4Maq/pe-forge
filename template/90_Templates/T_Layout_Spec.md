@@ -26,6 +26,7 @@ feeds: [08_PCB/<board>/<board>.kicad_pcb, 08_PCB/<board>/<board>.kicad_dru, 08_P
 | L-08 | Outer-layer GND fill | every unused area of top and bottom poured with GND (`forge pcb copper` coverage ≥ <x> %) | <datasheet thermal / layout section> |
 | L-09 | Reference plane | L2 solid GND, one piece, ≥ <x> % of the board, no slots under fast nets | <datasheet> |
 | L-10 | Stitching | GND via grid ≤ <pitch> mm; vias at every cap ground; edge row | Rule 12 |
+| L-11b | Thermal relief | all pads join pours via thermal relief (gap <x> mm, spokes <x> mm); solid only: <part.pad, datasheet ref> | Rule 12 |
 | L-11 | Switch node / hot loop | <max area>; no SW copper on quiet layers | <datasheet layout guidelines> |
 
 ## 3. Critical-part layout rules (project Rule 11: the datasheet, strictly)

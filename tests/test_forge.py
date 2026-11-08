@@ -1982,6 +1982,12 @@ class PcbSync(unittest.TestCase):
         rep["layers"]["In1.Cu"]["gnd_pieces"] = 2
         claims = " | ".join(c for c, _, _ in pcb.copper_findings(P, rep))
         self.assertEqual(claims, "In1.Cu reference plane is one piece")   # a split reference plane is flagged
+        rep["layers"]["In1.Cu"]["gnd_pieces"] = 1
+        rep["solid_pads"] = [{"pad": "J1.2", "th": True, "zone": "forge:fill", "local": False},
+                             {"pad": "U1.9", "th": False, "zone": "forge:fill", "local": True}]
+        claims = " | ".join(c for c, _, _ in pcb.copper_findings(P, rep))
+        self.assertIn("J1.2 joins forge:fill through thermal relief", claims)   # solid TH pad without a reason
+        self.assertNotIn("U1.9", claims)                                        # datasheet solid pad (placement.json)
 
     def test_stackup_block_thickness(self):
         sys.path.insert(0, REPO)
@@ -2027,6 +2033,9 @@ class PcbSync(unittest.TestCase):
         r = forge("pcb", "zones", zones, cwd=d, check=False)
         self.assertRegex(r.stdout, r"\d+ stitching via")            # stitched where GND covers every layer
         self.assertNotIn("clearance", r.stdout)                    # no stitching via breaks a clearance
+        board_t = open(os.path.join(d, "08_PCB", "t", "t.kicad_pcb")).read() if os.path.exists(os.path.join(d, "08_PCB", "t", "t.kicad_pcb")) else None
+        r = forge("pcb", "copper", cwd=d, check=False)
+        self.assertNotIn("joins forge:gnd", r.stdout)             # pours default to thermal relief (Rule 12)
         table = os.path.join(d, "placement.json")
         json.dump({"U1": [20, 15, 0], "R1": [20, 15, 0]}, open(table, "w"))   # R1 on top of U1
         r = forge("pcb", "place", table, cwd=d, check=False)

@@ -2320,5 +2320,30 @@ class Learn(unittest.TestCase):
         self.assertFalse(json.load(open(os.path.join(self.cfg, "config.json")))["learn"])
 
 
+class VaultOpen(unittest.TestCase):
+    def test_opens_its_own_vault_by_id_never_an_enclosing_one(self):
+        sys.path.insert(0, REPO)
+        from forge import vault
+        home = tempfile.mkdtemp(prefix="home-")
+        prj = os.path.join(home, "work", "Buck")
+        os.makedirs(prj)
+        reg = os.path.join(tempfile.mkdtemp(), "obsidian.json")
+        json.dump({"vaults": {"aaaa": {"path": home, "open": True}, "bbbb": {"path": prj}}}, open(reg, "w"))
+        old = os.environ.get("PE_FORGE_OBSIDIAN_REGISTRY")
+        os.environ["PE_FORGE_OBSIDIAN_REGISTRY"] = reg
+        try:
+            self.assertEqual(vault.vault_id(prj), "bbbb")
+            self.assertEqual(vault.enclosing_vaults(prj), [os.path.realpath(home)])
+            url = vault.open_url(prj, "04_Hardware/Layout/Layout_Spec.md")
+            self.assertTrue(url.startswith("obsidian://open?vault=bbbb&file=04_Hardware"))
+            self.assertNotIn("path=", url)                    # by path Obsidian would pick the home-folder vault
+            self.assertIsNone(vault.open_url(os.path.join(home, "other")))
+        finally:
+            if old is None:
+                del os.environ["PE_FORGE_OBSIDIAN_REGISTRY"]
+            else:
+                os.environ["PE_FORGE_OBSIDIAN_REGISTRY"] = old
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

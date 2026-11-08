@@ -126,7 +126,7 @@ first. Session start and each finished turn also print one short `pe-forge ▸` 
   Code (or open `/statusline`) to see it.
 - Options in `project.toml [ui]`: `mark = "<text>"` (the bar's marker; `""` removes it), `logo = false`,
   `accent = "#RRGGBB"`, `color = false`, `glyphs = "ascii"`,
-  `statusline_lines = 2` (adds a `Next:` line). `NO_COLOR` is honoured.
+  `statusline_lines = 2` (adds a `Next:` line), `meter = false` (hides the token-budget segment). `NO_COLOR` is honoured.
 - A custom status line hides Claude Code's footer key hints (`esc to interrupt`, `? for shortcuts`), and a folder
   you have not trusted shows it blank. Layout spec: `docs/ui-layout.md`.
 

@@ -105,7 +105,7 @@ def segments(root, data, T, cfg):
         at = (ck.get("at") or "")[11:16]
         S.append((8, T.paint("ok", f"check {T.g('ok')} {at}") if ck.get("ok") else
                   T.paint("err", f"check {T.g('fail')} {', '.join(ck.get('failed', [])[:3]) or 'strict'}")))
-    mt = _json(os.path.join(tools, "cache", "meter.json"))
+    mt = _json(os.path.join(tools, "cache", "meter.json")) if cfg.get("meter", True) else None   # [ui] meter = false hides it
     if mt and mt.get("status"):
         lvl = mt["status"]
         S.append((9, T.paint({"GREEN": "ok", "AMBER": "warn"}.get(lvl, "err"), f"meter {lvl}")))

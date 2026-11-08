@@ -168,6 +168,15 @@ written down.
 5. **Your manual edits are design intent**: they are detected each turn, propagated and never reverted.
 6. Schematic discipline (above). 7. One master plan. 8. Big decisions go to the council. 9. V-model traceability
    and standards checks for every requirement. 10. Never without you: spending, orders, messages, git push.
+11. **The datasheet is final** for critical parts: layout guidelines, land pattern, example layout, values.
+12. **Best EMI, heat and shielding**: outer layers filled with GND, a one-piece reference plane, stitching, minimal
+    hot loop and switch node, thermal relief on every pad (solid only where the datasheet asks).
+13. **Edge connectors** sit on the outline from the maker's drawing, open outward, with the mated plug or wire
+    envelope and tool access clear.
+14. **Orthogonal signal layers**: adjacent signal layers run horizontal / vertical; no broadside parallel runs.
+15. **The High-Power PCB Rule Book** (`docs/High_Power_PCB_Rule_Book.md`, about 130 rules: stack-up, power loop,
+    gate drive, switch node, grounding, sensing, EMI filter, thermal, thermal crosstalk, high current, creepage)
+    applies by default at 50 V or 5 A and above.
 
 `forge drift` holds the documents to the drawing: every BoM line, brief and booklet parts row and brief netlist
 is compared with the schematic KiCad exports, and each disagreement is reported as `{doc, claim, actual}` (for
@@ -195,6 +204,31 @@ cover the maximum operating voltage, and its clamp voltage at the design surge c
 margin of every protected pin's absolute maximum. The values come from the parts DB (`Clamp_V`, `Abs_Max_V`,
 copied from the datasheets) and project.toml `[protection]`. When no standard TVS can meet both limits, it says
 so. Gate G6 refuses a failing schematic.
+
+### PCB layout as data, reviewed against the rules
+
+The board is built from project data, so every step can be re-run and reviewed:
+`forge pcb sync` (Update PCB from Schematic, headless), `forge pcb setup` (outline, stack-up with copper weights and
+finish, holes with copper keep-outs, fiducials, marking and fab notes from `project.toml [pcb]`), `forge pcb place
+placement.json` (positions, label offsets, edge-connector declarations, solid pads with a datasheet reason),
+`forge pcb zones zones.json` (pours with thermal relief by default, plus GND stitching) and `forge pcb route
+routes.json`. Each step runs DRC with schematic parity.
+
+The rules are measured, not just written down:
+- `forge pcb copper`: copper coverage per layer, one-piece reference plane, stitching, pads joined solidly
+  without a reason (Rule 12).
+- `forge pcb connectors`: each edge connector's mating face on the outline, from the datasheet's pin-to-face
+  distance (Rule 13).
+- `forge pcb crosstalk`: signal direction per layer, adjacent layers orthogonal, broadside overlaps (Rule 14).
+- `forge hp`: the rule book. A `[hp]` profile decides which rules apply. The tool measures switch-node area,
+  layers and edge distance, signal copper over the switch node, exposed-pad via arrays, the via-in-pad fab note,
+  stack-up symmetry, HF-cap distance, copper under CM chokes, the overshoot budget and the safety basis. A rule
+  that does not fit is waived in `[hp.waive]` with the reason; a Must waiver needs your recorded OK.
+
+`forge pcb review-new <milestone>` writes the independent review form: one row per layout-spec rule, per project
+rule (R-11 to R-15) and per applicable rule-book rule, with the tool results filled in, and the board's content
+hash. The `pcb-reviewer` agent grades every row. Gates G7 / G8 pass only when the review says READY for this exact
+board and the Rule 12–15 checks pass themselves.
 
 `forge check --fab --strict` answers "can I order this board today?": routing complete, schematic and board
 match, every placed part released with an alternate, the outputs still match the design by content hash, every
@@ -235,7 +269,8 @@ forge module add NAME [--depends M-01]     forge gate check|pass G<n> [--module 
 forge vmodel build|check|impact|diff|cr|sync   forge link [--apply]   forge consistency
 forge schdraw check|apply|pins|new         forge bom check   forge doctor   forge kicad-setup [--apply]
 forge check [--json] [--strict] [--fab] [--only erc,drc,...]   forge hooks install [--chain] | --uninstall
-forge insulation [--rules] [--json]   forge pcb sync [--prune] [--dry-run]
+forge insulation [--rules] [--json]   forge protection [--json]   forge hp [--all|--json|rules]
+forge pcb sync|setup|place|zones|route|rules|copper|connectors|crosstalk|review-new|review-status
 forge drift [--module M-xx]   forge explain U1 | NET | U1.7 | --pins MC_ID   forge txn begin|verify|commit|rollback
 forge cr new|validate|approve|close   forge ledger show|clear   forge fab manifest
 ```
@@ -248,7 +283,8 @@ that installs KiCad 10 and uploads the JSON report.
 
 ## Status and limits
 
-v0.2. The process, engine, drawing engine and library are in daily use on a real 11 kW product. ERC / DRC are read
+v0.3. The process, engine, drawing engine and library are in daily use on a real 11 kW product; the PCB layout
+chain and rules 11–15 were proven on a 4-layer 48 V → 12 V pilot board. ERC / DRC are read
 from KiCad's JSON reports through one layer (`forge/kicad.py`; set `KICAD_CLI` if KiCad is not in a standard place).
 Known limits:
 - pwrlab covers buck, DAB, H-bridge, T-type / NPC and totem-pole PFC; other topologies are hand-built netlists

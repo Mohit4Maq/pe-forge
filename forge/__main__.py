@@ -29,6 +29,7 @@
   forge drift [--json] [--module M-xx]  BoM / brief / booklet against the drawn schematic {doc, claim, actual}
   forge pcb sync [--prune] [--dry-run]   update the board from the schematic headless (KiCad's F8)
   forge protection [--json]             surge clamps vs the system and every protected pin's abs max
+  forge hp [--all|--json|rules]         High-Power PCB Rule Book: applicable rules, auto-checked or for review
   forge insulation [--rules] [--json]   insulation from the netlist (INS-1/2/3, NET-4); --rules proves the
                                     .kicad_dru enforces [[insulation.rule]] (CLS-2)
   forge txn begin "<what>" [--allow-dirty] | status | verify | commit [-m MSG] | close | rollback [--reason T]
@@ -140,6 +141,9 @@ def main(argv):
     if cmd == "pcb":
         from forge import pcb
         return pcb.main(prj, rest)
+    if cmd == "hp":
+        from forge import hp
+        return hp.main(prj, rest)
     if cmd == "protection":
         from forge import protection
         return protection.main(prj, rest)

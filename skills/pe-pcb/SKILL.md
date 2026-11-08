@@ -24,6 +24,8 @@ The owner (or a layout engineer) places and routes in KiCad; agents write the ru
    envelope; declare it in placement.json; `forge pcb connectors` must pass.
    **Rule 14 (orthogonal signal layers):** declare `[pcb] layer_direction` before routing; `forge pcb crosstalk`
    must pass. Every review grades R-11..R-14; gates G7 / G8 run the Rule 12–14 checks themselves.
+   **Rule 15 (high-power rule book):** before placement set `[hp]` (profile) and fill the layout spec's
+   before-placement checklist (T_Layout_Spec 2a); `forge hp` before every review; waivers only in `[hp.waive]`.
 2. Encode what can be encoded: net classes and custom rules in the `.kicad_dru` (the template has a starting
    set), board setup from the fab's capabilities (`kicad-happy:jlcpcb` / `pcbway`).
    Start the spec from `90_Templates/T_Layout_Spec.md`. Board set-up from project.toml `[pcb]` with

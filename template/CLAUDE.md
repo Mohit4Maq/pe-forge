@@ -172,6 +172,25 @@ Owner, 2026-11-08: a standard for every board.
 - `forge pcb crosstalk` (check `pcb_crosstalk`) enforces it; the independent PCB review grades R-11..R-14 on every
   review, and gates G7 / G8 fail while any of Rules 12–14 fails.
 
+## Rule 15: the High-Power PCB Rule Book applies by default
+Owner, 2026-11-08. `docs/High_Power_PCB_Rule_Book.md` (in pe-forge) holds ~130 numbered rules (STK, PL, GD, SW, GND,
+SNS, FLT, TH, TX, HC, HV) graded Must / Should / Prefer. On every board at >= 50 V or >= 5 A:
+- **Profile first:** set `project.toml [hp]` before placement (discrete switches, gate driver, isolation, shunts,
+  paralleled devices, filter, heatsink, strips, WBG). It decides which rules apply; the rest are N/A with the reason.
+- **Before-placement checklist** (book section 14) goes into the layout spec: safety basis (HV-01), stack-up with
+  dielectric and hipot (STK-01/02/09), loop inductance budget and overshoot (PL-06, `[hp.budget]`), named ground
+  domains and star point (GND-01/02), heatsink connection (SW-06), thermal budget per hot part (TH-01), hot / warm /
+  cool zones (TX-01), conductor choice above 30 A.
+- **Enforced:** `forge hp` measures what it can (switch-node area, layers and edge distance, signal over SW copper,
+  exposed-pad via arrays, via-in-pad fab note, stack-up symmetry, HF-cap distance, copper under CM chokes, overshoot
+  budget, safety basis); every other applicable rule is a row on the PCB review form that the reviewer must grade.
+  A Must that fails blocks gates G7 / G8.
+- **Flexible, on record:** a rule that does not fit the board is waived in `[hp.waive]` with the reason. A Should
+  waiver needs the reason; a Must waiver also needs the owner's recorded OK. Priority when rules conflict: safety
+  spacing (HV) > power loop (PL) > gate loop (GD) > CM capacitance (SW) > thermal (TH/TX) > routing convenience.
+- **First article:** the bring-up checklist (loop inductance from ringing, overshoot, LISN, thermal map, mΩ drop,
+  hipot / PD) goes into the validation plan.
+
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |
 |---|---|

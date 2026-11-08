@@ -20,6 +20,18 @@ feeds: [08_PCB/<board>/<board>.kicad_pcb, 08_PCB/<board>/<board>.kicad_dru, 08_P
 | L-05 | <net class> to <net class> | <clearance / creepage mm> | <standard clause, pollution degree, material group> |
 | L-06 | Power tracks | <width or pour> | <current, ΔT, IPC-2221B / 2152> |
 
+## 2a. High-power profile and before-placement checklist (project Rule 15; rule book section 14)
+| # | Item | Value | Rule |
+|---|---|---|---|
+| L-HP1 | Safety basis: product standard, PD, OVC, altitude, insulation types, laminate CTI | <...> (also project.toml [insulation]) | HV-01 |
+| L-HP2 | Stack-up: dielectric per layer pair, copper weights, laminate, hipot | <...> | STK-01/02/09 |
+| L-HP3 | Loop inductance budget and overshoot per switching cell | V_bus + L·di/dt ≤ 0.8 V(BR): <...> ([hp.budget]) | PL-06 |
+| L-HP4 | Ground domains and star point | <PGND / SGND / driver refs / PE; star at ...> | GND-01/02 |
+| L-HP5 | Heatsink connection | <PE / DC− / none> | SW-06 |
+| L-HP6 | Thermal budget per hot part (allowed PCB °C/W) | <...> | TH-01 |
+| L-HP7 | Hot / warm / cool zones on the placement plan | <...> | TX-01 |
+| L-HP8 | Conductor per path > 30 A | <layers / heavy Cu / strips / busbar> | HC table |
+
 ## 2b. EMI, heat and shielding (project Rule 12)
 | # | Rule | Value | Source |
 |---|---|---|---|

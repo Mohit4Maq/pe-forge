@@ -64,6 +64,11 @@ INSULATION_EXAMPLE = """# Insulation checks (forge insulation; forge check runs 
 # b = "!HV"
 # clearance_mm = 2.5
 # creepage_mm = 4.0
+# [hp]                                  # High-Power PCB Rule Book (forge hp): on by default at >= 50 V or >= 5 A
+# discrete_switches = false             # profile flags decide which rules apply: gate_driver, isolation, shunts,
+# gate_driver = false                   # paralleled, emi_filter, heatsink, strips, wbg, multiphase, chassis
+# sw_edge_mm = 10                       # SW-05; hf_loops, cm_chokes, hot_parts / precision, [hp.budget] for PL-06
+# [hp.waive]                            # a rule that does not fit: "ID" = "reason"; a Must needs "(owner OK, date)"
 """
 
 

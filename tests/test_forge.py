@@ -2029,7 +2029,47 @@ class PcbSync(unittest.TestCase):
     def test_review_form_has_project_rules(self):
         sys.path.insert(0, REPO)
         from forge import pcb
-        self.assertEqual([i for i, _ in pcb.PROJECT_RULES], ["R-11", "R-12", "R-13", "R-14"])
+        self.assertEqual([i for i, _ in pcb.PROJECT_RULES], ["R-11", "R-12", "R-13", "R-14", "R-15"])
+
+    def test_hp_rulebook_catalogue_and_profile(self):
+        sys.path.insert(0, REPO)
+        from forge import hp
+        cat = hp.catalogue()
+        self.assertGreaterEqual(len(cat), 120)                       # parsed from the book, one source of truth
+        ids = {r["id"] for r in cat}
+        for i in ("STK-01", "PL-06", "GD-08", "SW-05", "GND-02", "SNS-01", "FLT-03", "TH-02", "TX-04", "HC-11", "HV-01"):
+            self.assertIn(i, ids)
+
+        class P:
+            cfg = {"specs": {"vin_V": [36, 63]}, "hp": {}}
+        prof = hp.profile(P)
+        self.assertTrue(prof["enabled"])                               # >= 50 V turns it on by default
+        rule = {r["id"]: r for r in cat}
+        self.assertFalse(hp.applies(rule["GD-01"], prof)[0])           # no gate driver on the board
+        self.assertTrue(hp.applies(rule["SW-05"], prof)[0])
+        P.cfg["hp"] = {"gate_driver": True}
+        self.assertTrue(hp.applies(rule["GD-01"], hp.profile(P))[0])
+        P.cfg = {"specs": {"vin_V": [10, 14], "iout_A": 2}, "hp": {}}
+        self.assertFalse(hp.profile(P)["enabled"])
+
+    def test_hp_auto_and_waivers(self):
+        sys.path.insert(0, REPO)
+        from forge import hp
+
+        class P:
+            cfg = {"specs": {"vin_V": 63}, "pcb": {"copper_oz": [2, 1, 1, 2], "copper_finish": "ENIG"},
+                   "hp": {"waive": {"SW-05": "50 mm board (owner OK 2026-11-08)", "SW-02": "TP4 is through-hole"}},
+                   "insulation": {}}
+        g = {"sw": {"F.Cu": 24.0, "B.Cu": 3.1}, "sw_edge_mm": 2.6, "sw_connector_mm": [("J2", 20.0)],
+             "sw_overlap": {"/FB@B.Cu": 3.0}, "exposed_pads": [{"pad": "U1.9", "area": 14.5, "vias": 12, "pitch": 1.1}],
+             "via_in_pad": 12, "notes": ["FAB: Cu 2/1/1/2 oz"], "cm_copper": {}, "pads": {}}
+        A = hp.auto(P, g, hp.profile(P))
+        self.assertFalse(A["SW-02"][0]); self.assertFalse(A["SW-05"][0]); self.assertFalse(A["GD-08"][0])
+        self.assertFalse(A["TH-03"][0])                                # vias in pads without the IPC-4761 note
+        self.assertTrue(A["TH-02"][0]); self.assertTrue(A["STK-05"][0]); self.assertFalse(A["HV-01"][0])
+        rows = {r["id"]: r for r in hp.evaluate(P, None, with_geometry=False)[1]}
+        self.assertEqual(rows["SW-05"]["status"], "WAIVED")             # Must waived with the owner's OK
+        self.assertEqual(rows["SW-02"]["status"], "WAIVER INVALID")     # Must waived without it
 
     def test_stackup_block_thickness(self):
         sys.path.insert(0, REPO)
@@ -2110,10 +2150,10 @@ class PcbSync(unittest.TestCase):
         self.assertIn("| L-01 |", t)
         self.assertIn("board_sha:", t)
         r = forge("pcb", "review-status", cwd=d, check=False)
-        self.assertIn("rules without a verdict: L-01, L-02, R-11, R-12, R-13, R-14", r.stdout)   # project rules enforced
+        self.assertIn("rules without a verdict: L-01, L-02, R-11, R-12, R-13, R-14, R-15", r.stdout)   # project rules enforced
         self.assertIn("| R-14 |", t)
         import re as _re
-        t = _re.sub(r"^\| (R-1[1-4]) \| ([^|]*) \| \| ([^|]*)\|$", r"| \1 | \2 | PASS | \3|", t, flags=_re.M)
+        t = _re.sub(r"^\| (R-1[1-5]) \| ([^|]*) \| \| ([^|]*)\|$", r"| \1 | \2 | PASS | \3|", t, flags=_re.M)
         t = t.replace("| L-01 | cap at VIN | | |", "| L-01 | cap at VIN | PASS | C4 1.0 mm from pin 3 |")
         t = t.replace("| L-02 | GND plane | | |", "| L-02 | GND plane | FAIL | L2 split under U1 |")
         open(form, "w").write(t.replace("verdict: OPEN", "verdict: READY"))

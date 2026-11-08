@@ -28,7 +28,12 @@ Every review is against the project's layout rules, one by one, and is recorded 
      top, swap-proofing.
    - R-14 orthogonal signal layers: `forge pcb crosstalk` (adjacent signal layers without a plane between run
      H / V, no broadside parallel runs, declared layer directions held); by eye on the layer renders.
-   Any FAIL on R-11..R-14 means the verdict cannot be READY.
+   - R-15 high-power rule book (docs/High_Power_PCB_Rule_Book.md): `forge hp` lists every applicable rule. The form
+     has one row per applicable rule with the tool's auto result; grade every row yourself (open the book for the
+     full rule text). Check the [hp] profile is honest (a gate driver, shunt or heatsink on the board with the flag
+     off is a Major finding). A Must may be DEVIATION-OK only with the owner's recorded OK in [hp.waive]; a Should
+     with a written reason. Use the book's priority when rules conflict (HV > PL > GD > SW > TH/TX > routing).
+   Any FAIL on R-11..R-15 (or an unwaived Must in the rule book) means the verdict cannot be READY.
 4. Then the general checks below, as ranked findings under "Other findings".
 5. Set `verdict:` in the form's header (READY / READY WITH FIXES / NOT READY) and add a QC register row
    (gate G7, the form's path). `forge pcb review-status` must then say PASS for the gate to pass; any later

@@ -1029,13 +1029,24 @@ def review_new(prj, board, milestone, by="pcb-reviewer"):
         path = os.path.join(d, f"PCB_{milestone}_{day}_{n}.md"); n += 1
     rows = "\n".join(f"| {i} | {txt[:90]} | | |" for i, txt in rs)
     tool = {}
-    for rid, fn in (("R-12", as_check_copper), ("R-13", as_check_connectors), ("R-14", as_check_xtalk)):
+    from . import hp as _hp
+    for rid, fn in (("R-12", as_check_copper), ("R-13", as_check_connectors), ("R-14", as_check_xtalk), ("R-15", _hp.as_check)):
         try:
             r = fn(prj, {})
             tool[rid] = f"tool: {r['status'].upper()} ({r.get('reason') or ''})"
         except SystemExit as e:
             tool[rid] = f"tool: did not run ({e})"
     prows = "\n".join(f"| {rid} | {txt} | | {tool.get(rid, '')} |" for rid, txt in PROJECT_RULES)
+    from . import hp
+    try:
+        hrows = hp.review_rows(prj, board) if hp.profile(prj)["enabled"] else []
+    except SystemExit as e:
+        hrows = []
+        tool["R-15"] = f"tool: did not run ({e})"
+    cell = lambda s: s.replace("|", "/")
+    hp_txt = "\n".join(f"| {r['id']} | ({r['strength']}) {cell(r['text'][:100])} | "
+                       + ("WAIVED" if r["status"] == "WAIVED" else "") + f" | {r['status'].lower()}: {cell(r['evidence'][:160])} |"
+                       for r in hrows) or "| — | high-power rules off for this board ([hp] enabled = false) | N/A | |"
     open(path, "w").write(f"""---
 type: pcb-review
 milestone: {milestone}
@@ -1062,6 +1073,13 @@ coordinates in mm, the image or report used. The board is never edited by the re
 |---|---|---|---|
 {prows}
 
+## High-power rule book (Rule 15; docs/High_Power_PCB_Rule_Book.md, applicable rules only)
+Verdict per rule: PASS, FAIL, DEVIATION-OK (a Should with the reason written here; a Must only with the owner's
+recorded OK, put in project.toml [hp.waive]) or N/A (why). "auto" results are tool evidence; open the board anyway.
+| Rule | Requirement | Verdict | Evidence |
+|---|---|---|---|
+{hp_txt}
+
 ## Other findings (ranked Critical / Major / Minor)
 
 ## Verdict
@@ -1075,6 +1093,7 @@ PROJECT_RULES = [
     ("R-12", "Best EMI / heat / shielding: outer GND fill, one-piece reference plane, stitching, minimal hot loop and SW node, thermal relief on pads (solid only by datasheet)"),
     ("R-13", "Edge connectors on the outline from the datasheet drawing; opening out; mating envelope and tool access clear; not swappable"),
     ("R-14", "Signal layers orthogonal: adjacent signal layers without a plane between run H / V; no broadside parallel runs"),
+    ("R-15", "High-power rule book applied: every applicable STK/PL/GD/SW/GND/SNS/FLT/TH/TX/HC/HV row below graded; Must rules pass or carry the owner's waiver"),
 ]
 
 
@@ -1099,13 +1118,17 @@ def review_status(prj, board):
     probs = []
     got = {}
     for line in t.splitlines():
-        m = re.match(r"^\|\s*([LR]-\d+[A-Za-z]?)\s*\|[^|]*\|\s*([^|]*?)\s*\|", line)
+        m = re.match(r"^\|\s*([LR]-\d+[A-Za-z]?|(?:STK|PL|GD|SW|GND|SNS|FLT|TH|TX|HC|HV)-\d+)\s*\|([^|]*)\|\s*([^|]*?)\s*\|", line)
         if m:
-            got[m.group(1)] = m.group(2).upper()
+            got[m.group(1)] = m.group(3).upper()
+            if re.match(r"(?:STK|PL|GD|SW|GND|SNS|FLT|TH|TX|HC|HV)-", m.group(1)):
+                rs.append(m.group(1))       # every high-power row in the form needs a verdict too
+    rs = list(dict.fromkeys(rs))
     missing = [i for i in rs if not got.get(i)]
     if missing:
         probs.append(f"rules without a verdict: {', '.join(missing)}")
-    bad = [i for i in rs if got.get(i) and not got[i].startswith(VERDICTS)]
+    rs = list(dict.fromkeys(rs))
+    bad = [i for i in rs if got.get(i) and not got[i].startswith(VERDICTS + ("WAIVED",))]
     if bad:
         probs.append(f"unknown verdicts on {', '.join(bad)} (use {', '.join(VERDICTS)})")
     failed = [i for i in rs if got.get(i, "").startswith("FAIL")]
@@ -1140,8 +1163,9 @@ def gate_items(prj):
     ok, probs, *where = review_status(prj, pcbs[0])
     res = [(ok, "independent PCB review against the layout rules and R-11..R-14" + (f" ({where[0]})" if where else "")
             + ("" if ok else ": " + "; ".join(probs)))]
+    from . import hp
     for name, fn in (("Rule 12 copper / thermal relief", as_check_copper), ("Rule 13 edge connectors", as_check_connectors),
-                     ("Rule 14 orthogonal signal layers", as_check_xtalk)):
+                     ("Rule 14 orthogonal signal layers", as_check_xtalk), ("Rule 15 high-power rule book", hp.as_check)):
         try:
             r = fn(prj, {})
         except SystemExit as e:

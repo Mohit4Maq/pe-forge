@@ -13,6 +13,7 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   sch_lib      library/tools/sch_check.py: parts against MC_Parts, nets, decoupling, text variables
   pcb_copper   Rule 12 metrics: outer-layer copper coverage, reference plane in one piece, GND stitching (warn)
   pcb_connectors  Rule 13: edge connectors on the outline, opening out, corridor clear, declared (fail)
+  bom_risk     supply-chain risk from the last forge bom build (no network): HIGH fails, MEDIUM warns
   pcb_hp       High-Power PCB Rule Book (forge hp): Must auto-fails fail, Should auto-fails warn
   pcb_crosstalk  Rule 14: adjacent signal layers orthogonal, no broadside parallel runs (fail)
   protection   PROT-1..4: surge clamps sized to the system (VRWM >= max operating V) and to every protected pin
@@ -48,7 +49,7 @@ import time
 from . import config, consistency, gates, kicad, vmodel
 
 ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "insulation", "dru_rules", "pcb_extra",
-       "pcb_review", "pcb_copper", "pcb_connectors", "pcb_crosstalk", "pcb_hp", "protection",
+       "pcb_review", "pcb_copper", "pcb_connectors", "pcb_crosstalk", "pcb_hp", "bom_risk", "protection",
        "legibility", "spice", "parts_evidence"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
@@ -280,6 +281,11 @@ def c_pcb_hp(prj, opts):
     return hp.as_check(prj, opts)
 
 
+def c_bom_risk(prj, opts):
+    from . import supply
+    return supply.as_check(prj, opts)
+
+
 def c_protection(prj, opts):
     from . import protection
     return protection.as_check(prj, opts)
@@ -305,7 +311,7 @@ def c_fab(prj, opts):
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
           "drift": c_drift, "sch_lib": c_sch_lib, "insulation": c_insulation, "dru_rules": c_dru_rules,
-          "pcb_review": c_pcb_review, "pcb_copper": c_pcb_copper, "pcb_connectors": c_pcb_connectors, "pcb_crosstalk": c_pcb_crosstalk, "pcb_hp": c_pcb_hp, "protection": c_protection, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
+          "pcb_review": c_pcb_review, "pcb_copper": c_pcb_copper, "pcb_connectors": c_pcb_connectors, "pcb_crosstalk": c_pcb_crosstalk, "pcb_hp": c_pcb_hp, "bom_risk": c_bom_risk, "protection": c_protection, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
           "fab": c_fab}
 
 

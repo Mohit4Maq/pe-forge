@@ -130,6 +130,8 @@ def check(prj, gate, mod=None):
             res.append((False, f"V-model check could not run: {e}"))
     if gate == "G4":
         res += bom_ok(os.path.join(prj.root, mod["dir"], "BOM.csv") if mod else prj.p("bom_csv"))
+        from . import supply              # supply-chain risk: an unwaived HIGH (can't build, single-source IC, EOL) fails
+        res += supply.gate_items(prj)
     if gate == "G5":
         base = os.path.join(prj.root, mod["dir"], "Simulations") if mod else prj.p("sim_results")
         res += sims_ok(glob.glob(os.path.join(base, "*.md")), prj)
@@ -153,6 +155,8 @@ def check(prj, gate, mod=None):
             from . import pcb                # independent PCB review against every layout rule, on this board
             res += pcb.gate_items(prj)
     if gate == "G8":           # the fab release gate, strict: NRND parts and unrun power checks fail too
+        from . import supply
+        res += supply.gate_items(prj)
         from . import check as fc
         from . import insulation
         res += insulation.gate_items(prj, rules=True)

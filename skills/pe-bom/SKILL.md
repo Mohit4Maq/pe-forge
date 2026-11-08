@@ -20,11 +20,16 @@ description: Phase P4 of a pe-forge project - size every component from the chos
    Passives and routine parts: pick yourself and state the choice.
 4. **Alternate for every line** (prefer an exact drop-in from another manufacturer); write `Alt match` as
    EXACT or FUNCTIONAL + what differs. Custom magnetics: performance spec + a second vendor or core source.
-5. **BoM**: `04_Hardware/BOM/WIP_BOM.csv` (module: `modules/M-xx/BOM.csv`, same columns) and the `.md` view
+5. **Build it from the schematic once parts are drawn**: `forge bom build --boards N [--spares N] [--jlcpcb]` groups the
+   drawn sheets into lines, checks each primary and its alternate at Mouser and LCSC (DigiKey when configured),
+   writes the BoM, the order files (`09_Release/bom/`) and `04_Hardware/BOM/Supply_Risk.md`. Read the risk report
+   with the owner: every HIGH (SC-1 can't build, SC-2 single-source IC, SC-3 EOL, SC-4 long lead) needs a fix or a
+   recorded waiver in `project.toml [bom.waive]`. `forge bom risk` re-reads it; gates G4 / G8 enforce it.
+6. **BoM**: `04_Hardware/BOM/WIP_BOM.csv` (module: `modules/M-xx/BOM.csv`, same columns) and the `.md` view
    with the cost roll-up vs target. `forge bom check` must PASS (no line missing price, stock or alternate).
-6. **Library**: every chosen part exists in MC_Lib with a verified symbol and footprint (`part-librarian`);
+7. **Library**: every chosen part exists in MC_Lib with a verified symbol and footprint (`part-librarian`);
    this is checked again in P6 before drawing.
-7. Gate G4 with `pe-reviewer` and `pe-reliability` (derating, lifetime at the 60 °C or project ambient).
+8. Gate G4 with `pe-reviewer` and `pe-reliability` (derating, lifetime at the 60 °C or project ambient).
 
 ## Changing design files safely
 

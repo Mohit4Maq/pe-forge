@@ -12,6 +12,9 @@
   forge meter [--json] [--cache]    token budget GREEN / AMBER / RED (--cache: for the status line)
   forge schdraw check|apply|pins|new ...           agent schematic drawing
   forge bom check [file]            BoM completeness (alternates, price, stock)
+  forge bom build [--boards N] [--spares N] [--offline] [--jlcpcb]   BoM from the schematic, priced and stock-checked
+                                    (primary + alternate, Mouser / LCSC / DigiKey), order files, supply-chain risk
+  forge bom risk [--fresh] [--offline] [--json]   the supply-chain risk assessment (SC-1..SC-9)
   forge check [--json] [--strict] [--fab] [--only a,b] [--module M-xx]
                                     one deterministic check: ERC, DRC, consistency, V-model, BoM, drift,
                                     library checks (no model, no network; CI and pre-commit safe)
@@ -195,6 +198,9 @@ def _dispatch(argv):
     if cmd == "hooks":
         from forge import check
         return check.hooks(prj, rest)
+    if cmd == "bom" and rest[:1] in (["build"], ["risk"]):
+        from forge import supply
+        return supply.main(prj, rest)
     if cmd == "bom":
         from forge import gates
         f = rest[1] if len(rest) > 1 else prj.p("bom_csv")

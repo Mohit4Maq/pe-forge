@@ -2345,5 +2345,72 @@ class VaultOpen(unittest.TestCase):
                 os.environ["PE_FORGE_OBSIDIAN_REGISTRY"] = old
 
 
+class Supply(unittest.TestCase):
+    """forge bom build / risk: supply-chain risk factors SC-1..SC-9, waivers, gate."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        from forge import supply
+        self.s = supply
+
+    def codes(self, F):
+        return {(lv, c) for lv, c, _, _ in F}
+
+    def test_cannot_build_single_source_ic(self):
+        line = {"Refs": "U1", "MPN": "LMR38020SDDAR", "Alt_MPN": ""}
+        prim = {"Mouser": {"found": True, "stock": 0, "lead_time": "182 Days", "on_order": [(6443, "2027-03-15")],
+                           "lifecycle": "Active", "min": 1}}
+        F = self.s.assess(line, prim, {}, "", {"Status": "Released"}, 5)
+        self.assertIn(("HIGH", "SC-1"), self.codes(F))      # can't build
+        self.assertIn(("HIGH", "SC-2"), self.codes(F))      # IC with no alternate
+        self.assertIn(("MEDIUM", "SC-4"), self.codes(F))    # 26-week lead time
+        self.assertIn("due 2027-03-15", [e for _, c, e, _ in F if c == "SC-1"][0])
+
+    def test_exact_alternate_covers_and_commodity_is_low(self):
+        line = {"Refs": "Q1", "MPN": "A", "Alt_MPN": "B"}
+        prim = {"Mouser": {"found": True, "stock": 0, "lead_time": "", "lifecycle": "", "min": 1}}
+        alt = {"Mouser": {"found": True, "stock": 900}}
+        F = self.s.assess(line, prim, alt, "EXACT", {"Manufacturer": "Vishay", "Alt_Manufacturer": "Diodes Inc"}, 5)
+        self.assertNotIn("SC-1", {c for _, c, _, _ in F})  # the exact drop-in has stock
+        F = self.s.assess({"Refs": "R2", "MPN": "RC0603", "Alt_MPN": ""},
+                          {"Mouser": {"found": True, "stock": 5_000_000, "min": 1}}, {}, "", {}, 5)
+        self.assertEqual(self.codes(F), {("LOW", "SC-2")})  # commodity, deep stock: only the Rule 4 note
+
+    def test_eol_thin_moq_seed_and_cost(self):
+        line = {"Refs": "J1", "MPN": "X", "Alt_MPN": "Y"}
+        prim = {"Mouser": {"found": True, "stock": 30, "lifecycle": "NRND", "min": 500, "replacement": "Z"}}
+        alt = {"Mouser": {"found": True, "stock": 2}}
+        F = self.s.assess(line, prim, alt, "FUNCTIONAL", {"Status": "Seed"}, 10, total_cost=100.0, ext=40.0)
+        got = self.codes(F)
+        for want in (("HIGH", "SC-3"), ("MEDIUM", "SC-5"), ("MEDIUM", "SC-6"), ("LOW", "SC-7"), ("MEDIUM", "SC-8"),
+                     ("LOW", "SC-9")):
+            self.assertIn(want, got)
+        self.assertIn("Z", [m for _, c, _, m in F if c == "SC-3"][0])   # the maker's replacement is suggested
+
+    def test_gate_and_check_from_the_last_assessment(self):
+        d = tempfile.mkdtemp()
+
+        class P:
+            root = d
+            cfg = {}
+            paths = {"tools_data": ".forge"}
+
+            @staticmethod
+            def p(*k):
+                return os.path.join(d, ".forge", *k[1:]) if k[0] == "tools_data" else os.path.join(d, *k)
+        os.makedirs(os.path.join(d, ".forge", "cache"))
+        self.assertFalse(self.s.gate_items(P)[0][0])                    # not assessed: the gate fails
+        line = lambda ref, lvl, w=None: {"line": {"Refs": ref, "MPN": "M" + ref}, "level": lvl, "waived": w,
+                                          "findings": [(lvl, "SC-1", "stock 0", "order the alternate")]}
+        doc = {"summary": {"date": "2026-11-08T10:00:00", "lines": 2, "levels": {"HIGH": 1, "MEDIUM": 0, "LOW": 0, "OK": 1}},
+               "lines": [line("U1", "HIGH"), line("R1", "OK")]}
+        json.dump(doc, open(os.path.join(d, ".forge", "cache", "supply.json"), "w"))
+        ok, msg = self.s.gate_items(P)[0]
+        self.assertFalse(ok); self.assertIn("U1 MU1", msg)
+        doc["lines"][0]["waived"] = "PO 1234 reserves on-order stock (owner OK)"
+        json.dump(doc, open(os.path.join(d, ".forge", "cache", "supply.json"), "w"))
+        self.assertTrue(self.s.gate_items(P)[0][0])                     # waived with a reason: passes
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

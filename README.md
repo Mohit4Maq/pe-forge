@@ -230,6 +230,16 @@ rule (R-11 to R-15) and per applicable rule-book rule, with the tool results fil
 hash. The `pcb-reviewer` agent grades every row. Gates G7 / G8 pass only when the review says READY for this exact
 board and the Rule 12–15 checks pass themselves.
 
+`forge bom build --boards N` builds the BoM from the drawn schematic and checks every line's part **and its alternate**
+at Mouser and LCSC (DigiKey when configured): stock, 1-off price, lead time, lifecycle, MOQ, on-order dates. It
+writes the BoM (with the alternate columns gate G4 needs), DigiKey / Mouser upload files (`--jlcpcb` adds the JLCPCB
+BoM + CPL) and a **supply-chain risk report** (`04_Hardware/BOM/Supply_Risk.md`). Each line is graded HIGH / MEDIUM /
+LOW for nine factors: can't build at that quantity, single source (an IC with no second maker is HIGH, a commodity
+resistor LOW), lifecycle (NRND / EOL), long lead time, thin or one-distributor stock, an alternate that needs a board
+change or has no stock, MOQ, a part not yet verified in the library, and cost concentration. Each finding has a
+mitigation; a HIGH is fixed or waived with the reason in `project.toml [bom.waive]`, and gates G4 / G8 enforce it.
+`--offline` uses the database and the last lookups.
+
 `forge check --fab --strict` answers "can I order this board today?": routing complete, schematic and board
 match, every placed part released with an alternate, the outputs still match the design by content hash, every
 Gerber layer, drill and pick-and-place file present, power layout rules, release documents filled in. Gate G8
@@ -286,6 +296,7 @@ forge insulation [--rules] [--json]   forge protection [--json]   forge hp [--al
 forge pcb sync|setup|place|zones|route|rules|copper|connectors|crosstalk|review-new|review-status
 forge drift [--module M-xx]   forge explain U1 | NET | U1.7 | --pins MC_ID   forge txn begin|verify|commit|rollback
 forge cr new|validate|approve|close   forge ledger show|clear   forge fab manifest
+forge bom build [--boards N] [--offline] [--jlcpcb]   forge bom risk [--fresh]
 forge learn [show|off|on|clear]   forge feedback [--note T]   forge issue [--last] [--kind K] [--rule ID] [--dry-run]
 ```
 

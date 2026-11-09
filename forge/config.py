@@ -18,6 +18,29 @@ def inside(path, root):
     return os.path.relpath(p, r).replace(os.sep, "/")
 
 
+def interactive(stream=None):
+    """True only when `stream` (default stdin) is a real console a person types into. isatty() is not enough on
+    Windows: the NUL device reports as a terminal there, so an unattended agent would look like the owner.
+    On Windows, GetConsoleMode succeeds only for a real console handle."""
+    import sys
+    s = stream or sys.stdin
+    try:
+        if not s or not s.isatty():
+            return False
+    except (AttributeError, ValueError):
+        return False
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+        import msvcrt
+        h = msvcrt.get_osfhandle(s.fileno())
+        mode = ctypes.c_uint32()
+        return bool(ctypes.windll.kernel32.GetConsoleMode(ctypes.c_void_p(h), ctypes.byref(mode)))
+    except Exception:
+        return False
+
+
 LIBRARY = os.environ.get("MC_LIB") or os.path.join(FORGE_ROOT, "library")
 TEMPLATE = os.path.join(FORGE_ROOT, "template")
 

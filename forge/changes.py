@@ -154,7 +154,8 @@ def violations(prj, rels):
 
 # ------------------------------------------------------------------ commands
 def agent_context():
-    return bool(os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_ENTRYPOINT")) or not sys.stdin.isatty()
+    from .config import interactive      # Windows: NUL looks like a TTY to isatty(); interactive() checks the console
+    return bool(os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_ENTRYPOINT")) or not interactive()
 
 
 def new(prj, title, modules, files, reqs, reason):

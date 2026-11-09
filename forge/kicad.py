@@ -37,6 +37,23 @@ SYMBOL_PATHS = [MAC_APP + "/Contents/SharedSupport/symbols", "/usr/share/kicad/s
 ERC_POS_SCALE = 100.0     # KiCad 10 ERC JSON positions are in 100 mm units
 
 
+def _win_kicad_dirs():
+    """C:\\Program Files\\KiCad\\<version> folders, newest version first (Windows only)."""
+    if os.name != "nt":
+        return []
+    import glob
+    roots = {os.environ.get("ProgramFiles", r"C:\Program Files"), os.environ.get("ProgramW6432", "")}
+    dirs = [d for r in roots if r for d in glob.glob(os.path.join(r, "KiCad", "*")) if os.path.isdir(d)]
+    key = lambda d: [int(x) if x.isdigit() else 0 for x in re.split(r"[.\-]", os.path.basename(d))]
+    return sorted(dirs, key=key, reverse=True)
+
+
+WIN_KICAD = _win_kicad_dirs()
+CLI_PATHS += [os.path.join(d, "bin", "kicad-cli.exe") for d in WIN_KICAD]
+PY_PATHS += [os.path.join(d, "bin", "python.exe") for d in WIN_KICAD]       # KiCad's own Python has pcbnew
+SYMBOL_PATHS += [os.path.join(d, "share", "kicad", "symbols") for d in WIN_KICAD]
+
+
 def _first(cands):
     return next((c for c in cands if c and os.path.exists(c)), None)
 
@@ -48,12 +65,13 @@ def find_cli():
 
 def find_python():
     """A Python that can `import pcbnew` (KiCad's bundled one on macOS), or None."""
-    return _first([os.environ.get("KICAD_PYTHON"), *PY_PATHS, shutil.which("python3")])
+    # on Windows "python3" is usually the Microsoft Store stub and cannot import pcbnew: never fall back to it
+    return _first([os.environ.get("KICAD_PYTHON"), *PY_PATHS, None if os.name == "nt" else shutil.which("python3")])
 
 
 def stock_footprints():
     return _first([os.environ.get("KICAD_FOOTPRINT_DIR"), os.environ.get("KICAD10_FOOTPRINT_DIR"),
-                   *[s.replace("/symbols", "/footprints") for s in SYMBOL_PATHS]])
+                   *[s.replace("/symbols", "/footprints").replace("\\symbols", "\\footprints") for s in SYMBOL_PATHS]])
 
 
 def stock_symbols():

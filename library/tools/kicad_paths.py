@@ -25,6 +25,12 @@ _CLI = [_MAC + "/Contents/MacOS/kicad-cli", "/usr/bin/kicad-cli", "/usr/local/bi
         "/var/lib/flatpak/exports/bin/kicad-cli"]
 _PY = [_MAC + "/Contents/Frameworks/Python.framework/Versions/Current/bin/python3"]
 _SYM = [_MAC + "/Contents/SharedSupport/symbols", "/usr/share/kicad/symbols", "/usr/local/share/kicad/symbols"]
+if os.name == "nt":                     # C:\\Program Files\\KiCad\\<version>, newest first (as in forge/kicad.py)
+    import glob as _glob
+    _w = sorted(_glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "KiCad", "*")), reverse=True)
+    _CLI += [os.path.join(d, "bin", "kicad-cli.exe") for d in _w]
+    _PY += [os.path.join(d, "bin", "python.exe") for d in _w]
+    _SYM += [os.path.join(d, "share", "kicad", "symbols") for d in _w]
 
 
 def _first(c):

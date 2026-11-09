@@ -64,7 +64,10 @@ asks you to log in the first time (Claude Pro, Max or an API key).
 
 **Obsidian is the document manager.** Every pe-forge project folder is also an Obsidian vault: the requirements,
 plan, booklets, reviews and V-model notes link to each other with `[[wikilinks]]`, and the tool folders (`.forge/`,
-KiCad backups, release outputs) are hidden from search and the graph. `forge vault open` opens a project in Obsidian.
+KiCad backups, release outputs) are hidden from search and the graph. `forge vault open` opens a project in Obsidian
+as its own vault, by the vault's id, never inside an enclosing vault (for example one set on your whole home folder,
+which it warns about). `--file <note>` opens a given note; `--restart` quits a running Obsidian first so a new
+folder can be registered.
 
 ### Linux, or by hand
 
@@ -132,12 +135,18 @@ first. Session start and each finished turn also print one short `pe-forge ▸` 
 
 ### The results panel
 
-A second plugin, `pe-forge-panel` (`mods/pe-forge-panel`), puts a panel beside the chat with five tabs:
+A second plugin, `pe-forge-panel` (`mods/pe-forge-panel`), puts a panel beside the chat. Its header carries the
+**maq** mark as a large block logo in the accent blue, with the project, phase and next step beside it
+(`[ui] logo = false` gives a one-line header). Five tabs:
 **V-cycle** (every stage of the V, where the project is now, what needs attention; pick a stage to see its facts,
 items and documents, and press `a` to ask Claude about it), **Simulations** (grade, key numbers per corner against
 the hand calculation, charts), **Checks**, **Gates** and **Parts**. It opens by itself when a simulation result or a
 full check lands; `/results [project folder]` opens it at any time. `forge report --open` shows the same as an
 interactive page in the browser, offline. Install: `/plugin install pe-forge-panel@pe-forge`.
+
+Keys: ctrl+x then Tab moves the keyboard into the panel; 1-5 switch tabs, the letter on a button presses it, Esc
+returns to the prompt. Inside tmux, Claude Code draws in 256 colours; set `focus-events on` for the panel, and for
+true colour start Claude with `TMUX` unset (the demo kit does both).
 
 ## Schematics: you draw, or the agents draw
 
@@ -305,6 +314,10 @@ schematic parity, superseded terms, V-model links, BoM completeness, drift and t
 reports pass / warn / fail / skip; a skipped check says why and is never counted as passed. New projects get a
 git pre-commit hook that runs the fast subset, and a GitHub Actions workflow (`.github/workflows/forge-check.yml`)
 that installs KiCad 10 and uploads the JSON report.
+
+## What changed
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Status and limits
 

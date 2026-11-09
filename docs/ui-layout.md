@@ -94,9 +94,34 @@ Truecolor when `$COLORTERM` is `truecolor` or `24bit`, else 256 colours; no colo
 - `forge status` keeps its exact text when stdout is not a TTY; colour only on a TTY; `--banner` adds a three-row
   block mark.
 
-## 7. Owner decisions
+## 7. Results panel (pe-forge-panel 0.2, owner 2026-11-08)
+
+Layout, top to bottom, with one blank row between blocks and one column of side padding:
+
+```
+ ▄▄▄▄▄▄▄▄▄▖  ▗▄▄▄▄▄▖ ▗▄▄▄▄▄▄
+ █▛  ██  ██ ▟█▘  ▐█▌▗█▌  ▗██   Buck48to12
+▐█▌ ▐█▛  ██ █▛   ▟█▘▟█   ▐█▌   pe-forge · power electronics
+▐█  ▐█▌ ▐█▛▗█▌   ██ ██   ██▌
+▀▀  ▀▀  ▝▀▘▝▀▀▀▘ ▀▀▝▀▀▀▀ ██    P3  system
+                        ▐█▛
+next  <next action, wrapped>
+────────────────────────────────────────────
+[ ▌1 V-cycle ]  [ 2 Simulations (1) ]  [ 3 Checks ]  [ 4 Gates ]  [ 5 Parts ]
+────────────────────────────────────────────
+<tab body: accent section titles; cards with a rounded accent border; findings show the result first and stop at
+the edge (truncate-end); button rows spaced two columns>
+```
+
+- The logo is `forge.ui.MAQ_LOGO`, the "maq" letters cut from the wordmark (28 × 6). `forge panel --json` carries it
+  as `logo`; empty with `[ui] logo = false` or `glyphs = "ascii"`, then the header is `maq ▸ <project>`.
+- Accent `#4245f5` for the logo, section titles, the active tab bar and card borders; dim for secondary text.
+- Columns: simulation result names 26, values 8 per corner, units 9; series labels 12.
+
+## 8. Owner decisions
 
 1. Decided: accent `#4245f5` (blue), changed from MaqLabs red on 2026-11-07.
 2. Decided: yes.
 3. Decided: pe-forge projects only (`forge new`); `--user` stays available but bootstrap does not offer it.
 4. Decided: keep `bin/` (Claude Code CLI).
+5. Decided (2026-11-08): the results panel shows the maq mark as a big block logo; layout as in section 7.

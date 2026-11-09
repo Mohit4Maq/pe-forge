@@ -46,6 +46,7 @@ def default_command() -> list[str]:
                 "--bottle=ltspice", _MAC_EXE]
     for cand in ("/Applications/LTspice.app/Contents/MacOS/LTspice",
                  r"C:\Program Files\ADI\LTspice\LTspice.exe",
+                 "/mnt/c/Program Files/ADI/LTspice/LTspice.exe",      # WSL: the Windows install
                  shutil.which("ltspice") or "",
                  shutil.which("LTspice") or ""):
         if cand and Path(cand).exists():
@@ -55,9 +56,50 @@ def default_command() -> list[str]:
     )
 
 
-def win_path(p) -> str:
-    """macOS/Linux absolute path -> wine Z: path."""
-    return "Z:" + Path(p).resolve().as_posix()
+def is_wsl() -> bool:
+    try:
+        return "microsoft" in open("/proc/version").read().lower()
+    except OSError:
+        return False
+
+
+def path_style(command=None) -> str:
+    """How LTspice must be given file paths on this host:
+    'native'  Windows: plain C:\\... paths
+    'wsl'     Linux under WSL running the Windows LTspice.exe: wslpath -w
+    'wine'    macOS / Linux running LTspice under Wine: Z:/... paths
+    PWRLAB_PATH_STYLE overrides."""
+    env = os.environ.get("PWRLAB_PATH_STYLE")
+    if env in ("native", "wsl", "wine"):
+        return env
+    if os.name == "nt":
+        return "native"
+    exe = str(command[-1]) if command else ""
+    if is_wsl() and exe.lower().endswith(".exe") and exe.startswith("/mnt/"):
+        return "wsl"
+    return "wine"
+
+
+def _mnt_to_windows(posix: str) -> str:
+    """/mnt/c/Users/x/run.net -> C:\\Users\\x\\run.net (fallback when wslpath is missing)."""
+    m = re.match(r"^/mnt/([a-zA-Z])/(.*)$", posix)
+    if not m:
+        return posix
+    return m.group(1).upper() + ":\\" + m.group(2).replace("/", "\\")
+
+
+def win_path(p, style="wine") -> str:
+    """The netlist path in the form LTspice can open (see path_style)."""
+    p = Path(p).resolve()
+    if style == "native":
+        return str(p)
+    if style == "wsl":
+        try:
+            return subprocess.run(["wslpath", "-w", str(p)], capture_output=True, text=True,
+                                  check=True).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            return _mnt_to_windows(p.as_posix())
+    return "Z:" + p.as_posix()
 
 
 # Measured on an M3 Pro (11 cores) with a 6-point DAB sweep:
@@ -171,8 +213,9 @@ class Runner:
         self.timeout = timeout
         self.max_workers = max_workers
         self.keep = keep
-        self.workroot = Path(workroot) if workroot else Path(
-            tempfile.mkdtemp(prefix="pwrlab_"))
+        self.path_style = path_style(self.command)
+        root = workroot or os.environ.get("PWRLAB_WORKROOT")   # WSL: on /mnt/c for the Windows LTspice
+        self.workroot = Path(root) if root else Path(tempfile.mkdtemp(prefix="pwrlab_"))
         self.workroot.mkdir(parents=True, exist_ok=True)
 
     def run_text(self, netlist_text: str, params: dict, measurements,
@@ -186,18 +229,20 @@ class Runner:
     def run_file(self, netlist: Path, params: dict, measurements) -> SimResult:
         netlist = Path(netlist)
         wd = netlist.parent
-        cmd = self.command + ["-Run", "-b", win_path(netlist)]
+        cmd = self.command + ["-Run", "-b", win_path(netlist, self.path_style)]
         res = SimResult(params=dict(params))
 
         t0 = time.perf_counter()
         proc = subprocess.Popen(cmd, cwd=wd, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, start_new_session=True)
+                                stderr=subprocess.DEVNULL, start_new_session=os.name != "nt")
         try:
             proc.wait(timeout=self.timeout)
             res.returncode = proc.returncode
         except subprocess.TimeoutExpired:
-            # kill the process GROUP: wineserver children outlive a plain kill
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            if os.name == "nt":      # Windows: kill LTspice and its children
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+            else:                    # kill the process GROUP: wineserver children outlive a plain kill
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             proc.wait()
             res.timed_out = True
         res.wall_s = time.perf_counter() - t0

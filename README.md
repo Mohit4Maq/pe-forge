@@ -81,6 +81,12 @@ cd ~/pe-forge && ./bootstrap.sh
 
 `bootstrap.sh` asks before each change. A missing tool disables only the features that need it (`forge doctor`).
 
+**Windows (WSL2).** Install Ubuntu with `wsl --install -d Ubuntu-24.04` and follow the Linux steps inside it; keep
+projects in the Linux home, not under `/mnt/c`. For simulations, install **LTspice for Windows** (analog.com) and
+let pwrlab call it from WSL: it finds `/mnt/c/Program Files/ADI/LTspice/LTspice.exe` and passes Windows paths. Put
+its work folder on the Windows drive: `export PWRLAB_WORKROOT=/mnt/c/Users/<you>/pwrlab-work`. Native Windows
+support is planned in `docs/PLAN_windows.md`.
+
 ## Use
 
 ```text

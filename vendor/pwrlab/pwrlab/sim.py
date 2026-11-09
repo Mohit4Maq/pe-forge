@@ -39,8 +39,10 @@ def default_command() -> list[str]:
     """argv prefix that actually runs LTspice on this host."""
     env = os.environ.get("PWRLAB_LTSPICE")
     if env:
-        import shlex
-        return shlex.split(env)
+        if Path(env.strip('"')).exists():          # a plain path (Windows: C:\\...\\LTspice.exe): use it as-is
+            return [env.strip('"')]
+        import shlex                               # a command line; POSIX rules would eat Windows backslashes
+        return [a.strip('"') for a in shlex.split(env, posix=os.name != "nt")]
     if platform.system() == "Darwin" and _MAC_WINE.exists():
         return [str(_MAC_WINE), "--enable-alt-loader=macdrv", "--wait-children",
                 "--bottle=ltspice", _MAC_EXE]

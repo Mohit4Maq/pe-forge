@@ -248,9 +248,13 @@ class KicadReports(unittest.TestCase):
     def test_stub_cli_without_report_fails_gate(self):
         tmp = tempfile.mkdtemp(prefix="pe-forge-stub-")
         try:
-            stub = os.path.join(tmp, "kicad-cli")
-            open(stub, "w").write("#!/bin/sh\nexit 0\n")
-            os.chmod(stub, 0o755)
+            if os.name == "nt":                      # a stand-in kicad-cli that writes no report
+                stub = os.path.join(tmp, "kicad-cli.cmd")
+                open(stub, "w").write("@echo off\r\nexit /b 0\r\n")
+            else:
+                stub = os.path.join(tmp, "kicad-cli")
+                open(stub, "w").write("#!/bin/sh\nexit 0\n")
+                os.chmod(stub, 0o755)
             ans = os.path.join(tmp, "a.json")
             json.dump({"name": "Stub", "summary": "s", "owner": "T"}, open(ans, "w"))
             prj = os.path.join(tmp, "p")
@@ -272,8 +276,12 @@ class KicadReports(unittest.TestCase):
             shutil.rmtree(tmp, True)
 
     def test_one_kicad_search_order(self):
-        hits = subprocess.run(["grep", "-rln", "Applications/KiCad", "forge", "library/tools", "skills",
-                               "--include=*.py"], cwd=REPO, capture_output=True, text=True).stdout.split()
+        hits = []                                   # pure Python: no grep on Windows
+        for top in ("forge", "library/tools", "skills"):
+            for dp, _, fn in os.walk(os.path.join(REPO, top)):
+                for f in fn:
+                    if f.endswith(".py") and " 2." not in f and "Applications/KiCad" in open(os.path.join(dp, f), encoding="utf-8", errors="replace").read():
+                        hits.append(os.path.relpath(os.path.join(dp, f), REPO).replace(os.sep, "/"))
         self.assertEqual(sorted(hits), ["forge/kicad.py", "library/tools/kicad_paths.py"])
 
 
@@ -1719,6 +1727,7 @@ class Vault(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("is not empty", r.stdout + r.stderr)
 
+    @unittest.skipIf(os.name == "nt", "install.sh is the macOS installer (Windows gets install.ps1)")
     def test_installer_syntax_and_help(self):
         self.assertEqual(subprocess.run(["bash", "-n", os.path.join(REPO, "install.sh")]).returncode, 0)
         r = subprocess.run(["bash", os.path.join(REPO, "install.sh"), "--help"], capture_output=True, text=True)
@@ -2231,6 +2240,13 @@ class Learn(unittest.TestCase):
     def fake_gh(self, auth_ok=True):
         d = tempfile.mkdtemp(prefix="fake-gh-")
         log = os.path.join(d, "calls.txt")
+        if os.name == "nt":                          # a stand-in gh for Windows (found through PATHEXT)
+            open(os.path.join(d, "gh.cmd"), "w").write(
+                "@echo off\r\n"
+                f'echo %* >> "{log}"\r\n'
+                'if "%1"=="auth" exit /b ' + ("0" if auth_ok else "1") + "\r\n"
+                'if "%1"=="issue" (echo https://github.com/me/fb/issues/7 & exit /b 0)\r\n')
+            return d, log
         open(os.path.join(d, "gh"), "w").write(
             "#!/bin/sh\n"
             f'echo "$@" >> "{log}"\n'
@@ -2260,7 +2276,7 @@ class Learn(unittest.TestCase):
                            "--repo", "me/fb", "--yes", env=env)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("Filed: https://github.com/me/fb/issues/7", r.stdout)
-        calls = open(log).read()
+        calls = open(log).read().replace('"', "")     # cmd keeps the quotes around arguments
         self.assertIn("issue create --repo me/fb --title [rule] SW-05 does not fit this board", calls)
         self.assertIn("<net>", r.stdout)                                  # net names redacted
         self.assertNotIn("/VIN", r.stdout)

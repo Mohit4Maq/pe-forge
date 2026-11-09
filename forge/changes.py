@@ -124,11 +124,10 @@ def block_reason(prj, path):
     """Why writing `path` is not allowed now (enforce mode), or None."""
     if mode(prj) == "off":
         return None
-    root = os.path.realpath(prj.root)
-    p = os.path.realpath(path)
-    if not p.startswith(root + os.sep):
+    from .config import inside
+    rel = inside(path, prj.root)
+    if rel is None or rel == ".":
         return None
-    rel = os.path.relpath(p, root)
     lk = lock_of(prj, rel)
     if not lk or covering(prj, rel, lk[0]):
         return None

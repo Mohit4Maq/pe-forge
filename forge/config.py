@@ -9,6 +9,15 @@ except ModuleNotFoundError:  # Python < 3.11
     sys.exit("pe-forge needs Python 3.11 or newer (tomllib)")
 
 FORGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the pe-forge repo / plugin root
+def inside(path, root):
+    """path relative to root with forward slashes, or None when it is not inside root. Case-insensitive and
+    separator-agnostic on Windows (Claude Code hands hooks C:\\... paths there)."""
+    p, r = os.path.realpath(path), os.path.realpath(root)
+    if os.path.normcase(p) != os.path.normcase(r) and not os.path.normcase(p).startswith(os.path.normcase(r) + os.sep):
+        return None
+    return os.path.relpath(p, r).replace(os.sep, "/")
+
+
 LIBRARY = os.environ.get("MC_LIB") or os.path.join(FORGE_ROOT, "library")
 TEMPLATE = os.path.join(FORGE_ROOT, "template")
 

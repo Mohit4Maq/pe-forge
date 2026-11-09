@@ -43,7 +43,7 @@ def _owned_file(sheet):
 
 
 def _key(sheet, root):
-    return os.path.relpath(os.path.realpath(sheet), os.path.realpath(root)) if root else os.path.realpath(sheet)
+    return os.path.relpath(os.path.realpath(sheet), os.path.realpath(root)).replace(os.sep, "/") if root else os.path.realpath(sheet)
 
 
 def stamp(sheet):

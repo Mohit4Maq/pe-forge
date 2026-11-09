@@ -33,7 +33,7 @@ def scan(prj):
             if not f.endswith(".md"):
                 continue
             p = os.path.join(dp, f)
-            rel = os.path.relpath(p, prj.root)
+            rel = prj.rel(p)
             if rel.startswith(frozen) or "/Reviews/" in rel:
                 continue
             lines = open(p, errors="ignore").read().split("\n")

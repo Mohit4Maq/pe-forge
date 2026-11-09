@@ -1144,7 +1144,7 @@ def review_status(prj, board):
         learn.record_review(prj, f, v)
     if v != "READY":           # READY WITH FIXES needs the fixes and a fresh review before a gate
         probs.append(f"review verdict {v}" + (": fix the findings and review again" if v.startswith("READY") else ""))
-    return not probs, probs, os.path.relpath(f, prj.root)
+    return not probs, probs, prj.rel(f)
 
 
 def as_check_review(prj, opts):

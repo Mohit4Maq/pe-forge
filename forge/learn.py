@@ -372,8 +372,11 @@ def file_issue(repo, title, body, out=print):
         import tempfile
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
             f.write(body)
-        r = subprocess.run([gh, "issue", "create", "--repo", repo, "--title", title, "--body-file", f.name],
-                           capture_output=True, text=True)
+        try:
+            r = subprocess.run([gh, "issue", "create", "--repo", repo, "--title", title, "--body-file", f.name],
+                               capture_output=True, text=True)
+        except OSError as e:                          # gh present but not runnable: fall back, never crash
+            r = subprocess.CompletedProcess([gh], 1, "", str(e))
         os.unlink(f.name)
         if r.returncode == 0:
             return "gh", r.stdout.strip()

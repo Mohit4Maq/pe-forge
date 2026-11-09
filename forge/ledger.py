@@ -62,7 +62,7 @@ def scan(prj):
             if f.endswith(EXTS):
                 p = os.path.join(dp, f)
                 try:
-                    out[os.path.relpath(p, prj.root)] = os.stat(p).st_mtime_ns
+                    out[os.path.relpath(p, prj.root).replace(os.sep, "/")] = os.stat(p).st_mtime_ns
                 except OSError:
                     pass
     return out
@@ -141,10 +141,10 @@ def record(prj, payload):
     files = []
     p = ti.get("file_path") or ti.get("notebook_path")
     if p:
-        p = os.path.realpath(os.path.join(payload.get("cwd") or prj.root, p))
-        root = os.path.realpath(prj.root)
-        if p.startswith(root + os.sep):
-            files.append(os.path.relpath(p, root))
+        from .config import inside
+        rel = inside(os.path.join(payload.get("cwd") or prj.root, p), prj.root)
+        if rel and rel != ".":
+            files.append(rel)
     now = scan(prj)
     old = d["mtimes"]
     if payload.get("tool_name") == "Bash" or not old:

@@ -210,7 +210,7 @@ def install(path, uninstall=False, chain=False):
             if rec.get("previous") is not None:
                 cur["statusLine"] = rec["previous"]
             if orig is not None and json.loads(orig) == cur:
-                open(path, "w").write(orig)          # byte for byte, when nothing else changed meanwhile
+                open(path, "wb").write(orig.encode())   # byte for byte (binary: no CRLF translation on Windows)
             else:
                 _write(path, cur)
         if rec.get("chained"):

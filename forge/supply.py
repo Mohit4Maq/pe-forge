@@ -268,7 +268,7 @@ def run(prj, boards=None, spares=0, offline=False, jlcpcb=False):
                "cost_per_board": round(per_board, 2),
                "currency": next((v.get("currency") for r in res for v in r["prim"].values() if v.get("currency")), ""),
                "levels": {k: sum(1 for r in res if r["level"] == k and not r["waived"]) for k in LEVEL},
-               "waived": sum(1 for r in res if r["waived"]), "order_files": os.path.relpath(outdir, prj.root),
+               "waived": sum(1 for r in res if r["waived"]), "order_files": prj.rel(outdir),
                "not_purchased": skipped}
     write(prj, res, summary)
     return res, summary, gen_log
@@ -402,5 +402,5 @@ def main(prj, argv):
             if lv in ("HIGH", "MEDIUM"):
                 print(f"           {lv} {c}: {e}  → {m}")
     print(f"  HIGH {s['levels']['HIGH']} · MEDIUM {s['levels']['MEDIUM']} · LOW {s['levels']['LOW']} · OK {s['levels']['OK']}"
-          f"   report: 04_Hardware/BOM/Supply_Risk.md · BoM: {os.path.relpath(prj.p('bom_csv'), prj.root)} · order files: {s['order_files']}/")
+          f"   report: 04_Hardware/BOM/Supply_Risk.md · BoM: {prj.rel(prj.p('bom_csv'))} · order files: {s['order_files']}/")
     return 1 if s["levels"]["HIGH"] else 0

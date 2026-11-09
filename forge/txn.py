@@ -74,6 +74,11 @@ class Git:
         return [l for l in self.run("status", "--porcelain", "--untracked-files=all").stdout.splitlines()
                 if l.strip() and not any(l[3:].startswith(k) for k in KEEP)]
 
+    # Snapshots keep the exact bytes: no .gitattributes eol rules (attributes read from the empty tree) and no
+    # autocrlf, or a CRLF file would come back as LF on Windows.
+    RAW = {"GIT_ATTR_SOURCE": "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "GIT_CONFIG_COUNT": "1",
+           "GIT_CONFIG_KEY_0": "core.autocrlf", "GIT_CONFIG_VALUE_0": "false"}
+
     def untracked_tree(self):
         paths = [p for p in self.run("ls-files", "--others", "--exclude-standard", "-z").stdout.split("\0")
                  if p and not any(p.startswith(k) for k in KEEP)]
@@ -90,7 +95,7 @@ class Git:
             return None
         idx = self.scratch_index(seed=False)
         try:
-            env = {"GIT_INDEX_FILE": idx}
+            env = {"GIT_INDEX_FILE": idx, **self.RAW}
             self.out("update-index", "-z", "--add", "--stdin", env=env, input="\0".join(usable) + "\0")
             return self.out("write-tree", env=env)
         finally:
@@ -99,7 +104,7 @@ class Git:
     def checkout_tree(self, tree):
         idx = self.scratch_index(seed=False)
         try:
-            env = {"GIT_INDEX_FILE": idx}
+            env = {"GIT_INDEX_FILE": idx, **self.RAW}
             self.out("read-tree", tree, env=env)
             self.out("checkout-index", "-a", "-f", env=env)
         finally:

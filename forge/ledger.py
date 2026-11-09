@@ -78,7 +78,7 @@ def _modules(prj):
 
 def module_of(prj, rel, mods):
     for m in mods:
-        if rel.startswith(m["dir"].rstrip("/") + "/"):
+        if rel.startswith(m["dir"].replace("\\", "/").rstrip("/") + "/"):     # older Windows state: backslashes
             return m
     if rel.endswith(".kicad_sch"):      # a sheet named in a module brief belongs to that module
         from .drift import frontmatter

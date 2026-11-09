@@ -451,7 +451,11 @@ def main_issue(argv, prj_cfg=None):
     if "--yes" not in argv:
         if not sys.stdin.isatty():
             print("not a terminal: add --yes to file it, or --dry-run to only show it"); return 1
-        if input("File this issue? [y/N] ").strip().lower() not in ("y", "yes"):
+        try:                                          # Windows reports NUL as a terminal: EOF means no answer
+            ans = input("File this issue? [y/N] ")
+        except EOFError:
+            print("\nno answer (not a terminal?): add --yes to file it, or --dry-run to only show it"); return 1
+        if ans.strip().lower() not in ("y", "yes"):
             print("not filed"); return 1
     how, where = file_issue(repo, title, body)
     print(("Filed: " if how == "gh" else "Opened the pre-filled issue page (press Submit): ") + where)

@@ -53,6 +53,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Windows: run in Python's UTF-8 mode so open() reads and writes UTF-8 like on macOS / Linux (the default there is
+# cp1252, which cannot read the project's ± µ Ω files). Re-run this process once with -X utf8.
+if os.name == "nt" and not sys.flags.utf8_mode and __name__ == "__main__" and not os.environ.get("PE_FORGE_NO_UTF8"):
+    import subprocess as _sp
+    sys.exit(_sp.call([sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]))
+
 # UTF-8 out, whatever the console or pipe: Windows defaults to cp1252 when redirected, which cannot encode
 # pe-forge's ▸ ✓ ≥ → or the block logo (UnicodeEncodeError). errors="replace" so output can never crash a command.
 for _s in (sys.stdout, sys.stderr):

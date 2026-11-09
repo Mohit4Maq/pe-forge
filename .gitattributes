@@ -1,0 +1,11 @@
+# LF everywhere: Git for Windows would otherwise check files out with CRLF (KiCad files, scripts, test fixtures)
+* text=auto eol=lf
+*.kicad_pcb text eol=lf
+*.kicad_sch text eol=lf
+*.kicad_pro text eol=lf
+*.sh text eol=lf
+bin/* text eol=lf
+*.png binary
+*.pdf binary
+*.sqlite binary
+*.bundle binary

@@ -1,5 +1,14 @@
 #!/bin/sh
 # pe-forge CLI wrapper: runs the stdlib-only forge package, preferring the repo's venv (has PyMuPDF + pwrlab).
 here=$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)
-py=python3; [ -x "$here/.venv/bin/python" ] && py="$here/.venv/bin/python"
-exec "$py" "$here/forge/__main__.py" "$@"
+# Python: the repo's venv (macOS / Linux layout, then Windows), else python3, python or the Windows py launcher
+py=""
+for c in "$here/.venv/bin/python" "$here/.venv/Scripts/python.exe"; do [ -x "$c" ] && { py="$c"; break; }; done
+if [ -z "$py" ]; then
+  for c in python3 python; do
+    command -v "$c" >/dev/null 2>&1 && "$c" -c "import sys; sys.exit(sys.version_info < (3, 11))" 2>/dev/null && { py="$c"; break; }
+  done
+fi
+[ -z "$py" ] && command -v py >/dev/null 2>&1 && py="py -3"
+[ -z "$py" ] && { echo "pe-forge: Python 3.11+ not found (python3, python or py)" >&2; exit 127; }
+exec $py "$here/forge/__main__.py" "$@"

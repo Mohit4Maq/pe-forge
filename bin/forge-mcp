@@ -1,5 +1,8 @@
 #!/bin/sh
 # pe-forge MCP server (stdio). Uses the repo venv (it has the mcp package, installed with pwrlab).
 here=$(cd "$(dirname "$0")/.." && pwd)
-py="$here/.venv/bin/python"; [ -x "$py" ] || py=python3
-exec "$py" "$here/forge/mcp_server.py" "$@"
+py=""
+for c in "$here/.venv/bin/python" "$here/.venv/Scripts/python.exe"; do [ -x "$c" ] && { py="$c"; break; }; done
+[ -z "$py" ] && for c in python3 python; do command -v "$c" >/dev/null 2>&1 && { py="$c"; break; }; done
+[ -z "$py" ] && py="py -3"
+exec $py "$here/forge/mcp_server.py" "$@"

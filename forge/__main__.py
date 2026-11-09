@@ -53,6 +53,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# UTF-8 out, whatever the console or pipe: Windows defaults to cp1252 when redirected, which cannot encode
+# pe-forge's ▸ ✓ ≥ → or the block logo (UnicodeEncodeError). errors="replace" so output can never crash a command.
+for _s in (sys.stdout, sys.stderr):
+    try:
+        if _s and (getattr(_s, "encoding", "") or "").lower().replace("-", "") != "utf8":
+            _s.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 from forge import config  # noqa: E402
 
 

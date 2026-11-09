@@ -55,7 +55,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Windows: run in Python's UTF-8 mode so open() reads and writes UTF-8 like on macOS / Linux (the default there is
 # cp1252, which cannot read the project's ± µ Ω files). Re-run this process once with -X utf8.
-if os.name == "nt" and not sys.flags.utf8_mode and __name__ == "__main__" and not os.environ.get("PE_FORGE_NO_UTF8"):
+# The status line is exempt (it must answer in < 100 ms; a second interpreter costs that much): it gets the
+# in-process UTF-8 default below instead.
+if os.name == "nt" and not sys.flags.utf8_mode and __name__ == "__main__" and not os.environ.get("PE_FORGE_NO_UTF8") \
+        and sys.argv[1:2] != ["statusline"]:
     import subprocess as _sp
     sys.exit(_sp.call([sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]))
 
@@ -70,6 +73,8 @@ if os.name == "nt":
     def _lf_open(file, mode="r", buffering=-1, encoding=None, errors=None, newline=None, *a, **k):
         if newline is None and "b" not in mode and any(m in mode for m in "wax+"):
             newline = "\n"
+        if encoding is None and "b" not in mode and not sys.flags.utf8_mode:
+            encoding = "utf-8"                   # the status line runs without UTF-8 mode: read and write UTF-8
         return _open(file, mode, buffering, encoding, errors, newline, *a, **k)
     _bi.open = _io.open = _lf_open
 

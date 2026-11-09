@@ -82,7 +82,7 @@ class Project:
         return os.path.join(self.root, self.paths[key], *more)
 
     def rel(self, path):
-        return os.path.relpath(path, self.root)
+        return os.path.relpath(path, self.root).replace(os.sep, "/")     # the same on Windows as elsewhere
 
     @property
     def name(self):

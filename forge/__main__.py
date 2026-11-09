@@ -59,6 +59,20 @@ if os.name == "nt" and not sys.flags.utf8_mode and __name__ == "__main__" and no
     import subprocess as _sp
     sys.exit(_sp.call([sys.executable, "-X", "utf8", os.path.abspath(__file__), *sys.argv[1:]]))
 
+# Windows: text files are written with LF like on macOS / Linux (Python's default there is CRLF, which made
+# transactions, settings files and git round-trips differ byte for byte). One switch for every open() /
+# Path.write_text() in pe-forge; reading is unchanged (universal newlines).
+if os.name == "nt":
+    import builtins as _bi
+    import io as _io
+    _open = _io.open
+
+    def _lf_open(file, mode="r", buffering=-1, encoding=None, errors=None, newline=None, *a, **k):
+        if newline is None and "b" not in mode and any(m in mode for m in "wax+"):
+            newline = "\n"
+        return _open(file, mode, buffering, encoding, errors, newline, *a, **k)
+    _bi.open = _io.open = _lf_open
+
 # UTF-8 out, whatever the console or pipe: Windows defaults to cp1252 when redirected, which cannot encode
 # pe-forge's ▸ ✓ ≥ → or the block logo (UnicodeEncodeError). errors="replace" so output can never crash a command.
 for _s in (sys.stdout, sys.stderr):

@@ -180,7 +180,8 @@ def record_review(prj, path, verdict):
 
 def record_error(cmd, exc):
     tb = [ln for ln in traceback.format_exception(type(exc), exc, exc.__traceback__)]
-    mine = [ln.strip().replace(ROOT, "pe-forge") for ln in tb if ROOT in ln or "/forge/" in ln]
+    mine = [ln.strip().replace(ROOT, "pe-forge").replace("\\", "/") for ln in tb
+            if ROOT in ln or "/forge/" in ln or "\\forge\\" in ln]
     err = {"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "command": cmd, "type": type(exc).__name__,
            "message": str(exc)[:500], "trace": mine[-8:] + [tb[-1].strip()], "version": version(),
            "python": platform.python_version(), "os": f"{platform.system()} {platform.release()}"}

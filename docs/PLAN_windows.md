@@ -1,6 +1,11 @@
 # pe-forge on Windows: assessment and plan
 
-Status: draft for the owner, 2026-11-09. Nothing here is built yet.
+Status 2026-11-09: W1-W3 done and tested in a Windows 11 ARM64 VM (UTM): the full test suite runs **85 passed,
+0 failed, 61 skipped** (skips need KiCad / LTspice, not yet installed there); macOS stays 146 / 146. Fixed on the way:
+launchers (python / py, Windows venv), UTF-8 mode and output, LF writes, forward-slash paths, case-insensitive
+project paths for hooks, module folders in state.json, byte-exact transaction snapshots, the status-line restore,
+and a security issue: owner-only `forge cr approve` trusted a NUL stdin as a terminal on Windows. Next: W4 (KiCad,
+LTspice in the VM), W5 (install.ps1), W7 (Windows CI).
 
 ## 1. Where pe-forge stands
 

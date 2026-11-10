@@ -7,6 +7,14 @@ project paths for hooks, module folders in state.json, byte-exact transaction sn
 and a security issue: owner-only `forge cr approve` trusted a NUL stdin as a terminal on Windows. Next: W4 (KiCad,
 LTspice in the VM), W5 (install.ps1), W7 (Windows CI).
 
+W4 (2026-11-10): KiCad 10.0.8 (native ARM64 build) found automatically (`Program Files\KiCad\<version>`, its own
+Python with pcbnew). With KiCad the suite runs **124 passed, 0 failed, 22 skipped** (ngspice not installed; the macOS
+installer test). Found and fixed: schematic text checks crashed without PyMuPDF (now SKIP, advice only); pwrlab took
+a Windows LTspice path through POSIX shell rules. **LTspice: ADI's installer refuses Windows on ARM64** ("not
+supported on ARM64"); unpacked and run under x64 emulation it does not complete a batch run (as SYSTEM in session 0,
+or as the user). pwrlab's Windows plumbing (native paths, timeout kill with taskkill) is verified; the LTspice run
+itself must be verified on x64 Windows (W7 CI on windows-latest). PyMuPDF has no Windows ARM64 build either.
+
 ## 1. Where pe-forge stands
 
 pe-forge is mostly portable already. The engine is standard-library Python and the gates, checks, V-model, review

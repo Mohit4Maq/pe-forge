@@ -26,10 +26,10 @@ from . import kicad
 from . import schdraw as sd
 
 sp = sd.sp
-WEIGHT = {"S1": 2, "S2": 4, "S3": 4, "S4": 3, "S5": 4, "S6": 2, "S7": 3, "S8": 1, "S9": 2, "S12": 2, "S13": 3,
+WEIGHT = {"SKIP": 0, "S1": 2, "S2": 4, "S3": 4, "S4": 3, "S5": 4, "S6": 2, "S7": 3, "S8": 1, "S9": 2, "S12": 2, "S13": 3,
           "S14": 2, "S15": 2, "S16": 3, "L1": 4, "L2": 2, "L3": 5, "L4": 3, "L5": 1}
 FAMILY_CAP = 20
-ADVICE_ONLY = ("L3", "S8")      # never blocking, even on an engine-owned sheet
+ADVICE_ONLY = ("L3", "S8", "SKIP")      # never blocking, even on an engine-owned sheet (SKIP: a check that could not run)
 PAPER = {"A4": (297, 210), "A3": (420, 297), "A2": (594, 420), "A1": (841, 594), "A0": (1189, 841),
          "A": (279.4, 215.9), "B": (431.8, 279.4), "C": (558.8, 431.8), "D": (863.6, 558.8)}
 
@@ -186,7 +186,7 @@ def lint(sheet, render_text=True):
             te, tw = sd.text_check(text, sheet, sh, wires, tempfile.mkdtemp(prefix="forge-lint-"))
             F += te + tw
         except ImportError:
-            F.append("S13 not checked: PyMuPDF missing (text placement checks need it)")
+            F.append("SKIP S13-S16 text checks: PyMuPDF missing (pip install pymupdf)")
     F = list(dict.fromkeys(F))
     owned = engine_owned(sheet)
     fam = collections.Counter(f.split()[0] for f in F)

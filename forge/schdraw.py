@@ -595,7 +595,7 @@ def text_check(text, sheet_path, sh, wires, workdir):
     try:
         import fitz  # noqa: F401  (PyMuPDF is optional: without it the text checks are skipped, not a crash)
     except ImportError:
-        return [], ["S13-S16 text checks skipped: PyMuPDF is not installed (pip install pymupdf)"]
+        return [], ["SKIP S13-S16 text checks: PyMuPDF is not installed (pip install pymupdf)"]
     lines, (pw, ph) = pdf_lines(cli, sheet_path, workdir)
     if lines is None:
         return ["S13 could not export a PDF to check text placement"], []

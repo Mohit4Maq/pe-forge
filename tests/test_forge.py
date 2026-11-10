@@ -913,7 +913,9 @@ class JlcExport(unittest.TestCase):
     def test_migration_idempotent(self):
         env = dict(ENV, MC_DB=self.db)
         mc = [sys.executable, os.path.join(REPO, "library/tools/mclib.py"), "init"]
-        dump = lambda: subprocess.run(["sqlite3", self.db, ".schema"], capture_output=True, text=True).stdout
+        import sqlite3                                # the schema, without the sqlite3 command (not on Windows)
+        dump = lambda: "\n".join(r[0] for r in sqlite3.connect(self.db).execute(
+            "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name"))
         subprocess.run(mc, env=env, check=True, capture_output=True)
         s1 = dump()
         subprocess.run(mc, env=env, check=True, capture_output=True)

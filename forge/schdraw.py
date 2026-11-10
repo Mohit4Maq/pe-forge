@@ -592,6 +592,10 @@ def part_of_symbol(t, b, sh, reach=5.08):
 def text_check(text, sheet_path, sh, wires, workdir):
     """S13-S16 on the text KiCad really renders (PDF export), minus the frame / title block of an empty sheet."""
     cli = kc.find_cli()
+    try:
+        import fitz  # noqa: F401  (PyMuPDF is optional: without it the text checks are skipped, not a crash)
+    except ImportError:
+        return [], ["S13-S16 text checks skipped: PyMuPDF is not installed (pip install pymupdf)"]
     lines, (pw, ph) = pdf_lines(cli, sheet_path, workdir)
     if lines is None:
         return ["S13 could not export a PDF to check text placement"], []

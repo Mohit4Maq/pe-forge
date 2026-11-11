@@ -8,7 +8,7 @@
       holes, fiducials, logos: footprints with no symbol link) are never touched. Afterwards DRC with schematic
       parity should show no parity issue.
 
-  forge pcb setup
+  forge pcb setup [--replace-outline]
       Board set-up from project.toml [pcb]: outline, mounting holes (marked "not in schematic"), copper layer
       count and stack-up (copper weight per layer), minimum hole, values moved to the fab layer.
   forge pcb place <placement.json> [--dry-run]
@@ -269,11 +269,28 @@ s = json.load(open(sys.argv[1]))
 b = pcbnew.LoadBoard(s["board"])
 mm = pcbnew.FromMM
 X0, Y0 = s["origin"]; W, H = s["outline"]
-for d in list(b.GetDrawings()):
-    if d.GetLayer() == pcbnew.Edge_Cuts:
-        KEEP.append(d); b.Remove(d)
+# The outline: replaced only when pe-forge drew it (its group "forge_outline", or - boards set up before the group
+# existed - a single rectangle starting at the configured origin). Someone else's outline (notches, cut-outs, a
+# drawing from mechanical) is never touched unless the person asked: --replace-outline.
+edge = [d for d in b.GetDrawings() if d.GetLayer() == pcbnew.Edge_Cuts]
+grp = [g for g in b.Groups() if g.GetName() == "forge_outline"]
+in_grp = set()
+for g in grp:
+    for it in g.GetItems():
+        in_grp.add(it.m_Uuid.AsString())
+legacy = (len(edge) == 1 and edge[0].GetShape() == pcbnew.SHAPE_T_RECT
+          and edge[0].GetStart() == pcbnew.VECTOR2I(mm(X0), mm(Y0)))
+foreign = [d for d in edge if d.m_Uuid.AsString() not in in_grp and not legacy]
+if foreign and not s.get("replace_outline"):
+    print("REPORT" + json.dumps({"error": "outline", "foreign": len(foreign)}))
+    sys.exit(0)
+for d in edge:
+    KEEP.append(d); b.Remove(d)
+for g in grp:
+    KEEP.append(g); b.Remove(g)
 r = pcbnew.PCB_SHAPE(b); r.SetShape(pcbnew.SHAPE_T_RECT); r.SetLayer(pcbnew.Edge_Cuts); r.SetWidth(mm(0.1))
 r.SetStart(pcbnew.VECTOR2I(mm(X0), mm(Y0))); r.SetEnd(pcbnew.VECTOR2I(mm(X0 + W), mm(Y0 + H))); b.Add(r)
+og = pcbnew.PCB_GROUP(b); og.SetName("forge_outline"); b.Add(og); og.AddItem(r)
 have = {f.GetReference(): f for f in b.GetFootprints()}
 if s["hole_dir"] and s["inset"]:
     i_ = s["inset"]
@@ -319,9 +336,17 @@ for f in b.GetFootprints():
         f.SetBoardOnly(True); f.SetExcludedFromBOM(True); f.SetExcludedFromPosFiles(True)
     f.Value().SetLayer(pcbnew.F_Fab if not f.IsFlipped() else pcbnew.B_Fab)
 ds = b.GetDesignSettings()
-ds.SetCopperLayerCount(s["layers"])
-ds.m_MinThroughDrill = mm(s["min_hole"])
-ds.SetBoardThickness(mm(s["thickness"]))
+# only what the project sets explicitly; never fewer copper layers on a board that already has copper on them
+if s["layers"] is not None and s["layers"] != ds.GetCopperLayerCount():
+    has_copper = any(True for _ in b.GetTracks()) or any(not z.GetIsRuleArea() for z in b.Zones())
+    if s["layers"] < ds.GetCopperLayerCount() and has_copper:
+        print("REPORT" + json.dumps({"error": "layers", "have": ds.GetCopperLayerCount(), "want": s["layers"]}))
+        sys.exit(0)
+    ds.SetCopperLayerCount(s["layers"])
+if s["min_hole"] is not None:
+    ds.m_MinThroughDrill = mm(s["min_hole"])
+if s["thickness"] is not None:
+    ds.SetBoardThickness(mm(s["thickness"]))
 b.Save(s["board"])
 print("OK")
 '''
@@ -940,8 +965,8 @@ def board_only(board):
             raise SystemExit(f"{os.path.basename(board)} is open in KiCad (lock file): close it first")
 
 
-def setup(prj, board):
-    cfg = prj.cfg.get("pcb", {})
+def setup(prj, board, replace_outline=False):
+    cfg = dict(prj.cfg.get("pcb", {}), _replace_outline=replace_outline)
     if not cfg.get("outline_mm"):
         raise SystemExit("project.toml [pcb] outline_mm is not set (see forge pcb --help)")
     board_only(board)
@@ -952,13 +977,28 @@ def setup(prj, board):
     spec = {"fiducials": cfg.get("fiducials", []), "fid_dir": lib_dirs().get(flib) if cfg.get("fiducials") else None,
             "fid_name": fname, "marking": marking, "mark_keys": [m["t"] for m in marking],
             "board": os.path.abspath(board), "outline": cfg["outline_mm"], "origin": cfg.get("origin_mm", [100, 100]),
-            "layers": len(oz), "min_hole": cfg.get("min_hole_mm", 0.2), "thickness": cfg.get("thickness_mm", 1.6),
+            "replace_outline": bool(cfg.get("_replace_outline")),
+            # unset in [pcb] = keep the board's own value (an adopted board's stack-up is never reset to defaults)
+            "layers": len(cfg["copper_oz"]) if "copper_oz" in cfg else None,
+            "min_hole": cfg.get("min_hole_mm"), "thickness": cfg.get("thickness_mm"),
             "hole_dir": lib_dirs().get(lib), "hole_name": name, "inset": cfg.get("hole_inset_mm", 0),
             "keepout": cfg.get("hole_keepout_mm", 3.5)}
     out, err = _run(SETUP, spec)
+    m = re.search(r"REPORT(\{.*\})", out)
+    if m and json.loads(m.group(1)).get("error") == "layers":
+        e = json.loads(m.group(1))
+        raise SystemExit(f"[pcb] copper_oz asks for {e['want']} copper layers but the board has {e['have']} with copper "
+                         "on them: reducing would delete copper. Nothing was changed. Fix copper_oz, or remove the "
+                         "copper on the extra layers in KiCad first.")
+    if m and json.loads(m.group(1)).get("error") == "outline":
+        raise SystemExit(f"the board already has an outline pe-forge did not draw ({json.loads(m.group(1))['foreign']} "
+                         "item(s) on Edge.Cuts). Nothing was changed. Keep it (remove outline_mm from [pcb] and set up "
+                         "the rest by hand), or run `forge pcb setup --replace-outline` to replace it.")
     if "OK" not in out:
         raise SystemExit("pcbnew set-up failed: " + (err or out)[-600:])
-    write_stackup(board, oz, spec["thickness"], cfg.get("copper_finish", "None"))
+    if "copper_oz" in cfg:                           # the stack-up only when the project defines it
+        write_stackup(board, oz, spec["thickness"] if spec["thickness"] is not None else 1.6,
+                      cfg.get("copper_finish", "None"))
     return spec
 
 
@@ -1257,9 +1297,11 @@ def main(prj, argv):
             print(("PASS" if ok else "OPEN") + (f" ({where[0]})" if where else "") + "".join(f"\n  {p}" for p in probs))
         return 0 if ok else 1
     if argv[0] == "setup":
-        s = setup(prj, board)
-        print(f"board set up: {s['outline'][0]:g} x {s['outline'][1]:g} mm, {s['layers']} copper layers "
-              f"({'/'.join(str(x) for x in prj.cfg['pcb'].get('copper_oz', [1, 1]))} oz), min hole {s['min_hole']:g} mm"
+        s = setup(prj, board, replace_outline="--replace-outline" in argv)
+        print(f"board set up: {s['outline'][0]:g} x {s['outline'][1]:g} mm"
+              + (f", {s['layers']} copper layers ({'/'.join(str(x) for x in prj.cfg['pcb']['copper_oz'])} oz)"
+                 if s["layers"] is not None else ", copper layers and stack-up unchanged (no copper_oz in [pcb])")
+              + (f", min hole {s['min_hole']:g} mm" if s["min_hole"] is not None else "")
               + (", 4 mounting holes" if s["inset"] else ""))
         return 0
     if argv[0] == "place":

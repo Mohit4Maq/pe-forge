@@ -58,6 +58,26 @@ servers, the KiCad parts library). Last, it asks:
    in Obsidian and in Claude Code (`/pe-forge:pe-run`).
 3. Not now.
 
+### A project that already has work in it
+
+`forge adopt <folder>` brings a half-done project under pe-forge **without changing any of its files**. Run it once
+to see the plan (nothing is written), then `forge adopt <folder> --apply`:
+- your KiCad files stay where they are: `project.toml [paths]` points pe-forge at them (nothing is moved);
+- the project starts at the phase the work is in (a drawn schematic: P6; a board with parts: P7); earlier phases
+  are marked skipped, not passed, so their gates stay yours to pass;
+- pe-forge's folders and files are only added; where you already have one (your `CLAUDE.md`, a plan) yours is
+  kept and pe-forge's goes beside it as `CLAUDE.forge-proposed.md` for you to merge;
+- every existing file is hashed before and after and must be byte-for-byte unchanged;
+- `forge adopt --undo` removes exactly what was added (a file you edited since is kept).
+
+**The write guard.** Everywhere else too, pe-forge never overwrites a file it did not write. It records what it
+generates (`.forge/generated.json`); a file you wrote, or one of its files you edited since, is left alone and the new
+version goes beside it (`WIP_BOM.forge-proposed.csv`). `forge guard status` lists both; `forge guard accept <path>`
+takes a proposed version (your previous one is backed up in `.forge/backup/`); `--replace` on a command overwrites
+after a backup. `forge pcb setup` never replaces a board outline it did not draw (`--replace-outline` to allow
+it), never changes the stack-up unless `[pcb] copper_oz` asks for it, and never removes copper layers that carry
+copper.
+
 Afterwards: `forge update` updates everything (tools, apps, Claude Code, pe-forge, its plugins); `forge doctor` shows
 what works; `./install.sh --check` reports without changing anything. If Claude Code has never run on the Mac, it
 asks you to log in the first time (Claude Pro, Max or an API key).
@@ -312,6 +332,7 @@ forge pcb sync|setup|place|zones|route|rules|copper|connectors|crosstalk|review-
 forge drift [--module M-xx]   forge explain U1 | NET | U1.7 | --pins MC_ID   forge txn begin|verify|commit|rollback
 forge cr new|validate|approve|close   forge ledger show|clear   forge fab manifest
 forge bom build [--boards N] [--offline] [--jlcpcb]   forge bom risk [--fresh]
+forge adopt [dir] [--apply|--undo]   forge guard status|accept <path>
 forge learn [show|off|on|clear]   forge feedback [--note T]   forge issue [--last] [--kind K] [--rule ID] [--dry-run]
 ```
 

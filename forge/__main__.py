@@ -41,6 +41,8 @@
   forge feedback [--note T]         redacted summary for the pe-forge team, shown first, never sent by itself
   forge issue [--last] [--kind bug|rule|check|idea] [--rule ID] [--dry-run] [--yes]
                                     one-step GitHub issue with the context filled in (gh, or the browser)
+  forge adopt [dir] [--apply|--undo] [--name N]   bring a half-done project under pe-forge without changing a file
+  forge guard status | accept <path>   files pe-forge generated; proposed copies beside files it would not overwrite
   forge doctor                      check the toolchain
   forge update [--yes]              update every tool, pe-forge and its plugins (runs install.sh --update)
   forge vault init|open [dir]       the project folder as an Obsidian vault (settings, register, open)
@@ -146,6 +148,12 @@ def _dispatch(argv):
     if cmd == "spice":
         from forge import spice
         return spice.main(need(), rest)
+    if cmd == "adopt":                                          # before a project exists
+        from forge import adopt
+        return adopt.main(rest)
+    if cmd == "guard":
+        from forge import guard
+        return guard.main(need(), rest)
     if cmd in ("learn", "feedback", "issue"):                   # work inside or outside a project
         from forge import learn
         if cmd == "learn":

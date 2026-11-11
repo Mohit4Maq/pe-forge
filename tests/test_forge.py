@@ -2092,6 +2092,45 @@ class PcbSync(unittest.TestCase):
         self.assertIn('(layer "F.Cu" (type "copper") (thickness 0.07))', blk)
 
     @unittest.skipUnless(kicad_cli(), "kicad-cli not installed")
+    def test_setup_never_replaces_a_users_outline_or_copper_layers(self):
+        sys.path.insert(0, REPO)
+        from forge import kicad
+        kp = kicad.find_python()
+        if not kp:
+            self.skipTest("KiCad's Python not found")
+        tmp = tempfile.mkdtemp(prefix="pe-forge-guard-pcb-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        d = new_project("Gp", tmp)
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/gp/gp.kicad_sch"))
+        pt = os.path.join(d, "project.toml")
+        open(pt, "a").write("\n[pcb]\noutline_mm = [40, 30]\ncopper_oz = [2, 1, 1, 2]\n")
+        forge("pcb", "sync", cwd=d)
+        forge("pcb", "setup", cwd=d)
+        zones = os.path.join(d, "zones.json")
+        json.dump([{"name": "gnd", "layer": "In1.Cu", "net": "GND", "rect": [0.5, 0.5, 39.5, 29.5]}], open(zones, "w"))
+        forge("pcb", "zones", zones, cwd=d, check=False)
+        board = os.path.join(d, "08_PCB/gp/gp.kicad_pcb")
+        txt = open(pt).read()                                       # read first: open(..., "w") truncates
+        open(pt, "w").write(txt.replace("copper_oz = [2, 1, 1, 2]", "copper_oz = [1, 1]"))
+        before = open(board, "rb").read()
+        r = forge("pcb", "setup", cwd=d, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("reducing would delete copper", r.stdout + r.stderr)
+        self.assertEqual(open(board, "rb").read(), before)          # nothing changed
+        txt = open(pt).read()
+        open(pt, "w").write(txt.replace("copper_oz = [1, 1]", "copper_oz = [2, 1, 1, 2]"))
+        subprocess.run([kp, "-c", "import pcbnew, sys\nb = pcbnew.LoadBoard(sys.argv[1]); mm = pcbnew.FromMM\n"
+                        "s = pcbnew.PCB_SHAPE(b); s.SetShape(pcbnew.SHAPE_T_SEGMENT); s.SetLayer(pcbnew.Edge_Cuts)\n"
+                        "s.SetStart(pcbnew.VECTOR2I(mm(110), mm(130))); s.SetEnd(pcbnew.VECTOR2I(mm(115), mm(130)))\n"
+                        "b.Add(s); b.Save(sys.argv[1])", board], capture_output=True)
+        before = open(board, "rb").read()
+        r = forge("pcb", "setup", cwd=d, check=False)              # someone else's outline piece is on the board
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("outline pe-forge did not draw", r.stdout + r.stderr)
+        self.assertEqual(open(board, "rb").read(), before)
+        r = forge("pcb", "setup", "--replace-outline", cwd=d)      # only on explicit request
+        self.assertIn("40 x 30 mm", r.stdout)
+
     def test_setup_and_place(self):
         sys.path.insert(0, REPO)
         from forge import kicad
@@ -2434,6 +2473,79 @@ class Supply(unittest.TestCase):
         doc["lines"][0]["waived"] = "PO 1234 reserves on-order stock (owner OK)"
         json.dump(doc, open(os.path.join(d, ".forge", "cache", "supply.json"), "w"))
         self.assertTrue(self.s.gate_items(P)[0][0])                     # waived with a reason: passes
+
+
+class GuardAndAdopt(unittest.TestCase):
+    """pe-forge never overwrites a file it did not write; adopting a half-done project changes none of its files."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-adopt-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_guard_states(self):
+        from forge import guard
+        root = os.path.join(self.tmp, "r")
+        os.makedirs(root)
+        f = os.path.join(root, "BOM.csv")
+        self.assertEqual(guard.write(root, f, "a\n")[0], "written")
+        self.assertEqual(guard.write(root, f, "b\n")[0], "updated")           # ours, unchanged since: rewritten
+        open(f, "w").write("my edit\n")
+        st, p = guard.write(root, f, "c\n")
+        self.assertEqual(st, "proposed")                                      # edited by the user: kept
+        self.assertEqual(open(f).read(), "my edit\n")
+        self.assertTrue(p.endswith("BOM.forge-proposed.csv"))
+        self.assertEqual(open(p).read(), "c\n")
+        mine = os.path.join(root, "notes.md")
+        open(mine, "w").write("mine\n")
+        self.assertEqual(guard.write(root, mine, "x\n")[0], "proposed")        # never ours
+        self.assertEqual(guard.write(root, mine, "x\n", replace=True)[0], "replaced")
+        self.assertEqual(open(mine).read(), "x\n")
+        backups = [os.path.join(dp, n) for dp, _, fs in os.walk(os.path.join(root, ".forge", "backup")) for n in fs]
+        self.assertEqual([open(b).read() for b in backups], ["mine\n"])          # the original was backed up
+        b = guard.accept(root, "BOM.csv")
+        self.assertEqual(open(f).read(), "c\n")
+        self.assertEqual(open(b).read(), "my edit\n")
+
+    def half_done(self):
+        d = os.path.join(self.tmp, "Cust")
+        os.makedirs(os.path.join(d, "hw", "buck"))
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "hw", "buck", "buck.kicad_sch"))
+        open(os.path.join(d, "CLAUDE.md"), "w").write("# my rules\n")
+        os.makedirs(os.path.join(d, "01_Program"))
+        open(os.path.join(d, "01_Program", "Master_Plan.md"), "w").write("my plan\n")
+        open(os.path.join(d, "bom.csv"), "w").write("Ref,MPN\nU1,X\n")
+        return d
+
+    def test_new_force_never_replaces_a_file(self):
+        d = self.half_done()
+        forge("new", d, "--name", "Cust", "--force")
+        self.assertEqual(open(os.path.join(d, "CLAUDE.md")).read(), "# my rules\n")
+        self.assertEqual(open(os.path.join(d, "01_Program", "Master_Plan.md")).read(), "my plan\n")
+        self.assertTrue(os.path.exists(os.path.join(d, "CLAUDE.forge-proposed.md")))
+
+    def test_adopt_survey_apply_unchanged_and_undo(self):
+        from forge import adopt
+        d = self.half_done()
+        before = adopt.snapshot(d)
+        r = forge("adopt", d, "--name", "Cust")                              # survey only
+        self.assertIn('[paths] pcb = "hw"', r.stdout)
+        self.assertIn("start at P6", r.stdout)
+        self.assertEqual(adopt.snapshot(d), before)                          # the survey writes nothing
+        self.assertFalse(os.path.exists(os.path.join(d, "project.toml")))
+        r = forge("adopt", d, "--apply", "--name", "Cust")
+        self.assertIn("every existing file unchanged (verified)", r.stdout)
+        after = adopt.snapshot(d)
+        self.assertEqual({k: after[k] for k in before}, before)              # byte for byte
+        self.assertIn('pcb = "hw"', open(os.path.join(d, "project.toml")).read())
+        st = json.load(open(os.path.join(d, ".forge", "state.json")))
+        self.assertEqual(st["phases"]["P6"]["status"], "active")
+        self.assertEqual(st["phases"]["P2"]["status"], "skipped")            # done outside pe-forge, not passed
+        self.assertTrue(os.path.exists(os.path.join(d, "CLAUDE.forge-proposed.md")))
+        r = forge("adopt", d, "--apply", check=False)                        # twice: refused, nothing changes
+        self.assertNotEqual(r.returncode, 0)
+        forge("adopt", d, "--undo")
+        self.assertEqual(adopt.snapshot(d), before)                          # back to exactly what was there
 
 
 if __name__ == "__main__":

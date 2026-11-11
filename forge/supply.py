@@ -1,7 +1,7 @@
 """forge bom build / risk: the BoM from the schematic, priced and stock-checked for primary and alternate, with a
 supply-chain risk assessment.
 
-  forge bom build [--boards N] [--spares N] [--offline] [--jlcpcb]
+  forge bom build [--boards N] [--spares N] [--offline] [--jlcpcb] [--replace]
       1. groups the drawn schematic into BoM lines (MC_Parts is authoritative) and writes the order files
          (DigiKey / Mouser upload, optional JLCPCB BoM + CPL) into 09_Release/<REVISION>/bom/ (REVISION from the
          KiCad project's text variables, default A)
@@ -11,6 +11,8 @@ supply-chain risk assessment.
       3. writes 04_Hardware/BOM/WIP_BOM.csv (the columns forge bom check and gate G4 need), the risk report
          04_Hardware/BOM/Supply_Risk.md and .forge/cache/supply.json
   forge bom risk [--offline] [--json]     the risk assessment again from the last lookups (or fresh)
+The BoM files go through the write guard: a BoM you wrote yourself is never overwritten (pe-forge writes
+WIP_BOM.forge-proposed.csv beside it); --replace overwrites it after a backup in .forge/backup/.
   forge bom check [file]                  completeness: price, stock and alternate on every line
 
 --offline uses only the parts database fields (Mouser_Stock, prices, lead time, lifecycle, Sourcing_Date) and
@@ -233,7 +235,7 @@ def _alt_match(row):
     return m.group(1).upper() if m else ""
 
 
-def run(prj, boards=None, spares=0, offline=False, jlcpcb=False):
+def run(prj, boards=None, spares=0, offline=False, jlcpcb=False, replace=False):
     from .evidence import rows_by_id
     cfg = prj.cfg.get("bom", {})
     boards = boards or int(cfg.get("boards", 5))
@@ -269,7 +271,7 @@ def run(prj, boards=None, spares=0, offline=False, jlcpcb=False):
                "currency": next((v.get("currency") for r in res for v in r["prim"].values() if v.get("currency")), ""),
                "levels": {k: sum(1 for r in res if r["level"] == k and not r["waived"]) for k in LEVEL},
                "waived": sum(1 for r in res if r["waived"]), "order_files": prj.rel(outdir),
-               "not_purchased": skipped}
+               "not_purchased": skipped, "replace": replace}
     write(prj, res, summary)
     return res, summary, gen_log
 
@@ -284,7 +286,12 @@ def write(prj, res, s):
     os.makedirs(bdir, exist_ok=True)
     cols = ["Ref", "Qty", "MPN", "Manufacturer", "Description", "Price_1", "Stock", "Source", "Alt MPN",
             "Alt manufacturer", "Alt price / stock", "Alt match", "Lead time", "Lifecycle", "Risk", "Risk factors", "MC_ID"]
-    with open(prj.p("bom_csv"), "w", newline="") as f:
+    import io
+    from . import guard
+    replace = bool(s.get("replace"))
+    say = lambda m: print("  " + m)
+    f = io.StringIO(newline="")
+    if True:                                        # the CSV is built in memory, then written under the guard
         w = csv.DictWriter(f, cols)
         w.writeheader()
         for r in res:
@@ -303,6 +310,9 @@ def write(prj, res, s):
                         "Lifecycle": next((v.get("lifecycle") for v in r["prim"].values() if v.get("lifecycle")), ""),
                         "Risk": ("WAIVED " if r["waived"] else "") + r["level"],
                         "Risk factors": "; ".join(f"{c}: {e}" for _, c, e, _ in r["findings"]), "MC_ID": l.get("MC_ID", "")})
+    s["written"] = {}
+    st, wp = guard.write(prj.root, prj.p("bom_csv"), f.getvalue(), replace, say)
+    s["written"]["bom_csv"] = [st, prj.rel(wp)]
     cur = s["currency"]
     B = ["---", "type: bom", f"generated: {s['date']}", "source: forge bom build (do not edit by hand: edit MC_Parts or the schematic)",
          "---", f"# BoM: {prj.cfg.get('project', {}).get('name', '')}", "",
@@ -322,7 +332,8 @@ def write(prj, res, s):
     if s.get("not_purchased"):
         B += ["", "Not purchased (PCB features): " + ", ".join(s["not_purchased"])]
     B += ["", "Supply-chain risk and mitigations: [[Supply_Risk]]. Order files: `" + s["order_files"] + "/`."]
-    open(os.path.splitext(prj.p("bom_csv"))[0] + ".md", "w").write("\n".join(B) + "\n")
+    st, wp = guard.write(prj.root, os.path.splitext(prj.p("bom_csv"))[0] + ".md", "\n".join(B) + "\n", replace, say)
+    s["written"]["bom_md"] = [st, prj.rel(wp)]
     L = [f"# Supply-chain risk: {prj.cfg.get('project', {}).get('name', '')}", "",
          f"{s['date']} · build of {s['boards']} board(s)" + (f" + {s['spares']} spares per line" if s.get("spares") else "")
          + f" · {s['lines']} lines · order {cur}{s['cost_total']:,.2f} · {cur}{s['cost_per_board']:,.2f} per board (Mouser 1-off prices)" + (" · OFFLINE (database / cache only)" if s["offline"] else ""),
@@ -341,7 +352,8 @@ def write(prj, res, s):
     L += ["", "Factors: SC-1 can't build · SC-2 single source · SC-3 lifecycle · SC-4 lead time · SC-5 thin coverage · "
               "SC-6 alternate not usable now · SC-7 MOQ · SC-8 library status · SC-9 cost concentration.",
           f"Order files (DigiKey / Mouser uploads): `{s['order_files']}/`. Regenerate: `forge bom build --boards {s['boards']}`."]
-    open(os.path.join(bdir, "Supply_Risk.md"), "w").write("\n".join(L) + "\n")
+    st, wp = guard.write(prj.root, os.path.join(bdir, "Supply_Risk.md"), "\n".join(L) + "\n", replace, say)
+    s["written"]["risk"] = [st, prj.rel(wp)]
     d = prj.p("tools_data", "cache")
     os.makedirs(d, exist_ok=True)
     json.dump({"summary": s, "lines": [{k: v for k, v in r.items()} for r in res]}, open(os.path.join(d, "supply.json"), "w"),
@@ -386,7 +398,7 @@ def main(prj, argv):
         d = last(prj); res, s = d["lines"], d["summary"]
     else:
         res, s, gen = run(prj, int(arg("--boards", 0)) or None, int(arg("--spares", 0)), "--offline" in argv,
-                          "--jlcpcb" in argv)
+                          "--jlcpcb" in argv, replace="--replace" in argv)
     if "--json" in argv:
         print(json.dumps({"summary": s, "lines": res}, indent=1, default=str))
         return 0

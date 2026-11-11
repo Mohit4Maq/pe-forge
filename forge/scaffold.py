@@ -1,5 +1,8 @@
 """forge new <dir> --name NAME [--answers intake.json] [--owner NAME] [--force]
 
+Never replaces a file: a template file that already exists in <dir> is kept and pe-forge's version goes beside it
+(<name>.forge-proposed<ext>). For a project that already has work in it, use `forge adopt`.
+
 Creates the project folder from template/, writes project.toml from the intake answers (the /pe-new skill
 collects them as multiple-choice questions), copies the KiCad project template into 08_PCB/<slug>/, writes
 .forge/state.json with P0 active, and runs `git init`. Nothing is committed: the skill asks first.
@@ -113,25 +116,135 @@ def fill(path, subs):
 
 
 def kicad_project(dst, slug, a):
+    """The starter KiCad project in 08_PCB/<slug>/, only when that folder holds no KiCad project yet."""
+    from . import guard
     src = os.path.join(config.FORGE_ROOT, "library", "template", "MC_Standard")
     out = os.path.join(dst, "08_PCB", slug)
+    if os.path.isdir(out) and any(f.endswith((".kicad_pro", ".kicad_sch", ".kicad_pcb")) for f in os.listdir(out)):
+        return out                                   # a KiCad project is already there: never touch it
     os.makedirs(out, exist_ok=True)
     for f in os.listdir(src):
         s = os.path.join(src, f)
         name = f.replace("MC_Standard", slug)
         if os.path.isdir(s):
-            shutil.copytree(s, os.path.join(out, name), dirs_exist_ok=True)
+            for dp, _, fs in os.walk(s):
+                for g in fs:
+                    rel = os.path.relpath(os.path.join(dp, g), s)
+                    guard.write(dst, os.path.join(out, name, rel), open(os.path.join(dp, g), "rb").read())
         else:
-            shutil.copy(s, os.path.join(out, name))
-    pro = os.path.join(out, f"{slug}.kicad_pro")
-    if os.path.exists(pro):
-        p = json.load(open(pro))
-        tv = p.setdefault("text_variables", {})
-        tv.update({"COMPANY": a.get("company", ""), "DESIGNER": a.get("owner", ""), "REVISION": "A",
-                   "PCB_PN": "TBD", "RELEASE_DATE": "DRAFT"})
-        p.setdefault("meta", {})["filename"] = f"{slug}.kicad_pro"
-        json.dump(p, open(pro, "w"), indent=2)
+            data = open(s, "rb").read()
+            if name.endswith(".kicad_pro"):
+                p = json.loads(data)
+                tv = p.setdefault("text_variables", {})
+                tv.update({"COMPANY": a.get("company", ""), "DESIGNER": a.get("owner", ""), "REVISION": "A",
+                           "PCB_PN": "TBD", "RELEASE_DATE": "DRAFT"})
+                p.setdefault("meta", {})["filename"] = f"{slug}.kicad_pro"
+                data = json.dumps(p, indent=2)
+            guard.write(dst, os.path.join(out, name), data)
     return out
+
+
+TEXT_EXT = (".md", ".toml", ".csv", ".json", ".yml", ".yaml", ".txt", ".gitignore", ".gitattributes")
+
+
+def copy_template(dst, subs, out=None):
+    """Template files one by one through the write guard: a file that already exists is never replaced (pe-forge's
+    version goes beside it as <name>.forge-proposed<ext>). Placeholders are filled in the template text only, never
+    in the project's own files. Returns {"written": [...], "proposed": [...], "unchanged": [...]} (relative paths)."""
+    from . import guard
+    res = {"written": [], "proposed": [], "unchanged": []}
+    for dp, dn, fs in os.walk(config.TEMPLATE):
+        dn[:] = [d for d in dn if d not in (".git", "__pycache__")]
+        for f in fs:
+            if f == ".gitkeep" or f.startswith(".DS_Store") or " 2." in f or f.endswith(" 2"):
+                continue
+            s = os.path.join(dp, f)
+            rel = os.path.relpath(s, config.TEMPLATE)
+            data = open(s, "rb").read()
+            if f.endswith(TEXT_EXT) or f in (".gitignore", ".gitattributes"):
+                try:
+                    txt = data.decode("utf-8")
+                    for k, v in subs.items():
+                        txt = txt.replace("{{" + k + "}}", v)
+                    data = txt.encode("utf-8")
+                except UnicodeDecodeError:
+                    pass
+            st, wp = guard.write(dst, os.path.join(dst, rel), data)
+            key = {"written": "written", "updated": "written", "unchanged": "unchanged"}.get(st, "proposed")
+            res[key].append(os.path.relpath(wp, dst).replace(os.sep, "/"))
+        for d in dn:                                 # empty template folders exist too
+            os.makedirs(os.path.join(dst, os.path.relpath(os.path.join(dp, d), config.TEMPLATE)), exist_ok=True)
+    if out and res["proposed"]:
+        out(f"  {len(res['proposed'])} file(s) already existed and were kept; pe-forge's versions are beside them "
+            "(*.forge-proposed.*): review and merge, or `forge guard accept <path>`")
+    return res
+
+
+def create(dst, a, paths=None, kicad=True, out=print):
+    """Lay out a pe-forge project in dst without replacing anything that is there. Returns what was created."""
+    from . import guard
+    if os.path.exists(os.path.join(dst, "project.toml")):
+        raise SystemExit(f"{dst} already holds a pe-forge project (project.toml)")
+    os.makedirs(dst, exist_ok=True)
+    had_git = os.path.isdir(os.path.join(dst, ".git"))
+    subs = {"NAME": a["name"], "DATE": dt.date.today().isoformat(), "OWNER": a.get("owner", "The owner"),
+            "SUMMARY": a.get("summary", "")}
+    made = copy_template(dst, subs, out)
+    eff = dict(config.DEFAULT_PATHS, **(paths or {}))
+    for key, rel in eff.items():                     # every standard folder exists (mapped ones already do)
+        os.makedirs(os.path.join(dst, rel if not os.path.splitext(rel)[1] else os.path.dirname(rel)), exist_ok=True)
+    toml, slug = project_toml(a)
+    if paths:
+        toml += "\n[paths]                       # the project's own folders (forge adopt)\n" + "".join(
+            f'{k} = "{v}"\n' for k, v in sorted(paths.items()))
+    st_, _ = guard.write(dst, os.path.join(dst, "project.toml"), toml)
+    made["written"].append("project.toml")
+    intake = (f"---\ntype: intake\ndate: {subs['DATE']}\n---\n# {a['name']}: intake answers\n\n"
+              f"**Summary:** {a.get('summary', '')}\n\n| Question | Answer |\n|---|---|\n")
+    for q, ans in (a.get("answers") or {}).items():
+        intake += f"| {q} | {ans} |\n"
+    for k in ("type", "specs", "corners", "standards", "volume", "target_cost_usd", "profile", "schematic_mode",
+              "reviews", "region", "distributors"):
+        if k in a:
+            intake += f"| {k} | {json.dumps(a[k], ensure_ascii=False)} |\n"
+    ip = os.path.join(dst, "03_Foundation", "Intake_Answers.md")
+    s_, wp = guard.write(dst, ip, intake)
+    made["written" if s_ in ("written", "updated", "unchanged") else "proposed"].append(os.path.relpath(wp, dst).replace(os.sep, "/"))
+    if kicad:
+        kicad_project(dst, slug, a)
+    prj = config.Project(dst)
+    st = state._blank()
+    st["phases"]["P0"]["status"] = "active"
+    state.log(st, "project created")
+    state.save(prj, st)
+    if not had_git:
+        subprocess.run(["git", "init", "-q", "-b", "main", dst], check=False)
+    extras = {"git_init": not had_git, "obsidian": [], "statusline": None, "hook": False}
+    if a.get("obsidian", True):        # the project folder is also an Obsidian vault (never overwrites a setting)
+        from . import vault
+        extras["obsidian"] = [os.path.relpath(w, dst).replace(os.sep, "/") for w in (vault.init(dst) or [])]
+    if a.get("statusline", True):      # the pe-forge bar, for this project on this machine only (merged, with a .bak)
+        from . import statusline
+        sl = os.path.join(dst, ".claude", "settings.local.json")
+        existed = os.path.exists(sl)
+        try:
+            statusline.install(sl)
+            extras["statusline"] = "merged" if existed else "created"
+        except Exception as e:
+            out(f"  status line not installed: {e}")
+    if a.get("precommit_hook", True):  # never replaces someone else's hook (forge hooks install --chain keeps it)
+        from . import check
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = check.hooks(prj, ["install"])
+        extras["hook"] = rc == 0
+        if rc:
+            out("  git pre-commit hook: you already have one; not replaced (forge hooks install --chain adds ours after it)")
+    made["extras"] = extras
+    made["slug"] = slug
+    return made
 
 
 def main(argv):
@@ -151,55 +264,14 @@ def main(argv):
     if os.path.isdir(dst) and "--force" not in argv:
         extra = [f for f in os.listdir(dst) if f not in (".obsidian", ".git", ".gitignore", ".DS_Store", ".claude", "00_Inbox")]
         if extra:
-            raise SystemExit(f"{dst} is not empty ({', '.join(sorted(extra)[:5])}): use a new folder, or --force")
-    shutil.copytree(config.TEMPLATE, dst, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".gitkeep"))
-    for key, rel in config.DEFAULT_PATHS.items():   # every standard folder exists, whatever git kept of the template
-        os.makedirs(os.path.join(dst, rel if not os.path.splitext(rel)[1] else os.path.dirname(rel)), exist_ok=True)
-    toml, slug = project_toml(a)
-    open(os.path.join(dst, "project.toml"), "w").write(toml)
-    subs = {"NAME": a["name"], "DATE": dt.date.today().isoformat(), "OWNER": a.get("owner", "The owner"),
-            "SUMMARY": a.get("summary", "")}
-    for dp, _, fs in os.walk(dst):
-        if "/.git" in dp:
-            continue
-        for f in fs:
-            if f.endswith((".md", ".toml", ".csv")):
-                fill(os.path.join(dp, f), subs)
-    with open(os.path.join(dst, "03_Foundation", "Intake_Answers.md"), "w") as fh:
-        fh.write(f"---\ntype: intake\ndate: {subs['DATE']}\n---\n# {a['name']}: intake answers\n\n"
-                 f"**Summary:** {a.get('summary', '')}\n\n| Question | Answer |\n|---|---|\n")
-        for q, ans in (a.get("answers") or {}).items():
-            fh.write(f"| {q} | {ans} |\n")
-        for k in ("type", "specs", "corners", "standards", "volume", "target_cost_usd", "profile", "schematic_mode",
-                  "reviews", "region", "distributors"):
-            if k in a:
-                fh.write(f"| {k} | {json.dumps(a[k], ensure_ascii=False)} |\n")
-    kicad_project(dst, slug, a)
-    prj = config.Project(dst)
-    st = state._blank()
-    st["phases"]["P0"]["status"] = "active"
-    state.log(st, "project created")
-    state.save(prj, st)
-    if not os.path.isdir(os.path.join(dst, ".git")):
-        subprocess.run(["git", "init", "-q", "-b", "main", dst], check=False)
-    if a.get("obsidian", True):        # the project folder is also an Obsidian vault
-        from . import vault
-        vault.init(dst)
-    if a.get("statusline", True):      # the pe-forge bar, for this project on this machine only
-        from . import statusline
-        try:
-            statusline.install(os.path.join(dst, ".claude", "settings.local.json"))
-        except Exception as e:
-            print(f"  status line not installed: {e}")
-    if a.get("precommit_hook", True):
-        from . import check
-        import contextlib
-        import io
-        with contextlib.redirect_stdout(io.StringIO()):
-            check.hooks(prj, ["install"])
+            raise SystemExit(f"{dst} is not empty ({', '.join(sorted(extra)[:5])}). For a project that already has "
+                             "work in it use `forge adopt` (it maps your folders and never replaces a file); "
+                             "--force lays out pe-forge here without replacing anything either")
+    made = create(dst, a)
+    slug = made["slug"]
     print(f"created {a['name']} at {dst}\n  KiCad project: 08_PCB/{slug}/"
-          + ("\n  git pre-commit hook: forge check (remove with `forge hooks --uninstall`)" if a.get("precommit_hook", True) else "")
+          + ("\n  git pre-commit hook: forge check (remove with `forge hooks --uninstall`)" if made["extras"]["hook"] else "")
           + ("\n  status line: pe-forge bar in .claude/settings.local.json (restart Claude Code to see it)"
-             if a.get("statusline", True) else "")
+             if made["extras"]["statusline"] else "")
           + "\n  next: /pe-run (or `forge status`)")
     return 0

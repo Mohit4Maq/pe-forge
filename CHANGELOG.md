@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+**Half-done projects and the write guard**
+- `forge adopt`: survey, then add pe-forge around an existing project without changing a file (verified by hash),
+  KiCad files mapped in place, phase from the work done, `--undo`.
+- Write guard: pe-forge never overwrites a file it did not write; proposed copies beside it, `forge guard
+  status / accept`, `--replace` with a backup. Used by `forge new` (also with `--force`, which used to replace
+  CLAUDE.md and the plan), `forge bom build` (used to overwrite a hand-made WIP_BOM.csv) and the template copy.
+- `forge pcb setup`: keeps an outline it did not draw, keeps the stack-up unless `copper_oz` is set (it used to reset
+  a 4-layer board to 2 layers), never removes copper layers that carry copper.
+
+**Windows**: native support work (W1-W4): launchers, UTF-8, LF, paths, KiCad discovery; the suite passes on
+Windows 11 ARM64 with KiCad 10; owner-only CR approval hardened against a NUL stdin.
+
 ## v0.3 (2026-11-09)
 
 **PCB layout as data, reviewed against rules**

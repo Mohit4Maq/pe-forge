@@ -2548,5 +2548,120 @@ class GuardAndAdopt(unittest.TestCase):
         self.assertEqual(adopt.snapshot(d), before)                          # back to exactly what was there
 
 
+class HelpFirstLevels(unittest.TestCase):
+    """An unmanaged KiCad folder gets help first (forge quick, read-only); adoption starts light; the process is
+    enforced before a release; lowering the level is the owner's."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-quick-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def board(self):
+        d = os.path.join(self.tmp, "Cust")
+        os.makedirs(os.path.join(d, "hw", "buck"))
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "hw", "buck", "buck.kicad_sch"))
+        open(os.path.join(d, "notes.md"), "w").write("my notes\n")
+        return d
+
+    def need_kicad(self):
+        from forge import kicad
+        if not kicad.find_cli():
+            self.skipTest("kicad-cli not found")
+
+    def test_quick_runs_on_a_copy_and_changes_nothing(self):
+        self.need_kicad()
+        from forge import adopt
+        d = self.board()
+        before = adopt.snapshot(d)
+        r = forge("quick", d, "--json", check=False)
+        q = json.loads(r.stdout)
+        self.assertEqual(adopt.snapshot(d), before)                       # nothing written, nothing changed
+        self.assertFalse(os.path.exists(os.path.join(d, ".forge")))
+        self.assertIn("erc", q["checks"])
+        self.assertIn("+12V", q["board"])
+        self.assertEqual(set(q["ranked"]), {"safety", "error", "warning", "not_run"})
+        for n, c in q["checks"].items():                                  # a check that did not run says why
+            if c["status"] == "skip":
+                self.assertTrue(c["reason"])
+
+    def test_session_hint_only_for_an_unmanaged_kicad_folder(self):
+        d = self.board()
+        env = dict(ENV, CLAUDE_PROJECT_DIR=d)
+        run = lambda: subprocess.run(FORGE + ["watch", "--report", "--event", "SessionStart"], cwd=d,
+                                     capture_output=True, text=True, env=env).stdout
+        out = json.loads(run())
+        self.assertIn("not a pe-forge project yet", out["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("forge quick", out["hookSpecificOutput"]["additionalContext"])
+        empty = os.path.join(self.tmp, "empty")
+        os.makedirs(empty)
+        env["CLAUDE_PROJECT_DIR"] = empty
+        self.assertEqual(subprocess.run(FORGE + ["watch", "--report", "--event", "SessionStart"], cwd=empty,
+                                        capture_output=True, text=True, env=env).stdout.strip(), "")
+        env["CLAUDE_PROJECT_DIR"] = d
+        forge("adopt", d, "--apply", "--name", "Cust")
+        self.assertNotIn("not a pe-forge project yet", run())          # a project now: the normal hook
+
+    def test_adopt_is_light_light_never_blocks_release_refused(self):
+        from forge import config, gates, ledger
+        from unittest import mock
+        d = self.board()
+        forge("adopt", d, "--apply", "--name", "Cust")
+        prj = config.Project(d)
+        self.assertEqual(prj.level, "light")
+        dd = ledger.load(prj)
+        dd["open"] = [{"kind": "drift", "target": "project", "opened_by": "claude", "opened_at": "t", "file": ""}]
+        ledger.save(prj, dd)
+        with mock.patch.object(ledger, "evaluate", return_value={("drift", "project"): "2 claims differ"}):
+            self.assertEqual(ledger.check_hook(prj, {}), 0)               # light: advice, never blocks
+        items = gates.release_process_items(prj)
+        self.assertFalse(items[0][0])                                     # no release in light mode
+        self.assertFalse(items[1][0])                                     # P2 skipped at adoption: not in place
+        r = forge("level", "standard", cwd=d)
+        self.assertIn("forge req infer", r.stdout)
+        prj = config.Project(d)
+        self.assertEqual(prj.level, "standard")
+        with mock.patch.object(ledger, "evaluate", return_value={("drift", "project"): "2 claims differ"}):
+            self.assertEqual(ledger.check_hook(prj, {}), 2)               # standard: the open obligation blocks
+        items = gates.release_process_items(prj)
+        self.assertEqual(len(items), 1)
+        self.assertFalse(items[0][0])                                     # still needs the requirements
+        r = forge("level", "light", cwd=d, check=False, stdin="")        # not a terminal: not the owner
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("owner's decision", r.stdout + r.stderr)
+        self.assertEqual(config.Project(d).level, "standard")
+
+    def test_strict_takes_no_gate_override(self):
+        d = new_project("St", self.tmp)
+        forge("level", "strict", cwd=d)
+        forge("gate", "pass", "G0", cwd=d, check=False)
+        r = forge("gate", "pass", "G1", "--override", "--note", "x", cwd=d, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no override", r.stdout)
+        self.assertIn('level = "strict"', open(os.path.join(d, "project.toml")).read())
+
+    def test_req_infer_drafts_and_applies_only_confirmed_rows(self):
+        self.need_kicad()
+        d = self.board()
+        forge("adopt", d, "--apply", "--name", "Cust")
+        r = forge("req", "infer", cwd=d)
+        draft = os.path.join(d, "02_Requirements", "Inferred_Requirements.md")
+        t = open(draft).read()
+        self.assertIn("DRAFT", t)
+        self.assertIn("+12V", t)
+        self.assertIn("not in the design: the owner sets it", t)
+        r = forge("req", "infer", "--apply", cwd=d, check=False)          # blanks left: refused
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("blanks", r.stdout + r.stderr)
+        rows = [l for l in t.splitlines() if l.startswith("| SYS-")]
+        keep = [re.sub(r"_\([^)]*\)_", "5", l) for l in rows if "owner sets it" not in l]
+        open(draft, "w").write("\n".join(keep) + "\n")                   # the owner filled and trimmed it
+        forge("req", "infer", "--apply", cwd=d)
+        forge("req", "infer", "--apply", cwd=d)                           # twice: replaced, not duplicated
+        sr = open(os.path.join(d, "02_Requirements", "System_Requirements.md")).read()
+        self.assertEqual(sr.count("inferred from the design"), len(keep))
+        self.assertNotIn("_(fill in)_ | _(fill in)_", sr.split("## 2.")[0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

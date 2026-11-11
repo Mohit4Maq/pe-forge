@@ -378,7 +378,7 @@ def render(res):
 def main(prj, argv):
     opt = lambda k: argv[argv.index(k) + 1] if k in argv else None
     only = [x for x in (opt("--only") or "").split(",") if x] or None
-    res = run(prj, only, "--fab" in argv, "--strict" in argv, opt("--module"))
+    res = run(prj, only, "--fab" in argv, "--strict" in argv or prj.level == "strict", opt("--module"))
     print(json.dumps(res, indent=1) if "--json" in argv else render(res))
     return 0 if res["ok"] else 1
 

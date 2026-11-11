@@ -42,7 +42,7 @@ def mode(prj):
     m = prj.process.get("change_control")
     if m in ("enforce", "warn", "off"):
         return m
-    return "warn" if prj.process.get("profile") == "lite" else "enforce"
+    return "warn" if prj.process.get("profile") == "lite" or prj.level == "light" else "enforce"
 
 
 def _list(v):

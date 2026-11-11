@@ -125,7 +125,8 @@ def apply(root, name, out=print):
         raise SystemExit(f"{root} is already a pe-forge project (project.toml): nothing to adopt")
     before = snapshot(root)
     paths = {"pcb": sv["pcb_root"]} if sv["pcb_root"] is not None else {}
-    a = {"name": name, "summary": "adopted project", "schematic_mode": "user"}
+    a = {"name": name, "summary": "adopted project", "schematic_mode": "user", "level": "light",
+         "change_control": "warn"}
     made = scaffold.create(root, a, paths=paths, kicad=sv["pcb_root"] is None, out=out)
     # the phase: where the work is; earlier phases skipped (not passed)
     prj = config.Project(root)

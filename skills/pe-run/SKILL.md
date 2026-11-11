@@ -14,6 +14,14 @@ independent reviewer.
 
 > **Agent names:** installed as a plugin, every agent is prefixed with the plugin name: spawn `pe-forge:pe-hw`, `pe-forge:pe-reviewer`, `pe-forge:schematic-reviewer` and so on (subagent_type). This file uses the short names.
 
+> **No `project.toml` here but KiCad files** (the session-start note says "not a pe-forge project yet"), or a
+> request like "help me with this board" on a folder that is not a project: follow `/pe-adopt`. Help first with
+> `forge quick` (read-only), offer adoption once afterwards, the full process only before boards are made.
+>
+> **Light mode** (`forge level` says light, as after `forge adopt`): checks are advice and nothing blocks. Keep the
+> owner's question first; mention open findings briefly; do not push phases. Release (G8) is refused until the
+> level is raised: `forge req infer` + the owner's confirmation, then `forge level standard`.
+
 ## 1. Orient (every time)
 1. `forge status`: phases, modules, next action. `forge watch --show`: the owner's manual edits (Rule 5).
 2. Read `CLAUDE.md`, `project.toml` and the open rows of `01_Program/Master_Plan.md` (D / E / S / V).

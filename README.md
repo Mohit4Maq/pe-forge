@@ -58,6 +58,27 @@ servers, the KiCad parts library). Last, it asks:
    in Obsidian and in Claude Code (`/pe-forge:pe-run`).
 3. Not now.
 
+### Help on a board first, the process later
+
+Open Claude Code in a KiCad folder that is not a pe-forge project and ask "help me with this board": pe-forge
+notices (session start), Claude answers first and backs it with **`forge quick`**: ERC, DRC, the library and layout
+checks, protection, insulation and the High-Power PCB Rule Book, run **on a copy** of the KiCad files (your folder is
+never written to, checked by hash), findings ranked SAFETY > errors > warnings, checks that could not run named.
+No set-up, no questions first. Claude offers once, afterwards, to keep track of the board (`/pe-adopt`).
+
+The process comes in three levels (`forge level`, project.toml `[process] level`):
+
+| Level | When | Enforcement |
+|---|---|---|
+| light | after `forge adopt` | every check runs and is reported as advice; nothing blocks; **no release** (G8 refuses) |
+| standard | new projects (default) | open obligations block the end of a turn; gates as written; G8 needs the requirements and V-model (P2 passed, not skipped) |
+| strict | on request | standard, plus warnings fail `forge check`, gates take no `--override` |
+
+Raising the level is always allowed; lowering it is the owner's, typed in a terminal (Claude cannot). Before a
+release, `forge req infer` drafts the system requirements from the design (rails and the voltage the parts take,
+output current, protection, isolation, each with its evidence; efficiency, ambient, standards and life left to the
+owner). The owner fills the blanks and confirms; `forge req infer --apply` refuses rows with blanks.
+
 ### A project that already has work in it
 
 `forge adopt <folder>` brings a half-done project under pe-forge **without changing any of its files**. Run it once

@@ -119,6 +119,22 @@ def kicad(cmd, path):
     return rep.ok, msg
 
 
+def release_process_items(prj):
+    """The firm stop before boards are made: never in light mode, and only with the requirements and V-model in
+    place (P2 passed, not skipped by an adoption). Light mode helps on any board; releasing one needs the process."""
+    from . import state
+    res = []
+    if prj.level == "light":
+        res.append((False, "process level is light (advice only): raise it before a release, `forge level standard`"))
+    try:
+        p2 = state.load(prj)["phases"]["P2"]["status"]
+    except Exception:
+        p2 = "unknown"
+    res.append((p2 == "passed", f"requirements and V-model in place before release: P2 is {p2}"
+                + ("" if p2 == "passed" else " (draft them from the design: forge req infer; then pass G2)")))
+    return res
+
+
 def check(prj, gate, mod=None):
     phase = next(p for p, g in GATE_OF.items() if g == gate)
     res = artefacts(prj, phase, mod)
@@ -155,6 +171,7 @@ def check(prj, gate, mod=None):
             from . import pcb                # independent PCB review against every layout rule, on this board
             res += pcb.gate_items(prj)
     if gate == "G8":           # the fab release gate, strict: NRND parts and unrun power checks fail too
+        res += release_process_items(prj)
         from . import supply
         res += supply.gate_items(prj)
         from . import check as fc

@@ -41,6 +41,7 @@ def interactive(stream=None):
         return False
 
 
+LEVELS = ("light", "standard", "strict")
 LIBRARY = os.environ.get("MC_LIB") or os.path.join(FORGE_ROOT, "library")
 TEMPLATE = os.path.join(FORGE_ROOT, "template")
 
@@ -123,6 +124,14 @@ class Project:
     @property
     def process(self):
         return self.cfg.get("process", {})
+
+    @property
+    def level(self):
+        """How firmly the process is enforced: light (advise, never block; boards are not released) | standard
+        (the default: obligations block, gates as written) | strict (also warnings fail, no gate overrides).
+        project.toml [process] level; see forge/level.py."""
+        lv = self.process.get("level", "standard")
+        return lv if lv in LEVELS else "standard"
 
     def git(self, *a):
         return subprocess.run(["git", "-C", self.root, *a], capture_output=True, text=True).stdout

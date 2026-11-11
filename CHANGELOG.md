@@ -11,6 +11,16 @@
 - `forge pcb setup`: keeps an outline it did not draw, keeps the stack-up unless `copper_oz` is set (it used to reset
   a 4-layer board to 2 layers), never removes copper layers that carry copper.
 
+**Help first, process later**
+- `forge quick [dir]`: pe-forge's checks on any KiCad folder, no project, run on a copy (nothing written, verified
+  by hash), findings ranked SAFETY > errors > warnings, plus what the board is (rails, limits).
+- Session start in an unmanaged KiCad folder: Claude is told to help directly, use `forge quick`, and offer
+  adoption once afterwards (`/pe-adopt`, new skill).
+- `forge level light|standard|strict` (`[process] level`): light = advice only, no blocking, no release; adoption
+  starts light. Lowering needs the owner at a terminal.
+- G8 needs the requirements and V-model in place (P2 passed, not skipped) and refuses in light mode.
+- `forge req infer [--apply]`: draft system requirements from the design for the owner to confirm.
+
 **Windows**: native support work (W1-W4): launchers, UTF-8, LF, paths, KiCad discovery; the suite passes on
 Windows 11 ARM64 with KiCad 10; owner-only CR approval hardened against a NUL stdin.
 

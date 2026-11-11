@@ -41,7 +41,11 @@
   forge feedback [--note T]         redacted summary for the pe-forge team, shown first, never sent by itself
   forge issue [--last] [--kind bug|rule|check|idea] [--rule ID] [--dry-run] [--yes]
                                     one-step GitHub issue with the context filled in (gh, or the browser)
+  forge quick [dir] [--vin V] [--json] [--out F]   pe-forge's checks on any KiCad folder, no project, nothing written
   forge adopt [dir] [--apply|--undo] [--name N]   bring a half-done project under pe-forge without changing a file
+                                    (starts in light mode)
+  forge level [light|standard|strict]   how firmly the process is enforced (lowering: the owner, at a terminal)
+  forge req infer [--apply] [--json]    draft system requirements from the existing design, for the owner to confirm
   forge guard status | accept <path>   files pe-forge generated; proposed copies beside files it would not overwrite
   forge doctor                      check the toolchain
   forge update [--yes]              update every tool, pe-forge and its plugins (runs install.sh --update)
@@ -148,6 +152,13 @@ def _dispatch(argv):
     if cmd == "spice":
         from forge import spice
         return spice.main(need(), rest)
+    if cmd == "quick":                                          # any KiCad folder, no project needed
+        from forge import quick
+        return quick.main(rest)
+    if cmd == "watch" and "--event" in rest and rest[rest.index("--event") + 1:][:1] == ["SessionStart"] \
+            and config.find_root() is None:                     # a KiCad folder that is not a project yet
+        from forge import quick
+        return quick.main(["--hint"])
     if cmd == "adopt":                                          # before a project exists
         from forge import adopt
         return adopt.main(rest)
@@ -189,6 +200,12 @@ def _dispatch(argv):
     if cmd == "cr" and rest[:1] == ["guard"] and config.find_root() is None:
         return 0   # hooks outside a forge project: silent no-op
     prj = need()
+    if cmd == "level":
+        from forge import level
+        return level.main(prj, rest)
+    if cmd == "req":
+        from forge import reqinfer
+        return reqinfer.main(prj, rest)
     if cmd == "status":
         from forge import cli_state
         return cli_state.status(prj, rest)

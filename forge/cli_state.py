@@ -26,7 +26,7 @@ def status(prj, rest=()):
             print(row)
     STY = {"passed": "ok", "active": "accent", "in-review": "warn"}
     paint_line = lambda s, line: T.paint(STY[s], line) if s in STY else line
-    print(f"{prj.name}  ·  profile {prj.process.get('profile', 'full')}  ·  schematic mode "
+    print(f"{prj.name}  ·  profile {prj.process.get('profile', 'full')}  ·  level {prj.level}  ·  schematic mode "
           f"{prj.process.get('schematic_mode', 'ask')}")
     for p in PHASES:
         s = st["phases"][p[0]]
@@ -94,6 +94,9 @@ def gate(prj, rest):
         bad = [msg for ok, msg in res if not ok]
         if bad and "--override" not in rest:
             print("cannot pass: " + "; ".join(bad))
+            return 1
+        if bad and prj.level == "strict":
+            print("cannot pass: process level is strict, gates have no override (" + "; ".join(bad) + ")")
             return 1
         tgt = m["phases"][pid] if m else st["phases"][pid]
         tgt.update(status="passed", date=S.TODAY(), note=_opt(rest, "--note") or "")

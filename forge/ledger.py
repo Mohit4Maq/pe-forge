@@ -240,6 +240,8 @@ def check_hook(prj, payload):
             blocking.append(line)
     save(prj, d)
     active = payload.get("stop_hook_active", False)
+    if prj.level == "light":             # light: the same checks, reported as advice; nothing blocks (forge level)
+        advisory, blocking = advisory + blocking, []
     if blocking and not active:
         print("pe-forge: open obligations (fix them, then stop again; `forge ledger show` for details):\n"
               + "\n".join("  open: " + b for b in blocking)
@@ -253,7 +255,8 @@ def check_hook(prj, payload):
     if blocking:
         msg.append("pe-forge: obligations still open: " + "; ".join(blocking))
     if advisory:
-        msg.append("pe-forge: files changed outside Claude need checks (blocking next turn): " + "; ".join(advisory))
+        msg.append(("pe-forge (light mode, advice): checks to look at: " if prj.level == "light" else
+                    "pe-forge: files changed outside Claude need checks (blocking next turn): ") + "; ".join(advisory))
     if msg:
         print(json.dumps({"systemMessage": "\n".join(msg)[:1500]}))
     return 0

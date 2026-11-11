@@ -5,7 +5,8 @@ description: Start a new power-electronics project with pe-forge (phase P0). Ask
 
 # pe-new: intake and project set-up (P0)
 
-> **A folder that already has work in it** (KiCad files, notes, a BoM): do not use `forge new`. Run
+> **A folder that already has work in it** (KiCad files, notes, a BoM): do not use `forge new`; follow `/pe-adopt`
+> (help first with `forge quick`, adopt on the owner's yes). Run
 > `forge adopt <folder>` and show the owner the plan, then `forge adopt <folder> --apply` on their yes. It changes no
 > existing file (verified), maps their KiCad folder in place and starts at the phase the work is in; `forge adopt
 > --undo` reverses it. Never use `forge new --force` on someone's work.

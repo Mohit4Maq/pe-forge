@@ -78,6 +78,16 @@ def cad_python():
     return next((p for p in CAD_PY if os.path.exists(p)), None)
 
 
+CCX = [os.path.expanduser("~/.local/bin/ccx"), "/opt/anaconda3/envs/calculix/bin/ccx", os.path.expanduser("~/anaconda3/envs/calculix/bin/ccx"),
+       os.path.expanduser("~/miniconda3/envs/calculix/bin/ccx"), os.path.expanduser("~/micromamba/envs/calculix/bin/ccx"),
+       "/opt/homebrew/bin/ccx", "C:/ProgramData/anaconda3/envs/calculix/Library/bin/ccx.exe"]
+
+
+def find_ccx():
+    import shutil
+    return shutil.which("ccx") or shutil.which("ccx_2.21") or next((p for p in CCX if os.path.exists(p)), None)
+
+
 # ------------------------------------------------------------------ E1 requirements
 REQ = [("ip", "the ingress code (IEC 60529): IP20 indoor open / IP54 dust and splash / IP65 jets / IP67 immersion", "IP54 | IP65 | IP67 | IP20"),
        ("material", "aluminium (die-cast / machined / sheet) / plastic (moulded) / printed / vendor box", "aluminium | plastic | printed | vendor"),
@@ -235,16 +245,21 @@ def fit(prj, out_dir=None):
         side = (r.get("Side") or "top").lower()
         # KiCad's STEP has +Y up; the pos file's Y is also up with --units mm (both board coordinates)
         best = None
-        for k in kids:
+        for k in kids:                      # the part whose model covers the placement point (bodies that hang
+            if "PCB" in k["label"]:         # over the edge, like connectors, are not centred on it)
+                continue
+            inside = k["min"][0] - 1 <= x <= k["max"][0] + 1 and k["min"][1] - 1 <= y <= k["max"][1] + 1
             cx, cy = (k["min"][0] + k["max"][0]) / 2, (k["min"][1] + k["max"][1]) / 2
-            d = math.hypot(cx - x, cy - y)
-            if d < 3.0 and (best is None or d < best[0]) and "PCB" not in k["label"]:
+            d = math.hypot(cx - x, cy - y) if not inside else 0.0
+            if (inside or d < 3.0) and (best is None or d < best[0]):
                 best = (d, k)
+        if best and best[1] in [p_.get("_kid") for p_ in parts]:
+            best = None                     # already taken by another placement
         if best:
             k = best[1]
             top = k["max"][2] if side == "top" else -k["min"][2]
             parts.append({"ref": ref, "side": side, "x": x, "y": y, "height_mm": round(top, 2), "label": k["label"],
-                          "size_mm": [round(k["max"][0] - k["min"][0], 2), round(k["max"][1] - k["min"][1], 2)]})
+                          "size_mm": [round(k["max"][0] - k["min"][0], 2), round(k["max"][1] - k["min"][1], 2)], "_kid": k})
         else:
             gaps.append(ref)
             if re.match(r"^(J|P|CN|X)\d", ref):          # a connector with no model still needs its cut-out:
@@ -260,6 +275,8 @@ def fit(prj, out_dir=None):
            "no_3d_model": gaps, "connectors": conns, "cad_venv": bool(cad_python()), "pos_rows": len(rows)}
     if h is None:
         env["note"] = "no CAD venv: heights not read (forge doctor)"
+    for p_ in parts:
+        p_.pop("_kid", None)
     json.dump(env, open(os.path.join(out_dir, "envelope.json"), "w"), indent=1)
     return env, ""
 
@@ -435,6 +452,22 @@ def thermal_l1(outer_mm, loss, amb, emis=0.85, orient="vertical", k_wall=150, wa
             "h_conv_W_m2K": round(hc, 2), "h_rad_W_m2K": round(hr, 2), "area_m2": round(A, 4)}
 
 
+def thermal_l2(prj, out_dir, loss, amb, t1, cadr):
+    """Gmsh + CalculiX on the built body: the same loss on the floor patch, film h from the closed form outside."""
+    spec = json.load(open(os.path.join(out_dir, "box_spec.json")))
+    h = (t1["h_conv_W_m2K"] + t1["h_rad_W_m2K"]) if t1 else 10.0
+    fea = {"body_step": os.path.join(out_dir, "box_body.step"), "out": os.path.join(out_dir, "fea"), "mesh_mm": max(spec["wall"], 2.0),
+           "floor_z": spec["floor"], "loss_W": loss, "k_W_mK": spec["k_W_mK"], "h_W_m2K": h, "ambient_C": amb, "ccx": find_ccx()}
+    sp = os.path.join(out_dir, "fea_spec.json")
+    os.makedirs(fea["out"], exist_ok=True)
+    json.dump(fea, open(sp, "w"), indent=1)
+    r = subprocess.run([cad_python(), os.path.join(os.path.dirname(__file__), "cad_fea.py"), sp], capture_output=True, text=True, timeout=1800)
+    m = re.search(r"REPORT(\{.*\})", r.stdout)
+    rep = json.loads(m.group(1)) if m else {"error": (r.stderr or r.stdout)[-600:]}
+    json.dump(rep, open(os.path.join(out_dir, "thermal_l2.json"), "w"), indent=1)
+    return rep
+
+
 def check(prj, out_dir=None):
     out_dir = out_dir or os.path.join(prj.p("mechanical"), "enclosure")
     e = cfg(prj)
@@ -471,9 +504,26 @@ def check(prj, out_dir=None):
         json.dump({"loss_W": loss, "source": src, "ambient_C": amax, **t1}, open(os.path.join(out_dir, "thermal_l1.json"), "w"), indent=1)
     else:
         items.append((False, "thermal L1: not computed: " + (src if loss is None else "no [corners] ambient_C" if amax is None else "run forge enclosure fit")))
-    import shutil
-    ccx = shutil.which("ccx") or shutil.which("ccx_2.21")
-    items.append((bool(ccx) or e.get("thermal_l2") == "waived", "thermal L2 (CalculiX): " + ("available" if ccx else "SKIPPED: ccx not installed (forge doctor); waive with [enclosure] thermal_l2 = \"waived\" + reason only for IP < 54 indoor")))
+    ccx = find_ccx()
+    t1 = locals().get("t1")
+    if ccx and cadr and loss is not None and amax is not None and cad_python() and e.get("thermal_l2") != "waived":
+        l2 = thermal_l2(prj, out_dir, loss, amax, t1, cadr)
+        if l2.get("T_max_C") is not None:
+            # the FEA solves the wall; the closed form's wall rise is T_surface - ambient (its inside figure adds the
+            # air-to-wall step, which the wall model does not contain)
+            l1wall = round(t1["T_surface_C"] - amax, 2) if t1 else None
+            dt2 = l2["T_max_C"] - amax
+            agree = l1wall is not None and abs(dt2 - l1wall) <= max(0.3 * max(l1wall, 0.5), 1.0)
+            inside2 = round(l2["T_max_C"] + (t1["T_inside_C"] - t1["T_surface_C"] if t1 else 0.0), 2)
+            items.append((agree and inside2 <= float(e.get("max_inside_C", 85)),
+                          f"thermal L2 (CalculiX, {l2['mesh']['nodes']} nodes): wall max {l2['T_max_C']} °C (ΔT {dt2:.2f} K vs closed form "
+                          f"{l1wall} K: {'agree' if agree else 'DISAGREE: model or load wrong, not a design value'}); inside with the air step {inside2} °C"))
+        else:
+            items.append((False, f"thermal L2 (CalculiX): did not solve ({l2.get('error') or str(l2.get('log', ''))[-200:]})"))
+    else:
+        items.append((bool(ccx) or e.get("thermal_l2") == "waived", "thermal L2 (CalculiX): " + (f"available ({ccx}); run after build" if ccx else "SKIPPED: ccx not installed (forge doctor); waive with [enclosure] thermal_l2 = \"waived\" + reason only for IP < 54 indoor")))
+    from . import models
+    items += models.gate_items(prj)
     ip = ip_digits(e.get("ip")) or (2, 0)
     if ip[1] >= 4 and cadr:
         g = spec_for(prj, env)["gasket"]

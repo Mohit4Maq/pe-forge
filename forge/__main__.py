@@ -48,6 +48,7 @@
   forge adopt [dir] [--apply|--undo] [--name N]   bring a half-done project under pe-forge without changing a file
                                     (starts in light mode)
   forge decision new|list|answer|withdraw ...   questions only the owner answers; a gate waits for them
+  forge models check|find [--apply]|ask    every placed part has a 3D model; search the libraries, else ask the owner
   forge enclosure req|fit|entries|build|check|release [--json]   the enclosure chain (docs/PLAN_enclosure.md)
   forge review record G<n> <file> [--module M-xx]   bind an independent review to the deliverables it reviewed
   forge level [light|standard|strict]   how firmly the process is enforced (lowering: the owner, at a terminal)
@@ -215,6 +216,9 @@ def _dispatch(argv):
     if cmd == "decision":
         from forge import decisions
         return decisions.main(prj, rest)
+    if cmd == "models":
+        from forge import models
+        return models.main(prj, rest)
     if cmd == "enclosure":
         from forge import enclosure
         return enclosure.main(prj, rest)

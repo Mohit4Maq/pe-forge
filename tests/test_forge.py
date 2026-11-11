@@ -3079,6 +3079,51 @@ class Enclosure(unittest.TestCase):
         items = enclosure.check(prj)
         texts = [m for _, m in items]
         self.assertTrue(any(m.startswith("thermal L1") for m in texts))
+        l2 = [m for ok, m in items if m.startswith("thermal L2")]
+        self.assertTrue(l2)
+        if enclosure.find_ccx():                                             # the FEA ran and agreed with the closed form
+            self.assertIn("agree", l2[0], l2[0])
+            self.assertNotIn("DISAGREE", l2[0])
+            self.assertTrue(os.path.exists(os.path.join(d, "07_Mechanical", "enclosure", "fea", "thermal.frd")))
+        else:
+            self.assertIn("SKIPPED", l2[0])                                  # never a silent pass
+
+
+class Models3D(unittest.TestCase):
+    """Every placed part has a 3D model: resolved from the footprint, found in the libraries, or asked of the owner."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-3d-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_resolve_find_and_ask(self):
+        from forge import models, kicad
+        if not kicad.find_cli() or not models.stock_3d():
+            self.skipTest("KiCad with its 3D models not found")
+        self.assertTrue(os.path.exists(models.resolve("${KICAD10_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0603_1608Metric.step")))
+        self.assertFalse(os.path.exists(models.resolve("${NOPE}/x.step")))
+        c = models.candidates("Resistor_SMD:R_0603_1608Metric")
+        self.assertTrue(c and c[0].endswith("R_0603_1608Metric.step"))
+        self.assertEqual(models.candidates("MC_IC:No_Such_Footprint_XYZ"), [])
+        from forge import config, decisions
+        d = sketch(new_project("M3", self.tmp))
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/m3/m3.kicad_sch"))
+        forge("pcb", "sync", cwd=d)
+        prj = config.Project(d)
+        rows = models.check(prj)
+        self.assertTrue(rows)
+        r = models.as_check(prj, {})
+        self.assertIn(r["status"], ("pass", "warn"))
+        missing = [x["ref"] for x in rows if not x["exists"]]
+        made, miss = models.ask(prj)
+        self.assertEqual(len(made), len([x for x in miss]))
+        if missing:
+            self.assertFalse(models.gate_items(prj)[0][0])
+            with mock.patch("forge.changes.agent_context", return_value=False):
+                for dd in made:
+                    decisions.answer(prj, dd["id"], "go without (height unknown, say why)", "test")
+            self.assertTrue(models.gate_items(prj)[0][0])         # the owner's waiver is recorded and honoured
 
 
 if __name__ == "__main__":

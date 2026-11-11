@@ -23,6 +23,14 @@
   inserts, standoffs, cut-outs) as STEP / STL with the board assembled; closed-form thermal (convection +
   radiation, inside-air step) against `[enclosure] max_inside_C`; gasket / flatness / vent rules; CalculiX and
   OpenFOAM levels SKIP (never pass) until installed; GE items in G8 when `[enclosure] required`.
+- Thermal level 2: Gmsh mesh of the built body + CalculiX steady-state conduction with the closed form's film
+  coefficient outside and the losses on the floor patch; the wall rise must agree with the closed form (SVR) or the
+  result is refused; the inside temperature adds the air step. CalculiX from conda-forge is found automatically.
+- `forge models check | find [--apply] | ask`: every placed part needs a 3D model (height, fit, assembly drawing):
+  resolved from the footprint, searched in MC_Lib and KiCad's 3D libraries (by name, then package family; --apply
+  writes the model line into an MC_Lib footprint), else one owner decision per part with where to get the STEP
+  (TI package page, Ultra Librarian, SnapEDA, Component Search Engine); a waiver is recorded and honoured. In
+  `forge check`, G7 and GE.
 - `forge doctor` rows for build123d, Gmsh, CalculiX, OpenFOAM. docs/Workflow_end_to_end.md: the stringent flow.
 
 **No surprises when the boards arrive** (independent review 2026-11-11, F-01..F-17, all closed)

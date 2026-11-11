@@ -43,8 +43,9 @@ def main(argv):
        "enclosure: fit, build, STEP / STL / DXF")
     ok(bool(cad) and "gmsh" in run([cad, "-c", "import gmsh; print('gmsh')"]) if cad else False, "gmsh (CAD venv)",
        "mesher for FEA" if cad else "see build123d", "enclosure: thermal / structural meshes")
-    ccx = shutil.which("ccx") or shutil.which("ccx_2.21") or shutil.which("ccx_2.22")
-    ok(bool(ccx), "CalculiX ccx", ccx or "conda install -c conda-forge calculix, or Docker (dhondt.de)", "enclosure: thermal L2, structural")
+    from .enclosure import find_ccx
+    ccx = find_ccx()
+    ok(bool(ccx), "CalculiX ccx", ccx or "conda create -n calculix -c conda-forge calculix", "enclosure: thermal L2, structural")
     ok(bool(shutil.which("simpleFoam") or shutil.which("chtMultiRegionFoam")), "OpenFOAM", "optional (Docker)", "enclosure: thermal L3 (sealed box CHT)")
     venv = os.path.join(config.FORGE_ROOT, ".venv", "bin", "python")
     pl = os.path.exists(venv) and run([venv, "-c", "import pwrlab; print('ok')"]) == "ok"

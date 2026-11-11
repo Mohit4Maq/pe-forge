@@ -33,6 +33,7 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   spice        ngspice assertions from the sheet briefs' `## Simulation` blocks (skip: none, or no ngspice)
   parts_evidence  every placed part's datasheet evidence exists and matches by hash; sourcing snapshot age
   fp_pins      FP-1..4: symbol pins have pads, polarity marked, assembly rotation known, land pattern vs datasheet
+  models       every placed part has a 3D model file (warn; GE / G7 item): forge models find --apply | ask
   fab_rules    the board's design rules vs the fab house's capabilities ([fab] house = jlcpcb | pcbway)
   testpoints   every rail and key net has a test point or connector pin (warn)
   fab          release readiness (only with --fab): routing, schematic/board match, BoM ready, outputs fresh
@@ -56,7 +57,7 @@ from . import config, consistency, gates, kicad, vmodel
 
 ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "stress", "sims", "insulation", "dru_rules", "pcb_extra",
        "pcb_review", "pcb_copper", "pcb_connectors", "pcb_crosstalk", "pcb_hp", "bom_risk", "protection",
-       "legibility", "spice", "parts_evidence", "fp_pins", "fab_rules", "testpoints"]
+       "legibility", "spice", "parts_evidence", "fp_pins", "models", "fab_rules", "testpoints"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
 
@@ -336,6 +337,11 @@ def c_fp_pins(prj, opts):
     return fpcheck.as_check(prj, opts)
 
 
+def c_models(prj, opts):
+    from . import models
+    return models.as_check(prj, opts)
+
+
 def c_fab_rules(prj, opts):
     from . import fabhouse
     return fabhouse.as_check(prj, opts)
@@ -357,7 +363,7 @@ def c_fab(prj, opts):
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
           "drift": c_drift, "sch_lib": c_sch_lib, "stress": c_stress, "sims": c_sims, "insulation": c_insulation, "dru_rules": c_dru_rules,
           "pcb_review": c_pcb_review, "pcb_copper": c_pcb_copper, "pcb_connectors": c_pcb_connectors, "pcb_crosstalk": c_pcb_crosstalk, "pcb_hp": c_pcb_hp, "bom_risk": c_bom_risk, "protection": c_protection, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
-          "fp_pins": c_fp_pins, "fab_rules": c_fab_rules, "testpoints": c_testpoints, "fab": c_fab}
+          "fp_pins": c_fp_pins, "models": c_models, "fab_rules": c_fab_rules, "testpoints": c_testpoints, "fab": c_fab}
 
 
 def run(prj, only=None, fab=False, strict=False, module=None):

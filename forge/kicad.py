@@ -78,6 +78,19 @@ def stock_symbols():
     return _first([os.environ.get("KICAD_SYMBOL_DIR"), os.environ.get("KICAD10_SYMBOL_DIR"), *SYMBOL_PATHS])
 
 
+def stock_3dmodels():
+    """KiCad's own 3D model library (<share>/3dmodels), next to its symbols; the KICAD*_3DMODEL_DIR variables first."""
+    for v in ("KICAD10_3DMODEL_DIR", "KICAD9_3DMODEL_DIR", "KICAD8_3DMODEL_DIR", "KISYS3DMOD"):
+        if os.environ.get(v) and os.path.isdir(os.environ[v]):
+            return os.environ[v]
+    s = stock_symbols()
+    if s:
+        d = os.path.join(os.path.dirname(s.rstrip("/\\")), "3dmodels")
+        if os.path.isdir(d):
+            return d
+    return _first([os.path.join(os.path.dirname(p.rstrip("/\\")), "3dmodels") for p in SYMBOL_PATHS if p])
+
+
 @dataclass
 class Report:
     source: str                       # "erc" | "drc"

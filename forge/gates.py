@@ -327,6 +327,8 @@ def check(prj, gate, mod=None):
             res += pcb.gate_items(prj)
             from . import fpcheck            # the board as drawn matches the symbols, polarity and the house's zero
             res += fpcheck.gate_items(prj)
+            from . import models             # every part has a 3D model (height, fit, assembly drawing) or a waiver
+            res += models.gate_items(prj)
     if gate == "G8":           # the fab release gate, strict: NRND parts and unrun power checks fail too
         res += release_process_items(prj)
         from . import supply

@@ -28,15 +28,104 @@ import glob
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 
 SCHEMA = "pe-forge-result-1"
 GRADES = ("ACCEPTED", "PROVISIONAL", "REJECTED", "NOT RUN")
 
+# What every converter's simulation set must show before G5 (metric names matched by these patterns, across all
+# result files). project.toml [sims] required = [...] replaces the list; [sims.waive] "name" = "reason (owner OK)".
+REQUIRED = {
+    "dc-dc": [("inductor current ripple", r"inductor.*ripple|ripple.*inductor|dI_?L|ΔI"),
+              ("peak inductor current", r"peak.*current|current.*peak|I_?pk"),
+              ("output voltage ripple", r"output.*ripple|ripple.*output|dV_?out|ΔV"),
+              ("efficiency", r"efficien"),
+              ("loop stability (phase / gain margin or crossover)", r"phase margin|gain margin|crossover|loop"),
+              ("start-up / soft-start / inrush", r"start-?up|soft-?start|inrush"),
+              ("output short / overload / current limit", r"short|overload|current limit|fault")],
+    "inverter": [("THD", r"\bthd\b"), ("efficiency", r"efficien"), ("DC-link ripple", r"dc.?link.*ripple|bus.*ripple"),
+                 ("device losses / junction temperature", r"loss|T_?j|junction"),
+                 ("start-up / precharge", r"start-?up|precharge|inrush"), ("fault / short", r"short|fault|overload")],
+    "pfc": [("THD / power factor", r"\bthd\b|power factor|\bpf\b"), ("efficiency", r"efficien"),
+            ("inductor ripple", r"ripple"), ("start-up / inrush", r"start-?up|inrush"), ("fault / short", r"short|fault|overload")],
+    "other": [("efficiency", r"efficien"), ("start-up / inrush", r"start-?up|inrush"), ("fault / short / overload", r"short|fault|overload")],
+}
+PROVENANCE_TOOLS = ("pwrlab", "ltspice", "ngspice", "spice", "plecs", "simetrix", "psim")
+
 
 # ------------------------------------------------------------------ result files
-def validate(d):
+def provenance_problems(prov, root=None):
+    """A simulated number is citable only when what produced it is named: pwrlab's provenance block
+    (model_version, toolchain_hash, run_utc, evidence_eligible = true), or the netlist file with its hash."""
+    if not isinstance(prov, dict):
+        return ["provenance missing: the pwrlab payload's provenance block, or {tool, netlist, sha256}"]
+    P = []
+    if prov.get("netlist"):
+        p = os.path.join(root, prov["netlist"]) if root and not os.path.isabs(prov["netlist"]) else prov["netlist"]
+        if root is not None and not os.path.exists(p):
+            P.append(f"provenance netlist {prov['netlist']} does not exist")
+        elif root is not None and prov.get("sha256"):
+            import hashlib
+            h = hashlib.sha256(open(p, "rb").read()).hexdigest()
+            if not h.startswith(str(prov["sha256"])[:16]):
+                P.append(f"provenance netlist {prov['netlist']} has changed since the run (hash {h[:16]})")
+        elif not prov.get("sha256"):
+            P.append("provenance netlist without sha256")
+        return P
+    for k in ("model_version", "toolchain_hash", "run_utc"):
+        if not prov.get(k):
+            P.append(f"provenance {k} missing")
+    if prov.get("evidence_eligible") is not True:
+        P.append("provenance evidence_eligible is not true (a dirty or unversioned run cannot be cited)")
+    return P
+
+
+def required_metrics(prj):
+    """[(name, regex)] this project's simulation set must cover, from [sims] required or the type's default."""
+    sims = prj.cfg.get("sims", {})
+    if sims.get("required"):
+        return [(x, re.escape(x)) if isinstance(x, str) else tuple(x) for x in sims["required"]]
+    typ = (prj.cfg.get("project", {}).get("type") or "other").lower()
+    key = next((k for k in REQUIRED if k in typ), "other")
+    return REQUIRED[key]
+
+
+def coverage(prj, docs=None):
+    """(covered, missing, waived): which required metrics the project's results show (REJECTED / NOT RUN do not count)."""
+    docs = load_results(prj) if docs is None else docs
+    names = [m.get("name", "") for d in docs if d.get("grade") in ("ACCEPTED", "PROVISIONAL") for m in d.get("metrics") or []]
+    notes = " ".join(str(n) for d in docs for n in d.get("notes") or [])
+    waive = prj.cfg.get("sims", {}).get("waive", {})
+    cov, miss, wv = [], [], []
+    for name, rx in required_metrics(prj):
+        if any(re.search(rx, n, re.I) for n in names):
+            cov.append(name)
+        elif any(re.search(re.escape(k), name, re.I) or re.search(rx, k, re.I) for k in waive):
+            wv.append(f"{name} (waived: {next(v for k, v in waive.items() if re.search(re.escape(k), name, re.I) or re.search(rx, k, re.I))})")
+        else:
+            miss.append(name)
+    return cov, miss, wv
+
+
+def gate_items(prj):
+    """G5: every result file valid and citable; the required metrics covered; the closed forms reproduce."""
+    docs = load_results(prj)
+    bad = [(d["file"], d["problems"]) for d in docs if d.get("problems")]
+    out = [(not bad, f"simulation results: {len(docs)} file(s), {len(bad)} with problems"
+            + "".join(f"; {f}: {p[0]}" for f, p in bad[:3]))]
+    cov, miss, wv = coverage(prj, docs)
+    out.append((not miss, f"required simulations ({len(cov)}/{len(cov) + len(miss) + len(wv)} shown"
+                + (f", {len(wv)} waived" if wv else "") + ")" + (": missing " + ", ".join(miss) if miss else "")))
+    from . import calc
+    r = calc.as_check(prj, {})
+    out.append((r["status"] != "fail", f"closed forms recomputed by pe-forge: {r['status']} ({r['reason']})"
+                + "".join(f"; {f['actual']}" for f in r["findings"][:2] if r["status"] == "fail")))
+    return out
+
+
+def validate(d, root=None):
     """List of problems with one result document (empty = valid)."""
     P = []
     if not isinstance(d, dict):
@@ -60,6 +149,17 @@ def validate(d):
             P.append(f"metric {m['name']}: {len(vals)} value(s) for {len(corners)} corner(s)")
         if m.get("grade") and m["grade"] not in GRADES:
             P.append(f"metric {m['name']}: grade {m['grade']!r}")
+        cf = m.get("closed_form") or []
+        if cf and isinstance(vals, list) and len(cf) == len(vals) and isinstance(m.get("err_pct"), (int, float)):
+            errs = [abs(v - c) / abs(c) * 100 for v, c in zip(vals, cf)
+                    if isinstance(v, (int, float)) and isinstance(c, (int, float)) and c]
+            if errs and abs(max(errs) - m["err_pct"]) > 0.5:       # the stated error must be the computed one
+                P.append(f"metric {m['name']}: err_pct {m['err_pct']} but values vs closed_form give {max(errs):.2f} %")
+        if m.get("grade") == "ACCEPTED" and not cf and not m.get("anchor"):
+            P.append(f"metric {m['name']}: ACCEPTED needs a closed_form or an \"anchor\" (hardware / datasheet value)")
+    if d.get("grade") in ("ACCEPTED", "PROVISIONAL") and any(k in str(d.get("tool", "")).lower() for k in PROVENANCE_TOOLS) \
+            and "forge spice check" not in str(d.get("tool", "")):
+        P += provenance_problems(d.get("provenance"), root)
     for i, c in enumerate(d.get("charts") or []):
         t = (c or {}).get("type")
         if t == "line":
@@ -92,7 +192,7 @@ def load_results(prj):
             out.append({"id": os.path.basename(f), "title": os.path.basename(f), "grade": "REJECTED", "tool": "?",
                         "problems": [f"unreadable: {e}"], "file": prj.rel(f)})
             continue
-        d = dict(d, file=prj.rel(f), problems=validate(d))
+        d = dict(d, file=prj.rel(f), problems=validate(d, prj.root))
         rec = d.get("record")
         if rec and os.path.exists(os.path.join(prj.root, rec)):
             why = record_problem(prj, os.path.join(prj.root, rec))
@@ -357,13 +457,15 @@ def main_results(prj, argv):
     bad = 0
     for f in result_files(prj):
         try:
-            P = validate(json.load(open(f)))
+            P = validate(json.load(open(f)), prj.root)
         except (OSError, ValueError) as e:
             P = [str(e)]
         print(("FAIL " if P else "OK   ") + prj.rel(f) + ("".join(f"\n     {p}" for p in P)))
         bad += bool(P)
-    print(f"{len(result_files(prj))} result file(s), {bad} with problems")
-    return 1 if bad else 0
+    cov, miss, wv = coverage(prj)
+    print(f"{len(result_files(prj))} result file(s), {bad} with problems; required simulations shown: {', '.join(cov) or 'none'}"
+          + (f"; MISSING: {', '.join(miss)}" if miss else "") + (f"; waived: {', '.join(wv)}" if wv else ""))
+    return 1 if bad or miss else 0
 
 
 def main_panel(prj, argv):

@@ -365,6 +365,24 @@ def as_check(prj, opts):
     return result("fail" if F else "warn" if W else "pass", F + W, reason=reason)
 
 
+def _skip_ok(prj, r):
+    """A skipped insulation check passes a gate only when the project says why: every voltage in [specs] is below
+    60 V (ELV, no insulation coordination needed), or [insulation] none = true with the reason recorded."""
+    if r["missing_tool"]:
+        return False, "a missing tool is not a pass"
+    if prj.cfg.get("insulation", {}).get("none") is True:
+        return True, ""
+    vs = []
+    for k, v in prj.cfg.get("specs", {}).items():
+        if k.lower().endswith("_v"):
+            vs += [float(x) for x in (v if isinstance(v, list) else [v]) if isinstance(x, (int, float))]
+    if vs and max(vs) < 60:
+        return True, ""
+    return False, ("no voltage in [specs] shows insulation does not apply: set [specs] vin_V / vout_V, or "
+                   "[insulation] none = true with the reason in a comment" if not vs else
+                   f"[specs] reaches {max(vs):g} V: put the HV nets in the HV class and set [insulation] (or none = true with the reason)")
+
+
 def gate_items(prj, rules=False):
     """[(ok, text)] for gates G6 (schematic) and G7 / G8 (rules=True: the DRU proof too). A skip passes only when
     the project has no HV net and no [insulation] table; a missing tool or an unset rule table fails."""
@@ -372,7 +390,8 @@ def gate_items(prj, rules=False):
     r = as_check(prj, {})
     hv = r["status"] != "skip"
     if r["status"] == "skip":
-        out.append((not r["missing_tool"], f"insulation: skipped ({r['reason']})"))
+        ok, why = _skip_ok(prj, r)
+        out.append((ok, f"insulation: skipped ({r['reason']})" + ("" if ok else f": {why}")))
     else:
         bad = [f for f in r["findings"] if not f["claim"].startswith(("NET-4 runs", "INS-3 runs", "barrier parts"))]
         out.append((r["status"] != "fail", f"insulation ({r['reason']}): {r['status']}"
@@ -380,7 +399,7 @@ def gate_items(prj, rules=False):
     if rules:
         r2 = as_check_rules(prj, {})
         if r2["status"] == "skip":
-            ok = not r2["missing_tool"] and not hv
+            ok = not hv and _skip_ok(prj, r)[0]
             out.append((ok, f"insulation rules (CLS-2): skipped ({r2['reason']})"
                         + ("" if ok else ": the board has HV nets, so the .kicad_dru must be proven")))
         else:

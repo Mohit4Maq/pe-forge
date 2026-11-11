@@ -129,13 +129,27 @@ for lay in CU:
         for p in f.Pads():
             if p.GetNetCode() in sw_codes and p.IsOnLayer(lay):
                 p.TransformShapeToPolygon(ps, lay, 0, mm(0.005), pcbnew.ERROR_INSIDE)
+    nonvia = pcbnew.SHAPE_POLY_SET()
     for t in b.GetTracks():
         if t.GetNetCode() in sw_codes and t.IsOnLayer(lay):
             t.TransformShapeToPolygon(ps, lay, 0, mm(0.005), pcbnew.ERROR_INSIDE)
+            if t.GetClass() != "PCB_VIA":
+                t.TransformShapeToPolygon(nonvia, lay, 0, mm(0.005), pcbnew.ERROR_INSIDE)
+    for z in b.Zones():
+        if not z.GetIsRuleArea() and z.GetNetCode() in sw_codes and z.IsOnLayer(lay):
+            nonvia.Append(z.GetFilledPolysList(lay))
+    for f in b.GetFootprints():
+        for p in f.Pads():
+            if p.GetNetCode() in sw_codes and p.IsOnLayer(lay) and p.GetAttribute() != pcbnew.PAD_ATTRIB_PTH:
+                p.TransformShapeToPolygon(nonvia, lay, 0, mm(0.005), pcbnew.ERROR_INSIDE)
     ps.Simplify()
+    nonvia.Simplify()
     a = ps.Area() / 1e12
     if a > 0:
         out["sw"][b.GetLayerName(lay)] = round(a, 2)
+        out.setdefault("sw_routed", {})
+        if nonvia.Area() / 1e12 > 0.01:                 # copper that is not just a via barrel / through-hole pad
+            out["sw_routed"][b.GetLayerName(lay)] = round(nonvia.Area() / 1e12, 2)
         union.Append(ps)
         for i in range(ps.OutlineCount()):
             o = ps.Outline(i)
@@ -258,8 +272,10 @@ def auto(prj, g, prof):
         R["SW-01"] = (lim is None or area <= lim, f"SW copper {area:.1f} mm2 ({', '.join(f'{k} {v}' for k, v in sw.items())}); "
                       f"~{cm:.2f} A CM peak at {dvdt} V/ns over a plane" + (f"; limit {lim} mm2" if lim else
                       "; reviewer judges 'only as wide as the current needs'"))
-        R["SW-02"] = (len(sw) <= 1, f"SW copper on {len(sw)} layer(s): {', '.join(sw) or 'none'}"
-                      + ("" if len(sw) <= 1 else " (a through-hole pad or via on SW puts it on every layer)"))
+        routed = g.get("sw_routed", sw)
+        R["SW-02"] = (len(routed) <= 1, f"SW copper routed on {len(routed)} layer(s): {', '.join(routed) or 'none'}"
+                      + (f" (via barrels alone on {', '.join(k for k in sw if k not in routed)})" if len(sw) > len(routed) else "")
+                      + ("" if len(routed) <= 1 else ": SW tracks or pours on more than one layer"))
         dmin = hp.get("sw_edge_mm", 10)
         near = [f"{r} {d} mm" for r, d in g["sw_connector_mm"] if d < dmin]
         R["SW-05"] = (g["sw_edge_mm"] >= dmin and not near,
@@ -350,8 +366,14 @@ def as_check(prj, opts):
     prof = profile(prj)
     if not prof["enabled"]:
         return result("skip", reason="[hp] high-power rules off")
-    try:
-        _, rows = evaluate(prj, pcbs[0] if pcbs else None)
+    try:                                   # every board with content, not the first (F-08)
+        rows = []
+        for b_ in (pcbs or [None]):
+            _, rs = evaluate(prj, b_)
+            for r in rs:
+                if b_ and len(pcbs) > 1:
+                    r["evidence"] = f"{os.path.basename(b_)}: {r['evidence']}"
+            rows += rs
     except SystemExit as e:
         return result("skip", reason=str(e), missing_tool=True)
     from . import learn
@@ -378,7 +400,10 @@ def main(prj, argv):
         return 0
     from .check import roots, has_content
     pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
-    prof, rows = evaluate(prj, pcbs[0] if pcbs else None)
+    board = argv[argv.index("--board") + 1] if "--board" in argv else (pcbs[0] if pcbs else None)
+    if len(pcbs) > 1 and "--board" not in argv:
+        print(f"{len(pcbs)} boards: showing {os.path.basename(board)} (--board <file> for another; forge check runs all)")
+    prof, rows = evaluate(prj, board)
     from . import learn
     learn.record_hp(prj, rows)
     if "--json" in argv:

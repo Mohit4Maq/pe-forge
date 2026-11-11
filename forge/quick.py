@@ -23,9 +23,9 @@ import tempfile
 
 from . import config
 
-QUICK = ["erc", "drc", "sch_lib", "protection", "insulation", "pcb_hp", "pcb_copper", "pcb_connectors",
+QUICK = ["erc", "drc", "sch_lib", "protection", "stress", "insulation", "pcb_hp", "pcb_copper", "pcb_connectors",
          "pcb_crosstalk", "pcb_extra", "legibility"]
-SAFETY = {"protection", "insulation"}
+SAFETY = {"protection", "insulation", "stress"}
 KICAD_EXT = (".kicad_sch", ".kicad_pcb", ".kicad_pro", ".kicad_dru", ".kicad_sym", ".kicad_mod", ".kicad_prl",
              ".kicad_jobset", ".kicad_wks")
 KICAD_NAMES = ("sym-lib-table", "fp-lib-table")
@@ -78,8 +78,13 @@ def run(root, vin=None, only=None):
         files = list(_kicad_files(root))
         before = _hashes(files)
         copy_kicad(root, tmp)
-        specs = {"vin_V": vin} if vin else {}
+        base = {}
+        proot = config.find_root(root)
+        if proot:                                   # inside a project: its specs, protection, hp and insulation apply
+            base = {k: v for k, v in config.Project(proot).cfg.items() if k in ("specs", "protection", "hp", "insulation", "pcb")}
+        specs = dict(base.get("specs", {}), **({"vin_V": vin} if vin else {}))
         prj = Virtual(tmp, sv["pcb_root"], os.path.basename(root.rstrip(os.sep)), specs)
+        prj.cfg.update({k: v for k, v in base.items() if k != "specs"})
         res = check.run(prj, only or QUICK)
         board = None
         sch = [f for f in check.roots(prj, "kicad_sch") if check.has_content(f)]

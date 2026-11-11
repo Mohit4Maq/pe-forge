@@ -97,11 +97,11 @@ def analyse(parts, nets, db):
     external = {n for r in conns for n in parts[r]["nets"] if n in power or (not GND.match(short(n)) and n in nets
                 and any(kind(x) == "C" for x, _, _ in nets[n]["pins"]))}
     rails = {}
+    from . import stress
     for n in sorted(power | external):
-        caps = [r for r, _, _ in nets[n]["pins"] if kind(r) == "C" and P.volt(r)]
-        lim = min(caps, key=P.volt) if caps else None
+        lim, by, unrated = stress.net_limit(P, nets, n)     # the lowest-rated part of any kind (IC pins, diodes, caps)
         rails[n] = {"net": short(n), "nominal_V": nominal(n), "external": n in external,
-                    "limit_V": P.volt(lim) if lim else None, "limit_by": P.label(lim) if lim else "",
+                    "limit_V": lim, "limit_by": by, "unrated": [P.label(r) for r in unrated],
                     "pins": len(nets[n]["pins"])}
     path = [n for n in rails if INPUT.search(short(n))]       # the input and the nets behind its fuse / filter
     if not path:
@@ -114,6 +114,7 @@ def analyse(parts, nets, db):
             low = min(rated, key=lambda r: r["limit_V"])
             rails[ins[0]].update(path_limit_V=low["limit_V"], path_limit_by=f"{low['limit_by']} on {low['net']}")
         rails[ins[0]]["path"] = [short(n) for n in path]
+        rails[ins[0]]["path_unrated"] = sorted({u for n in path for u in rails[n]["unrated"]})
     outs = [n for n in rails if n not in path and (rails[n]["external"] or OUTPUT.search(short(n)))]
     for n in rails:
         rails[n]["role"] = "input" if n in ins else "input path" if n in path else "output" if n in outs else "internal"
@@ -140,6 +141,8 @@ def rows(a):
         v, by = r.get("path_limit_V") or r["limit_V"], r.get("path_limit_by") or r["limit_by"]
         via = r.get("path", [r["net"]])
         lim = f"; the input path ({', '.join(via)}) takes at most {v:g} V (lowest-rated part: {by})" if v else ""
+        if r.get("path_unrated"):
+            lim += f"; NOT rated in the library, check their datasheets: {', '.join(r['path_unrated'][:5])}"
         nom = f"nominal {r['nominal_V']:g} V, " if r["nominal_V"] else ""
         R.append(("Input voltage range", f"Operate from {nom}_(min)_ to _(max)_ V on {r['net']}"
                   + (f", max below {v:g} V" if v else ""), f"input rail {r['net']}" + lim,

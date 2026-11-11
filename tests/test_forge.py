@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FORGE = [sys.executable, os.path.join(REPO, "forge", "__main__.py")]
@@ -87,7 +88,16 @@ class Project(unittest.TestCase):
         with open(qc, "a") as fh:
             fh.write("| 2026-11-05 | G3 | system | Topology_Trade 0.2 | T3 | READY | 0/0/1 | 0/0/0 | r2.md | CLOSED |\n")
         r = forge("gate", "check", "G3", cwd=self.dir, check=False)
-        self.assertIn("PASS latest G3 review (2026-11-05): verdict READY, status CLOSED", r.stdout)
+        self.assertIn("FAIL latest G3 review (2026-11-05): verdict READY, status CLOSED; no recorded G3 review", r.stdout)
+        rf = os.path.join(self.dir, "01_Program/QC/Reviews/r2.md")              # the row is a claim: bind it (F-09)
+        os.makedirs(os.path.dirname(rf), exist_ok=True)
+        open(rf, "w").write("---\nreviewer: pe-reviewer\nverdict: READY\n---\n# G3 review\nfindings...\n")
+        forge("review", "record", "G3", "01_Program/QC/Reviews/r2.md", cwd=self.dir)
+        r = forge("gate", "check", "G3", cwd=self.dir, check=False)
+        self.assertIn("PASS latest G3 review (2026-11-05): verdict READY, status CLOSED; G3 review by pe-reviewer", r.stdout)
+        open(rf, "a").write("edited after recording\n")
+        r = forge("gate", "check", "G3", cwd=self.dir, check=False)
+        self.assertIn("changed since it was recorded", r.stdout)
 
     def test_04_vmodel(self):
         sr = os.path.join(self.dir, "02_Requirements/System_Requirements.md")
@@ -307,6 +317,15 @@ def new_project(name, tmp, **extra):
     json.dump(dict({"name": name, "summary": "s", "owner": "T"}, **extra), open(ans, "w"))
     d = os.path.join(tmp, name)
     forge("new", d, "--answers", ans)
+    return d
+
+
+def sketch(d):
+    """Mark a test project as a sketch: board work is allowed before G6 (and it can never be released)."""
+    pt = os.path.join(d, "project.toml")
+    t = open(pt).read()
+    if "sketch = true" not in t:
+        open(pt, "w").write(t.replace("parallel_modules = false", "parallel_modules = false\nsketch = true", 1))
     return d
 
 
@@ -1648,7 +1667,10 @@ class ResultsPanel(unittest.TestCase):
 
     def sample(self, **kw):
         return dict({"id": "s1", "title": "Sample", "tool": "pwrlab buck", "grade": "ACCEPTED", "corners": ["36 V", "60 V"],
-                     "metrics": [{"name": "Efficiency", "unit": "%", "values": [93.1, 91.4], "grade": "ACCEPTED"}],
+                     "metrics": [{"name": "Efficiency", "unit": "%", "values": [93.1, 91.4], "grade": "ACCEPTED",
+                                  "anchor": "TI datasheet fig. 7: 93 % at 36 V"}],
+                     "provenance": {"tool": "pwrlab", "model_version": "v", "toolchain_hash": "h", "run_utc": "2026",
+                                    "evidence_eligible": True},
                      "charts": [{"type": "line", "title": "Eff", "x": {"values": [0.1, 1.0]},
                                  "series": [{"name": "36 V", "values": [82, 93]}]},
                                 {"type": "bars", "title": "Loss", "unit": "W", "items": [{"name": "Q1", "value": 0.4}]}]}, **kw)
@@ -1946,7 +1968,7 @@ class PcbSync(unittest.TestCase):
             self.skipTest("KiCad's Python not found")
         tmp = tempfile.mkdtemp(prefix="pe-forge-sync-")
         self.addCleanup(shutil.rmtree, tmp, True)
-        d = new_project("Sy", tmp)
+        d = sketch(new_project("Sy", tmp))
         shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/sy/sy.kicad_sch"))
         r = forge("pcb", "sync", cwd=d, check=False)
         self.assertIn("added:", r.stdout)
@@ -2100,7 +2122,7 @@ class PcbSync(unittest.TestCase):
             self.skipTest("KiCad's Python not found")
         tmp = tempfile.mkdtemp(prefix="pe-forge-guard-pcb-")
         self.addCleanup(shutil.rmtree, tmp, True)
-        d = new_project("Gp", tmp)
+        d = sketch(new_project("Gp", tmp))
         shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/gp/gp.kicad_sch"))
         pt = os.path.join(d, "project.toml")
         open(pt, "a").write("\n[pcb]\noutline_mm = [40, 30]\ncopper_oz = [2, 1, 1, 2]\n")
@@ -2138,7 +2160,7 @@ class PcbSync(unittest.TestCase):
             self.skipTest("KiCad's Python not found")
         tmp = tempfile.mkdtemp(prefix="pe-forge-place-")
         self.addCleanup(shutil.rmtree, tmp, True)
-        d = new_project("Pl", tmp)
+        d = sketch(new_project("Pl", tmp))
         shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/pl/pl.kicad_sch"))
         open(os.path.join(d, "project.toml"), "a").write(
             "\n[pcb]\noutline_mm = [40, 30]\ncopper_oz = [2, 1, 1, 2]\nhole_inset_mm = 3.5\n")
@@ -2661,6 +2683,288 @@ class HelpFirstLevels(unittest.TestCase):
         sr = open(os.path.join(d, "02_Requirements", "System_Requirements.md")).read()
         self.assertEqual(sr.count("inferred from the design"), len(keep))
         self.assertNotIn("_(fill in)_ | _(fill in)_", sr.split("## 2.")[0])
+
+
+class GateIntegrity(unittest.TestCase):
+    """Independent review 2026-11-11 (F-01..F-04): a board with unrouted nets fails G7; an override is the owner's,
+    with a reason, recorded, never at G7 / G8; at G8 a skipped check is not a pass; ERC / DRC warnings are findings."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-gi-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_unrouted_and_parity_are_errors_and_warnings_are_findings(self):
+        from forge import check, kicad
+        raw = json.load(open(os.path.join(KFIX, "drc_parity.json")))
+        rep = kicad.parse(raw, "drc", "b.kicad_pcb")
+        self.assertTrue(rep.unconnected or rep.parity)
+        with mock.patch.object(kicad, "drc", return_value=rep), mock.patch.object(kicad, "find_cli", return_value="x"), \
+                mock.patch.object(check, "roots", return_value=["b.kicad_pcb"]), \
+                mock.patch.object(check, "has_content", return_value=True):
+            r = check.c_drc(type("P", (), {"rel": staticmethod(lambda f: f), "p": lambda *a: "", "root": self.tmp})(), {})
+        self.assertEqual(r["status"], "fail")
+        claims = {f["claim"] for f in r["findings"]}
+        self.assertTrue(claims & {"all connections routed", "schematic and board match"})
+        raw = json.load(open(os.path.join(KFIX, "drc_broken.json")))
+        rep = kicad.parse(raw, "drc", "b.kicad_pcb")
+        self.assertTrue(rep.warnings)
+        with mock.patch.object(kicad, "drc", return_value=rep), mock.patch.object(kicad, "find_cli", return_value="x"), \
+                mock.patch.object(check, "roots", return_value=["b.kicad_pcb"]), \
+                mock.patch.object(check, "has_content", return_value=True):
+            r = check.c_drc(type("P", (), {"rel": staticmethod(lambda f: f), "p": lambda *a: "", "root": self.tmp})(), {})
+        self.assertTrue(any(f["claim"] == "no DRC warnings" for f in r["findings"]))
+
+    def test_override_is_the_owners_with_a_reason_and_a_qc_row_never_g7_g8(self):
+        d = new_project("Ov", self.tmp)                                     # G0 fails: the intake is not filled in
+        r = forge("gate", "pass", "G0", "--override", "--note", "x", cwd=d, check=False, stdin="")   # an agent shell
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("owner only", r.stdout)
+        r = forge("gate", "pass", "G0", "--override", "--i-am-the-owner", cwd=d, check=False)       # no reason
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("--note", r.stdout)
+        st = json.load(open(os.path.join(d, ".forge", "state.json")))
+        self.assertNotEqual(st["phases"]["P0"]["status"], "passed")
+        r = forge("gate", "pass", "G0", "--override", "--i-am-the-owner", "--note", "foundation done on paper", cwd=d)
+        qc = open(os.path.join(d, "01_Program", "QC", "QC_Register.md")).read()
+        self.assertIn("| OVERRIDE |", qc)
+        self.assertIn("foundation done on paper", qc)
+        for g in ("G7", "G8"):
+            r = forge("gate", "pass", g, "--override", "--i-am-the-owner", "--note", "x", cwd=d, check=False)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("takes no override", r.stdout)
+
+    def test_g8_skip_is_not_a_pass_and_insulation_skip_needs_a_reason(self):
+        from forge import config, gates, insulation
+        d = new_project("Sk", self.tmp)
+        prj = config.Project(d)
+        res = gates.check(prj, "G8")
+        fab = [ok for ok, m in res if m.startswith("fab ") and "skip" in m]
+        self.assertTrue(fab and not any(fab))                                   # every skipped fab part fails
+        skip = {"status": "skip", "reason": "no net in class HV", "missing_tool": False, "findings": []}
+        with mock.patch.object(insulation, "as_check", return_value=skip):
+            prj.cfg["specs"] = {"vin_V": [36, 63]}
+            self.assertFalse(insulation.gate_items(prj)[0][0])                   # 63 V: insulation must be set
+            prj.cfg["specs"] = {"vin_V": [9, 36], "vout_V": 12}
+            self.assertTrue(insulation.gate_items(prj)[0][0])                    # ELV: the skip is explained
+            prj.cfg["specs"] = {"vin_V": [36, 63]}
+            prj.cfg["insulation"] = {"none": True}
+            self.assertTrue(insulation.gate_items(prj)[0][0])                    # the owner said why
+            skip["missing_tool"] = True
+            self.assertFalse(insulation.gate_items(prj)[0][0])                   # a missing tool never passes
+
+
+class StressDerating(unittest.TestCase):
+    """F-05: every part's rating vs the operating corners, derated; a gap in the data is reported, never passed."""
+
+    def nets(self):
+        parts = {"C1": {"value": "22uF 50V", "mc_id": "", "mpn": "", "nets": ["/VIN", "GND"], "dup": 1, "values": []},
+                 "C2": {"value": "22uF", "mc_id": "", "mpn": "X", "nets": ["/+12V", "GND"], "dup": 1, "values": []},
+                 "U1": {"value": "LM5164", "mc_id": "IC-9", "mpn": "LM5164", "nets": ["/VIN", "/SW", "GND"], "dup": 1, "values": []},
+                 "Q1": {"value": "Q", "mc_id": "", "mpn": "FET60", "nets": ["/VIN", "/SW", "/G"], "dup": 1, "values": []},
+                 "D1": {"value": "D", "mc_id": "", "mpn": "DIO40", "nets": ["/SW", "GND"], "dup": 1, "values": []},
+                 "L1": {"value": "33uH", "mc_id": "", "mpn": "IND", "nets": ["/SW", "/+12V"], "dup": 1, "values": []},
+                 "Z1": {"value": "15V", "mc_id": "", "mpn": "", "nets": ["/G", "/VIN"], "dup": 1, "values": []}}
+        nets = {"/VIN": {"classes": [], "pins": [("C1", "1", ""), ("U1", "1", "VIN"), ("Q1", "2", "D"), ("Z1", "2", "K")]},
+                "GND": {"classes": [], "pins": [("C1", "2", ""), ("C2", "2", ""), ("U1", "3", "GND"), ("D1", "1", "A")]},
+                "/SW": {"classes": [], "pins": [("U1", "2", "SW"), ("Q1", "1", "S"), ("D1", "2", "K"), ("L1", "1", "")]},
+                "/+12V": {"classes": [], "pins": [("C2", "1", ""), ("L1", "2", "")]},
+                "/G": {"classes": [], "pins": [("Q1", "3", "G"), ("Z1", "1", "A")]}}
+        db = {"IC-9": {"ID": "IC-9", "MPN": "LM5164", "Voltage_Rating": "100V", "Abs_Max_V": "VIN=70; SW=70", "Temp_Range": "-40°C ~ 125°C"},
+              "X": {"ID": "C-1", "MPN": "X", "Voltage_Rating": "25V", "Temp_Range": "-55°C ~ 85°C"},
+              "FET60": {"ID": "T-1", "MPN": "FET60", "Voltage_Rating": "60V"},
+              "DIO40": {"ID": "D-1", "MPN": "DIO40", "Voltage_Rating": "40V"},
+              "IND": {"ID": "M-1", "MPN": "IND", "Current_Rating": "1.9A (Isat) / 1.5A (Irms)"}}
+        return parts, nets, db
+
+    def test_rules_fire_with_derating_and_gaps_are_reported(self):
+        from forge import stress
+        parts, nets, db = self.nets()
+        r = stress.analyse(parts, nets, db, {}, {"vin_V": [36, 63], "vout_V": 12, "iout_A": 2.0}, {"ambient_C": [-20, 70]})
+        rules = {(f["rule"], f["claim"].split(":")[0]) for f in r["fail"]}
+        self.assertIn(("STR-1", "C1 22uF 50V"), rules)             # 63 V on a 50 V cap (limit 40 V derated)
+        self.assertIn(("STR-2", "U1 LM5164.VIN on VIN"), rules)    # 63 V > 0.8 x 70 V abs max, although rated 100 V
+        self.assertIn(("STR-3", "Q1 FET60"), rules)                 # 63 V D-S on a 60 V FET
+        self.assertIn(("STR-4", "D1 DIO40"), rules)                 # 63 V reverse on a 40 V diode
+        self.assertIn(("STR-5", "L1 IND"), rules)                   # 1.9 A Isat < 1.2 x 2 A; 1.5 A Irms < 2 A
+        self.assertTrue(any(w["rule"] == "STR-6" and w["claim"].startswith("C2") for w in r["warn"]))   # 85 °C < 70 + 20
+        self.assertEqual(r["voltages"]["VIN"], 63.0)
+        self.assertEqual(r["voltages"]["SW"], [0.0, 63.0])            # a switch node swings over the whole input
+        self.assertIn("G", r["unknown_nets"])                        # the gate net has no known voltage: said so
+        r2 = stress.analyse(parts, nets, db, {"cap_v": 1.0, "semi_v": 1.0, "ic_abs": 1.0, "i_pk_A": 1.5, "i_out_A": 1.0,
+                                              "nets": {"G": 36}}, {"vin_V": [24, 36]}, {})
+        self.assertEqual(r2["fail"], [])                              # 36 V within every rating at 1.0
+        self.assertNotIn("G", r2["unknown_nets"])
+        parts["C1"]["value"] = "22uF"                                 # no rating anywhere: a gap, not a pass
+        r3 = stress.analyse(parts, nets, db, {}, {"vin_V": [36, 48]}, {})
+        self.assertTrue(any(u.startswith("C1") for u in r3["unchecked"]))
+
+    def test_rail_limit_uses_every_rated_part_but_not_a_gate_zener(self):
+        from forge import reqinfer, stress
+        parts, nets, db = self.nets()
+        P = reqinfer.Parts(parts, db)
+        lim, by, unrated = stress.net_limit(P, nets, "/VIN")
+        self.assertEqual(lim, 50.0)                                  # the 50 V cap is the lowest-rated part
+        self.assertNotIn("Z1", by)                                   # the 15 V gate Zener is not across the rail
+        parts["C1"]["value"] = "22uF 100V"
+        lim, by, unrated = stress.net_limit(P, nets, "/VIN")
+        self.assertEqual(lim, 56.0)                                  # then U1: VIN abs max 70 x 0.8, below its 100 V rating
+        self.assertIn("U1", by)
+        a = reqinfer.analyse(parts, nets, db)
+        self.assertEqual(a["rails"]["/VIN"]["limit_V"], 56.0)
+
+
+class SimulationGate(unittest.TestCase):
+    """F-07: a simulated number is evidence only when it is citable (provenance), its stated error is the computed
+    one, the required set of simulations is shown, and pe-forge reproduces the closed forms itself."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-sim-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def doc(self, **kw):
+        d = {"schema": "pe-forge-result-1", "id": "r", "title": "t", "tool": "pwrlab buck", "grade": "PROVISIONAL",
+             "corners": ["36 V", "63 V"],
+             "metrics": [{"name": "Inductor ripple ΔI_L", "unit": "A pk-pk", "values": [0.606, 0.736],
+                          "closed_form": [0.606, 0.736], "err_pct": 0.0, "grade": "PROVISIONAL"}],
+             "provenance": {"tool": "pwrlab", "model_version": "abc", "toolchain_hash": "def", "run_utc": "2026", "evidence_eligible": True}}
+        d.update(kw)
+        return d
+
+    def test_provenance_and_err_pct_are_checked(self):
+        from forge import results
+        self.assertEqual(results.validate(self.doc()), [])
+        self.assertTrue(any("provenance" in p for p in results.validate(self.doc(provenance=None))))
+        bad = self.doc(provenance={"tool": "pwrlab", "model_version": "abc", "toolchain_hash": "d", "run_utc": "x", "evidence_eligible": False})
+        self.assertTrue(any("evidence_eligible" in p for p in results.validate(bad)))
+        d = self.doc()
+        d["metrics"][0]["err_pct"] = 0.0
+        d["metrics"][0]["values"] = [0.7, 0.736]                           # 15 % off but says 0: refused
+        self.assertTrue(any("err_pct" in p for p in results.validate(d)))
+        d = self.doc(grade="NOT RUN", provenance=None)                      # not claimed as evidence: no provenance needed
+        self.assertEqual(results.validate(d), [])
+        net = os.path.join(self.tmp, "run.net")
+        open(net, "w").write("* netlist\n")
+        import hashlib
+        h = hashlib.sha256(open(net, "rb").read()).hexdigest()
+        d = self.doc(tool="LTspice", provenance={"tool": "ltspice", "netlist": "run.net", "sha256": h})
+        self.assertEqual(results.validate(d, self.tmp), [])
+        open(net, "w").write("* changed\n")
+        self.assertTrue(any("changed" in p for p in results.validate(d, self.tmp)))
+
+    def test_closed_forms_and_required_set_gate_g5(self):
+        from forge import calc, config, results
+        d = new_project("Sim", self.tmp, type="dc-dc", specs={"vin_V": [36, 63], "vout_V": 12, "iout_A": 1, "topology": "buck"},
+                        corners={"f_sw_kHz": [400, 400]})
+        prj = config.Project(d)
+        b = calc.buck(36, 12, 1, 400e3, 33e-6, 44e-6)
+        self.assertAlmostEqual(b["D"], 1 / 3)
+        self.assertAlmostEqual(b["dI_L"], (36 - 12) / 3 / (400e3 * 33e-6), places=6)
+        rd = os.path.join(d, "06_Simulations", "Results")
+        os.makedirs(rd, exist_ok=True)
+        doc = self.doc(params={"f_sw_Hz": 400e3, "L_H": 33e-6, "C_out_F": 44e-6})
+        doc["metrics"][0]["closed_form"] = [round(b["dI_L"], 4), round(calc.buck(63, 12, 1, 400e3, 33e-6, 44e-6)["dI_L"], 4)]
+        doc["metrics"][0]["values"] = doc["metrics"][0]["closed_form"]
+        json.dump(doc, open(os.path.join(rd, "a.result.json"), "w"))
+        r = calc.as_check(prj, {})
+        self.assertEqual(r["status"], "pass", r)
+        items = results.gate_items(prj)
+        self.assertTrue(items[0][0])                                        # valid and citable
+        self.assertFalse(items[1][0])                                       # stability / start-up / short missing
+        self.assertIn("loop stability", items[1][1])
+        doc["metrics"][0]["closed_form"] = [0.9, 0.9]                       # an invented closed form
+        doc["metrics"][0]["values"] = [0.9, 0.9]
+        json.dump(doc, open(os.path.join(rd, "a.result.json"), "w"))
+        r = calc.as_check(prj, {})
+        self.assertEqual(r["status"], "fail")
+        open(os.path.join(d, "project.toml"), "a").write(
+            '\n[sims]\nrequired = [["ripple", "ripple"]]\n')
+        prj = config.Project(d)
+        self.assertTrue(results.gate_items(prj)[1][0])                      # the project named its own required set
+        open(os.path.join(d, "project.toml"), "a").write('[sims.waive]\n"ripple" = "no magnetics on this board (owner OK)"\n')
+        prj = config.Project(d)
+        cov, miss, wv = results.coverage(prj)
+        self.assertEqual(miss, [])
+
+
+class BoardsArrive(unittest.TestCase):
+    """F-08, F-10..F-13: every board checked; no board work on an unreviewed schematic unless a sketch, and a sketch
+    never ships; symbol pins vs pads, polarity, rotation source; fab-house rules; test points."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-ba-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_board_work_waits_for_g6_unless_sketch_and_a_sketch_never_releases(self):
+        from forge import config, gates
+        d = new_project("Bw", self.tmp)
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/bw/bw.kicad_sch"))
+        r = forge("pcb", "sync", cwd=d, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("G6", r.stdout + r.stderr)
+        sketch(d)
+        prj = config.Project(d)
+        items = gates.release_process_items(prj)
+        self.assertTrue(any("sketch" in m and not ok for ok, m in items))
+        forge("level", "light", cwd=d, check=False)       # light: no guard either (cannot lower from an agent shell)
+
+    def test_every_board_is_checked(self):
+        from forge import pcb
+        from unittest import mock
+        calls = []
+        one = lambda b: calls.append(b) or {"status": "warn" if b.endswith("b.kicad_pcb") else "pass", "findings": [{"claim": os.path.basename(b)}] if b.endswith("b.kicad_pcb") else [], "reason": "r", "missing_tool": False}
+        with mock.patch("forge.check.roots", return_value=["/x/a/a.kicad_pcb", "/x/b/b.kicad_pcb"]), \
+                mock.patch("forge.check.has_content", return_value=True), \
+                mock.patch.object(pcb.kicad, "find_python", return_value="py"):
+            r = pcb.every_board(object(), one)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(r["status"], "warn")                      # the worse board decides
+        self.assertIn("b.kicad_pcb", r["reason"])
+        self.assertEqual(r["findings"][0]["claim"], "b.kicad_pcb")
+
+    def test_footprint_pins_polarity_rotation(self):
+        from forge import fpcheck
+        txt = '(footprint "X" (pad "1" smd rect (at 0 0) (size 1 2)) (pad "2" smd roundrect (at 2 0) (size 1 2)))'
+        pd = fpcheck.pads(txt)
+        self.assertEqual(set(pd), {"1", "2"})
+        self.assertEqual(pd["1"]["w"], 1.0)
+        self.assertEqual(fpcheck.rotation_source({"fields": {}, "footprint": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"}, {}, type("P", (), {"cfg": {}})()), "rotation table")
+        self.assertIsNone(fpcheck.rotation_source({"fields": {}, "footprint": "MC:Weird_Thing"}, {}, type("P", (), {"cfg": {}})()))
+        self.assertEqual(fpcheck.rotation_source({"fields": {}, "footprint": "MC:Weird_Thing"}, {}, type("P", (), {"cfg": {"fab": {"rotation": {"Weird": 90}}}})()), "[fab.rotation]")
+        from forge import kicad
+        if not kicad.find_cli():
+            self.skipTest("kicad-cli not found")
+        d = new_project("Fp", self.tmp)
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/fp/fp.kicad_sch"))
+        from forge import config
+        r = fpcheck.as_check(config.Project(d), {})
+        self.assertNotEqual(r["status"], "fail", r)              # the fixture's symbols fit their footprints
+        self.assertTrue(r["reason"].startswith(("1", "2")))
+
+    def test_fab_house_rules_and_testpoints(self):
+        from forge import fabhouse
+        h = dict(fabhouse.HOUSES["jlcpcb"]); h["track"], h["space"] = 0.127, 0.127; h["oz"] = 1
+        rules = {"min_track_width": 0.1, "min_clearance": 0.15, "min_through_hole_diameter": 0.2, "min_via_annular_width": 0.05}
+        res = fabhouse.compare(rules, h)
+        bad = [m for ok, m in res if not ok]
+        self.assertEqual(len(bad), 2)                             # track 0.1 and annular 0.05 below JLCPCB
+        self.assertTrue(any("min_track_width" in m for m in bad))
+        d = new_project("Fh", self.tmp)
+        from forge import config
+        self.assertEqual(fabhouse.as_check(config.Project(d), {})["status"], "skip")     # no house set: said so
+        open(os.path.join(d, "project.toml"), "a").write('\n[fab]\nhouse = "jlcpcb"\n')
+        prj = config.Project(d)
+        r = fabhouse.as_check(prj, {})
+        self.assertIn(r["status"], ("pass", "fail", "skip"))
+        from forge import kicad
+        if kicad.find_cli():
+            shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/fh/fh.kicad_sch"))
+            rows, _ = fabhouse.testpoints(config.Project(d))
+            self.assertTrue(rows)
+            self.assertTrue(any(r_["net"] == "VIN" and r_["ok"] for r_ in rows))     # VIN is on J1
+            self.assertTrue(any(r_["net"] == "SW" and not r_["ok"] for r_ in rows))  # SW has no access
 
 
 if __name__ == "__main__":

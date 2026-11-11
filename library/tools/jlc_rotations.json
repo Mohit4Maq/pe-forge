@@ -1,0 +1,13 @@
+{
+ "_note": "Assembly rotation offsets (degrees, added to KiCad's rotation) for JLCPCB's pick-and-place zero, by footprint name pattern. From the community JLCKicadTools table; verify a package against the house's part image before the first order. A JLC_Rotation field on the part or [fab.rotation] in project.toml wins.",
+ "by_footprint": {
+  "^SOT-23": 180, "^SOT-23-5": 180, "^SOT-23-6": 180, "^SOT-223": 180, "^SOT-89": 180, "^SOT-353": 180, "^SOT-363": 180,
+  "^SOIC-8": 270, "^SOIC-14": 270, "^SOIC-16": 270, "^SOIC-16W": 270, "^SO-8": 270, "^SOP-8": 270, "^SSOP": 270,
+  "^TSSOP": 270, "^MSOP": 270, "^HTSSOP": 270, "^PowerPAK": 270, "^DFN": 270, "^QFN": 270, "^VQFN": 270, "^WQFN": 270,
+  "^LQFP": 270, "^TQFP": 270, "^QFP": 270, "^TO-252": 180, "^DPAK": 180, "^TO-263": 180, "^D2PAK": 180, "^TO-277": 180,
+  "^SMA$|^SMA_|^SMB|^SMC|^SOD-123|^SOD-323|^SOD-523|^D_SMA|^D_SMB|^D_SMC|^D_SOD": 180,
+  "^LED_0603|^LED_0805|^LED_1206": 180, "^CP_Elec|^CP_EIA": 180, "^Tantalum|^CP_Tantalum": 180,
+  "^R_0|^C_0|^L_0|^R_1|^C_1|^L_1|^R_2|^C_2|^L_2": 0, "^Fuse": 0, "^Inductor|^L_TDK|^L_Coilcraft|^L_Wuerth|^L_Bourns": 0,
+  "^USB_C": 0, "^PinHeader|^PinSocket|^Conn": 0, "^Crystal|^Oscillator": 0
+ }
+}

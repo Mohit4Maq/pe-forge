@@ -37,5 +37,12 @@ assertion an `expect:` closed form, then `forge spice check --module M-xx`. The 
 Next to every simulation record, write `<record stem>.result.json` (schema in `forge/results.py`): the grade, the
 corners, one metric per key number with its values per corner, the closed-form value, the difference in % and the
 metric's own grade, the charts (sweeps as `line`, loss breakdowns as `bars`) and the notes. Run
-`forge results check`. The pe-forge side panel (V-cycle, Simulations, Checks, Gates, Parts tabs) opens on it, and
+`forge results check`. **A result is evidence only when it is citable:** copy the pwrlab payload's `provenance`
+block into the result file (`model_version`, `toolchain_hash`, `run_utc`, `evidence_eligible` must be true), or for
+a netlist you wrote `"provenance": {"tool": "ltspice", "netlist": "<path>", "sha256": "<hash>"}`. Write `"params"`
+(`f_sw_Hz`, `L_H`, `C_out_F`, `esr_ohm`) so `forge calc check` can recompute the closed forms exactly; `err_pct` must
+be the computed error, never rounded to look good. **G5 requires the set** (`forge results check` lists what is
+missing): for a DC-DC converter inductor ripple, peak current, output ripple, efficiency, loop stability (phase /
+gain margin), start-up / inrush, output short / overload; `[sims] required` / `[sims.waive]` in project.toml change
+the list with the owner's reason. The pe-forge side panel (V-cycle, Simulations, Checks, Gates, Parts tabs) opens on it, and
 `forge report --open` shows it as an interactive page. `forge spice check` writes its own result files.

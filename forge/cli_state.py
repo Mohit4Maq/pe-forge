@@ -98,6 +98,20 @@ def gate(prj, rest):
         if bad and prj.level == "strict":
             print("cannot pass: process level is strict, gates have no override (" + "; ".join(bad) + ")")
             return 1
+        if bad:                                   # --override: the owner, at a terminal, with a reason, never G7 / G8
+            from . import changes, gates
+            if g in ("G7", "G8"):
+                print(f"cannot pass: {g} takes no override (a board or a release with failed checks); fix them: " + "; ".join(bad))
+                return 1
+            if changes.agent_context() and "--i-am-the-owner" not in rest:
+                print(f"cannot pass: --override is for the project owner only. Run it in your own terminal, or here as\n"
+                      f"  ! forge gate pass {g} --override --note \"<reason>\" --i-am-the-owner\n"
+                      "(Agents must ask the owner and never pass that flag.)")
+                return 1
+            if not (_opt(rest, "--note") or "").strip():
+                print("cannot pass: --override needs --note \"<why the failed checks are acceptable>\"")
+                return 1
+            gates.record_override(prj, g, mid or "system", bad, _opt(rest, "--note"))
         tgt = m["phases"][pid] if m else st["phases"][pid]
         tgt.update(status="passed", date=S.TODAY(), note=_opt(rest, "--note") or "")
         if bad:

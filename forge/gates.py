@@ -5,6 +5,7 @@ least 8 lines of content that are not template placeholders ("_(fill in)_", "TOD
 """
 import csv
 import glob
+import json
 import os
 import re
 
@@ -21,6 +22,104 @@ MODULE_ARTEFACTS = {
 }
 BOM_REQUIRED = ["Ref", "Qty", "MPN", "Manufacturer", "Description", "Price_1", "Stock", "Source",
                 "Alt MPN", "Alt manufacturer", "Alt price / stock", "Alt match"]
+
+
+PLACEHOLDER = re.compile(r"_\(fill in\)_|\{\{[A-Z_]+\}\}|\(fill in\)|lorem ipsum", re.I)
+MIN_WORDS = {"md": 120}
+
+
+def content_problem(path, min_words=MIN_WORDS["md"]):
+    """Why a deliverable is not filled in: placeholders left, or too little content to be a deliverable."""
+    if not os.path.exists(path):
+        return "missing"
+    if not path.lower().endswith((".md", ".txt", ".csv")):
+        return None
+    t = open(path, errors="ignore").read()
+    body = [l for l in t.splitlines() if l.strip() and not l.startswith(("---", "#", "|---", "> [!"))]
+    ph = PLACEHOLDER.findall(t)
+    if ph and not path.lower().endswith(".csv"):
+        return f"placeholders left: {', '.join(sorted(set(p.strip() for p in ph))[:3])}"
+    if path.lower().endswith(".md") and len(" ".join(body).split()) < min_words:
+        return f"{len(' '.join(body).split())} words of content (a deliverable needs {min_words}+)"
+    return None
+
+
+REVIEWS = os.path.join(".forge", "reviews.json")
+
+
+def _hash_file(p):
+    import hashlib
+    return hashlib.sha256(open(p, "rb").read()).hexdigest()[:16]
+
+
+def deliverable_hashes(prj, phase, mod=None):
+    """{relpath: hash} of the phase's artefacts, plus every schematic / board (what a review is a review of)."""
+    from .phases import PHASE
+    out = {}
+    for key in PHASE[phase][4]:
+        pat = key.format(**{k: prj.paths[k] for k in prj.paths}) if "{" in key else key
+        base = os.path.join(prj.root, mod["dir"]) if mod and not pat.startswith(("{", "0", "1", "9", "p")) else prj.root
+        for f in glob.glob(os.path.join(prj.root, pat), recursive=True) + glob.glob(os.path.join(base, pat), recursive=True):
+            if os.path.isfile(f) and "-backups" not in f:
+                out[prj.rel(f)] = _hash_file(f)
+    for ext in ("kicad_sch", "kicad_pcb"):
+        for f in glob.glob(os.path.join(prj.p("pcb"), "**", "*." + ext), recursive=True):
+            if "-backups" not in f and "/release/" not in f:
+                out[prj.rel(f)] = _hash_file(f)
+    return out
+
+
+def record_review(prj, gate, review_file, mod=None):
+    """Bind a review to what it reviewed: the review file's hash, the reviewer named in it, its verdict, and the
+    hashes of every deliverable at that moment. `review_ok` refuses a gate whose record is missing, whose review
+    file changed, or whose deliverables changed since (a review of other content is no review)."""
+    import datetime as _dt
+    p = os.path.join(prj.root, review_file)
+    if not os.path.exists(p):
+        raise SystemExit(f"review file {review_file} does not exist")
+    t = open(p, errors="ignore").read()
+    m = re.search(r"^(?:reviewer|agent|by):\s*(.+)$", t, re.M)
+    v = re.search(r"^verdict:\s*(.+)$", t, re.M)
+    if not m:
+        raise SystemExit("the review file must name its reviewer in the frontmatter (reviewer: pe-reviewer)")
+    if not v:
+        raise SystemExit("the review file must carry its verdict in the frontmatter (verdict: READY | READY WITH MINORS | NOT READY)")
+    phase = next(p_ for p_, g in GATE_OF.items() if g == gate)
+    rec = {"gate": gate, "module": (mod or {}).get("id", "system"), "review": prj.rel(p), "review_sha": _hash_file(p),
+           "reviewer": m.group(1).strip(), "verdict": v.group(1).strip().upper(),
+           "date": _dt.date.today().isoformat(), "deliverables": deliverable_hashes(prj, phase, mod)}
+    f = os.path.join(prj.root, REVIEWS)
+    try:
+        d = json.load(open(f))
+    except (OSError, ValueError):
+        d = []
+    d.append(rec)
+    os.makedirs(os.path.dirname(f), exist_ok=True)
+    json.dump(d, open(f, "w"), indent=1)
+    return rec
+
+
+def review_record_ok(prj, gate, mod=None):
+    """(ok, why) from .forge/reviews.json for this gate and module: present, verdict READY*, file and deliverables unchanged."""
+    want = (mod or {}).get("id", "system")
+    try:
+        recs = [r for r in json.load(open(os.path.join(prj.root, REVIEWS))) if r["gate"] == gate and r["module"] == want]
+    except (OSError, ValueError):
+        recs = []
+    if not recs:
+        return False, f"no recorded {gate} review for {want} (forge review record {gate} <review file>)"
+    r = recs[-1]
+    p = os.path.join(prj.root, r["review"])
+    if not os.path.exists(p) or _hash_file(p) != r["review_sha"]:
+        return False, f"the recorded {gate} review {r['review']} changed since it was recorded"
+    if not r["verdict"].startswith("READY"):
+        return False, f"recorded {gate} review verdict {r['verdict']}"
+    phase = next(p_ for p_, g in GATE_OF.items() if g == gate)
+    now = deliverable_hashes(prj, phase, mod)
+    changed = sorted(k for k in set(now) | set(r["deliverables"]) if now.get(k) != r["deliverables"].get(k))
+    if changed:
+        return False, f"{len(changed)} deliverable(s) changed since the {gate} review by {r['reviewer']}: " + ", ".join(changed[:4]) + ": review again"
+    return True, f"{gate} review by {r['reviewer']} ({r['date']}) bound to {len(r['deliverables'])} unchanged file(s)"
 
 
 def filled(path):
@@ -43,7 +142,8 @@ def artefacts(prj, phase, mod=None):
         if not hits:
             out.append((False, f"missing: {pat}"))
         else:
-            empty = [prj.rel(h) for h in hits if not filled(h)]
+            mw = 0 if phase == "P0" else MIN_WORDS["md"]          # P0 holds forms and the plan, not deliverables
+            empty = [f"{prj.rel(h)} ({content_problem(h, mw)})" for h in hits if not filled(h) or content_problem(h, mw)]
             out.append((not empty, f"{pat}: {len(hits)} file(s)" + (f", not filled in: {', '.join(empty[:4])}" if empty else "")))
     return out
 
@@ -73,7 +173,23 @@ def review_ok(prj, gate, mod=None):
         return False, f"no {gate} review row for {want} in the QC register"
     r = rows[-1]
     ok = r.get("verdict", "").upper().startswith("READY") and r.get("status", "").upper() in ("CLOSED", "ACCEPTED")
-    return ok, f"latest {gate} review ({r.get('date')}): verdict {r.get('verdict')}, status {r.get('status')}"
+    msg = f"latest {gate} review ({r.get('date')}): verdict {r.get('verdict')}, status {r.get('status')}"
+    if ok and prj.level != "light":          # a row in a table is a claim; the record binds it to the content (F-09)
+        ok2, why = review_record_ok(prj, gate, mod)
+        return ok2, msg + "; " + why
+    return ok, msg
+
+
+def record_override(prj, gate, module, bad, note):
+    """An owner override is a QC event: one row in the register, verdict OVERRIDE, listing what was failing."""
+    import datetime as _dt
+    f = prj.p("qc_register")
+    if not os.path.exists(f):
+        return
+    what = "; ".join(bad)[:300].replace("|", "/")
+    row = (f"| {_dt.date.today().isoformat()} | {gate} | {module} | owner override: {what} | - | OVERRIDE | - | - | "
+           f"{note.replace('|', '/')} | ACCEPTED |\n")
+    open(f, "a").write(row)
 
 
 def bom_ok(path):
@@ -119,6 +235,23 @@ def kicad(cmd, path):
     return rep.ok, msg
 
 
+def main_review(prj, argv):
+    """forge review record G<n> <review file> [--module M-xx]"""
+    if argv[:1] != ["record"] or len(argv) < 3:
+        print("forge review record G<n> <review file> [--module M-xx]   bind an independent review to the deliverables it reviewed")
+        return 1
+    from . import state
+    gate, f = argv[1], argv[2]
+    mod = None
+    if "--module" in argv:
+        st = state.load(prj)
+        mod = next((m for m in st["modules"] if m["id"] == argv[argv.index("--module") + 1]), None)
+    rec = record_review(prj, gate, f, mod)
+    print(f"recorded {gate} review {rec['review']} by {rec['reviewer']}: verdict {rec['verdict']}, "
+          f"{len(rec['deliverables'])} deliverable(s) hashed")
+    return 0
+
+
 def release_process_items(prj):
     """The firm stop before boards are made: never in light mode, and only with the requirements and V-model in
     place (P2 passed, not skipped by an adoption). Light mode helps on any board; releasing one needs the process."""
@@ -130,6 +263,8 @@ def release_process_items(prj):
         p2 = state.load(prj)["phases"]["P2"]["status"]
     except Exception:
         p2 = "unknown"
+    if prj.process.get("sketch") is True:
+        res.append((False, "[process] sketch = true: a sketch is never released; finish the phases and set sketch = false"))
     res.append((p2 == "passed", f"requirements and V-model in place before release: P2 is {p2}"
                 + ("" if p2 == "passed" else " (draft them from the design: forge req infer; then pass G2)")))
     return res
@@ -151,6 +286,8 @@ def check(prj, gate, mod=None):
     if gate == "G5":
         base = os.path.join(prj.root, mod["dir"], "Simulations") if mod else prj.p("sim_results")
         res += sims_ok(glob.glob(os.path.join(base, "*.md")), prj)
+        from . import results             # results as data: valid, citable (provenance), the required set shown,
+        res += results.gate_items(prj)    # closed forms reproduced by pe-forge itself (F-07)
     if gate in ("G6", "G7"):   # the same sub-check `forge check` runs, so the two never disagree
         from . import check as fc
         r = (fc.c_erc if gate == "G6" else fc.c_drc)(prj, {})
@@ -158,8 +295,10 @@ def check(prj, gate, mod=None):
         if r["status"] == "skip":
             res.append((False, f"{kind}: skipped ({r['reason']}): nothing to check yet is not a pass"))
         else:
-            bad = [f for f in r["findings"] if f["claim"].startswith(("no ", kind))]
+            bad = [f for f in r["findings"] if not f["claim"].startswith(("no ERC warnings", "no DRC warnings"))]
+            warn = len(r["findings"]) - len(bad)
             res.append((r["status"] != "fail", f"{kind} ({r['reason']}): {len(bad)} error(s)"
+                        + (" (unrouted / parity count as errors)" if gate == "G7" else "") + f", {warn} warning(s)"
                         + "".join(f"; {f['location']}: {f['actual']}" for f in bad[:3])))
         from . import protection          # surge clamps vs the system and every protected pin (PROT-1..3)
         pr = protection.as_check(prj, {})
@@ -167,24 +306,41 @@ def check(prj, gate, mod=None):
                     + "".join(f"; {f['claim']}: {f['actual']}" for f in pr["findings"][:2] if f["claim"].startswith("PROT-"))))
         from . import insulation          # INS-0/1/2, NET-4 at G6; the .kicad_dru proof (CLS-2) too at G7
         res += insulation.gate_items(prj, rules=gate == "G7")
+        from . import stress              # STR-1..7: ratings vs the operating corners, with derating
+        res += stress.gate_items(prj)
         if gate == "G7":
             from . import pcb                # independent PCB review against every layout rule, on this board
             res += pcb.gate_items(prj)
+            from . import fpcheck            # the board as drawn matches the symbols, polarity and the house's zero
+            res += fpcheck.gate_items(prj)
     if gate == "G8":           # the fab release gate, strict: NRND parts and unrun power checks fail too
         res += release_process_items(prj)
         from . import supply
-        res += supply.gate_items(prj)
+        res += supply.gate_items(prj, release=True)
         from . import check as fc
         from . import insulation
         res += insulation.gate_items(prj, rules=True)
+        from . import stress
+        res += stress.gate_items(prj)
         from . import pcb
         res += pcb.gate_items(prj)
+        from . import fabhouse            # the house must be able to make the board as drawn
+        fr = fabhouse.as_check(prj, {})
+        res.append((fr["status"] == "pass", f"fab house rules: {fr['status']}" + (f" ({fr['reason']})" if fr["status"] != "pass" else "")
+                    + "".join(f"; {f['actual']}" for f in fr["findings"][:2])
+                    + (": set [fab] house = jlcpcb | pcbway" if fr["status"] == "skip" else "")))
+        tp = fabhouse.as_check_tp(prj, {})
+        res.append((tp["status"] != "fail", f"test points: {tp['status']} ({tp['reason']})"
+                    + "".join(f"; {f['claim']}" for f in tp["findings"][:3])))
         r = fc.c_fab(prj, {"strict": True})
         if r["status"] == "skip":
             res.append((False, f"fab release gate: skipped ({r['reason']})"))
         for name, part in (r.get("parts") or {}).items():
             first = "; ".join(f"{f['location']}: {f['claim']}, {f['actual']}" for f in part["findings"][:2])
-            res.append((part["status"] in ("pass", "skip"), f"fab {name}: {part['status']}" + (f" ({first})" if first else "")))
+            # at the release gate a check that could not run is a failure, never a pass (F-03)
+            res.append((part["status"] == "pass", f"fab {name}: {part['status']}"
+                        + (f" (skipped: {part.get('reason', '')}: fix the tool or the input, a skip is not a pass)" if part["status"] == "skip" else "")
+                        + (f" ({first})" if first else "")))
     hits = consistency.scan(prj)
     res.append((not hits, f"consistency: {len(hits)} live mention(s) of superseded terms"))
     from .phases import GATE_REVIEWERS

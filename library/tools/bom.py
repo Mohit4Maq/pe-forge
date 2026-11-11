@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 import re
 import subprocess
@@ -139,11 +140,22 @@ def lcsc_of(c, row):
 
 
 def rot_of(c, row):
+    """The assembly rotation offset: the JLC_Rotation field, else the package rotation table (jlc_rotations.json)."""
     v = ((row or {}).get("JLC_Rotation") or c.fields.get("JLC_Rotation") or "").strip()
     try:
-        return float(v) if v else 0.0
+        if v:
+            return float(v)
     except ValueError:
         return 0.0
+    try:
+        table = json.load(open(Path(__file__).resolve().parent / "jlc_rotations.json")).get("by_footprint", {})
+    except (OSError, ValueError):
+        return 0.0
+    fp = c.footprint.split(":")[-1]
+    for pat, off in table.items():
+        if re.search(pat, fp):
+            return float(off)
+    return 0.0
 
 
 def pos_rows(sch, a):

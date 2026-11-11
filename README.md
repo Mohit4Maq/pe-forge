@@ -79,6 +79,18 @@ release, `forge req infer` drafts the system requirements from the design (rails
 output current, protection, isolation, each with its evidence; efficiency, ambient, standards and life left to the
 owner). The owner fills the blanks and confirms; `forge req infer --apply` refuses rows with blanks.
 
+### What stops a bad board (the gates, in one place)
+
+| Before boards are made, pe-forge refuses when | Check |
+|---|---|
+| a connection is unrouted, the board differs from the schematic, DRC / ERC has an error | `forge check drc / erc`, G7 |
+| a part is over its rating at the operating corners (caps, IC pins, FETs, diodes, inductor I_sat / I_rms, temperature), or has no rating to check | `forge stress`, G6 / G7 / G8 |
+| a symbol pin has no pad, a polarized part has no polarity marking, a part has no assembly rotation source, the land pattern differs from the datasheet | `forge check fp_pins`, G7 |
+| a simulated number has no provenance, a closed form pe-forge cannot reproduce, or stability / start-up / short circuit were never simulated | `forge results check`, `forge calc check`, G5 |
+| a review is not bound to the files it reviewed, or they changed since | `forge review record`, every gate |
+| the fab house cannot make the design rules, a rail has no test access, stock data is stale, a skipped check, a sketch, no requirements | `forge fab rules / testpoints`, G8 |
+| a gate is passed with failed checks | owner only, with a reason, recorded; never at G7 / G8 |
+
 ### A project that already has work in it
 
 `forge adopt <folder>` brings a half-done project under pe-forge **without changing any of its files**. Run it once

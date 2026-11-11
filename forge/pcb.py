@@ -688,13 +688,36 @@ def connector_findings(prj, rep):
     return F
 
 
-def as_check_connectors(prj, opts):
-    from .check import finding, result, roots, has_content
+def every_board(prj, one):
+    """Run a one-board check on every board with content and merge: worst status, all findings, reasons joined.
+    A multi-board project (power + control + driver) gets every board checked, not the first one (F-08)."""
+    from .check import result, roots, has_content
     pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
     if not pcbs:
         return result("skip", reason="no board yet")
     if not kicad.find_python():
         return result("skip", reason="KiCad's Python (pcbnew) not found", missing_tool=True)
+    order = ["skip", "pass", "warn", "fail"]
+    out = None
+    for b_ in pcbs:
+        r = one(b_)
+        if out is None:
+            out = dict(r, reason=(f"{os.path.basename(b_)}: " if len(pcbs) > 1 else "") + r["reason"])
+            continue
+        out["status"] = max(out["status"], r["status"], key=order.index)
+        out["findings"] += r["findings"]
+        out["missing_tool"] = out["missing_tool"] or r["missing_tool"]
+        out["reason"] += f"; {os.path.basename(b_)}: {r['reason']}"
+    return out
+
+
+def as_check_connectors(prj, opts):
+    return every_board(prj, lambda b_: _check_connectors(prj, b_))
+
+
+def _check_connectors(prj, board):
+    from .check import finding, result
+    pcbs = [board]
     rep = connectors(prj, pcbs[0])
     if not rep["connectors"]:
         return result("skip", reason="no connector at the board edge")
@@ -810,12 +833,12 @@ def xtalk_analyse(prj, rep):
 
 
 def as_check_xtalk(prj, opts):
-    from .check import finding, result, roots, has_content
-    pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
-    if not pcbs:
-        return result("skip", reason="no board yet")
-    if not kicad.find_python():
-        return result("skip", reason="KiCad's Python (pcbnew) not found", missing_tool=True)
+    return every_board(prj, lambda b_: _check_xtalk(prj, b_))
+
+
+def _check_xtalk(prj, board):
+    from .check import finding, result
+    pcbs = [board]
     stats, pairs, F = xtalk_analyse(prj, xtalk(prj, pcbs[0]))
     if not any(s["signal"] for s in stats):
         return result("skip", reason="no signal tracks yet")
@@ -867,12 +890,12 @@ def copper_findings(prj, rep):
 
 
 def as_check_copper(prj, opts):
-    from .check import finding, result, roots, has_content
-    pcbs = [b_ for b_ in roots(prj, "kicad_pcb") if has_content(b_)]
-    if not pcbs:
-        return result("skip", reason="no board yet")
-    if not kicad.find_python():
-        return result("skip", reason="KiCad's Python (pcbnew) not found", missing_tool=True)
+    return every_board(prj, lambda b_: _check_copper(prj, b_))
+
+
+def _check_copper(prj, board):
+    from .check import finding, result
+    pcbs = [board]
     rep = copper(prj, pcbs[0])
     if not any(v["copper_pct"] for v in rep["layers"].values()):
         return result("skip", reason="no copper pours yet")
@@ -1192,20 +1215,27 @@ def as_check_review(prj, opts):
     pcbs = [b for b in roots(prj, "kicad_pcb") if has_content(b)]
     if not pcbs:
         return result("skip", reason="no board yet")
-    ok, probs, *where = review_status(prj, pcbs[0])
-    loc = where[0] if where else prj.paths["reviews"]
-    return result("pass" if ok else "warn", [finding("independent PCB review covers every layout rule, board unchanged",
-                                                      p, loc) for p in probs], reason=loc)
+    F, locs = [], []
+    for b in pcbs:                         # every board needs its own review, bound to its own hash
+        ok, probs, *where = review_status(prj, b)
+        loc = where[0] if where else prj.paths["reviews"]
+        locs.append(loc)
+        F += [finding(f"independent PCB review of {os.path.basename(b)} covers every layout rule, board unchanged", p, loc)
+              for p in probs]
+    return result("pass" if not F else "warn", F, reason="; ".join(locs))
 
 
 def gate_items(prj):
     from .check import roots
-    pcbs = roots(prj, "kicad_pcb")
+    from .check import has_content
+    pcbs = [b for b in roots(prj, "kicad_pcb") if has_content(b)]
     if not pcbs:
         return [(False, "PCB review: no board")]
-    ok, probs, *where = review_status(prj, pcbs[0])
-    res = [(ok, "independent PCB review against the layout rules and R-11..R-14" + (f" ({where[0]})" if where else "")
-            + ("" if ok else ": " + "; ".join(probs)))]
+    res = []
+    for b in pcbs:
+        ok, probs, *where = review_status(prj, b)
+        res.append((ok, f"independent PCB review of {os.path.basename(b)} against the layout rules and R-11..R-14"
+                    + (f" ({where[0]})" if where else "") + ("" if ok else ": " + "; ".join(probs))))
     from . import hp
     for name, fn in (("Rule 12 copper / thermal relief", as_check_copper), ("Rule 13 edge connectors", as_check_connectors),
                      ("Rule 14 orthogonal signal layers", as_check_xtalk), ("Rule 15 high-power rule book", hp.as_check)):
@@ -1228,6 +1258,13 @@ def main(prj, argv):
         print(__doc__)
         return 1
     from . import check
+    if argv[0] in ("setup", "place", "zones", "route", "sync") and prj.level != "light" and not prj.process.get("sketch"):
+        from . import state
+        p6 = state.load(prj)["phases"]["P6"]["status"]
+        if p6 not in ("passed", "skipped"):
+            raise SystemExit(f"forge pcb {argv[0]}: the schematic gate G6 is {p6}, so the board would be built on an unreviewed "
+                             "schematic. Pass G6 first; or, for a throwaway sketch, set [process] sketch = true in "
+                             "project.toml (a sketch is never released: G8 refuses while it is set).")
     board = argv[argv.index("--board") + 1] if "--board" in argv else None
     if not board:
         pcbs = check.roots(prj, "kicad_pcb")

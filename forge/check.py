@@ -18,6 +18,9 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
   pcb_crosstalk  Rule 14: adjacent signal layers orthogonal, no broadside parallel runs (fail)
   protection   PROT-1..4: surge clamps sized to the system (VRWM >= max operating V) and to every protected pin
                (clamp V <= margin x abs max from MC_Parts Abs_Max_V); forge/protection.py
+  stress       STR-1..7: every part's voltage / current / temperature rating against the operating corners with
+               derating (forge/stress.py); a part or rail with no rating is a gap, never a pass
+  sims         every *.result.json valid and citable (provenance), its closed forms recomputed by forge calc
   insulation   INS-1/2/3, NET-4: HV-side nets in the HV class, no path across a barrier, barrier package
                creepage, one island class per HV net (forge/insulation.py; skip: no HV net)
   dru_rules    CLS-2: the .kicad_dru flags copper just closer than each [[insulation.rule]] (a generated test
@@ -29,6 +32,9 @@ Sub-checks (each: pass | warn | fail | skip, with findings {claim, actual, locat
                saved since is held to it by the ledger instead
   spice        ngspice assertions from the sheet briefs' `## Simulation` blocks (skip: none, or no ngspice)
   parts_evidence  every placed part's datasheet evidence exists and matches by hash; sourcing snapshot age
+  fp_pins      FP-1..4: symbol pins have pads, polarity marked, assembly rotation known, land pattern vs datasheet
+  fab_rules    the board's design rules vs the fab house's capabilities ([fab] house = jlcpcb | pcbway)
+  testpoints   every rail and key net has a test point or connector pin (warn)
   fab          release readiness (only with --fab): routing, schematic/board match, BoM ready, outputs fresh
                (content hashes) and complete, power layout rules, release docs. See forge/fab.py
 
@@ -48,9 +54,9 @@ import time
 
 from . import config, consistency, gates, kicad, vmodel
 
-ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "insulation", "dru_rules", "pcb_extra",
+ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "stress", "sims", "insulation", "dru_rules", "pcb_extra",
        "pcb_review", "pcb_copper", "pcb_connectors", "pcb_crosstalk", "pcb_hp", "bom_risk", "protection",
-       "legibility", "spice", "parts_evidence"]
+       "legibility", "spice", "parts_evidence", "fp_pins", "fab_rules", "testpoints"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
 
@@ -100,16 +106,21 @@ def _kicad(prj, kind):
         if not rep.tool_ok:
             F.append(finding(f"{kind.upper()} runs on {loc}", rep.error, loc))
             continue
-        for v in rep.violations:
+        def where(v):
             it = next((i for i in v["items"] if i.get("pos")), None)
-            where = loc + (f" sheet {v['sheet']}" if v["sheet"] else "") + \
+            return loc + (f" sheet {v['sheet']}" if v.get("sheet") else "") + \
                 (f" @ ({it['pos'][0]:g}, {it['pos'][1]:g}) mm" if it else "")
-            refs = ", ".join(i["ref"] for i in v["items"] if i.get("ref"))
-            F.append(finding(f"no {kind.upper()} errors", f"{v['type']}: {v['description']}" + (f" [{refs}]" if refs else ""),
-                             where))
-        if kind == "drc":
-            W += [finding("all connections routed", v["description"], loc) for v in rep.unconnected]
-            W += [finding("schematic and board match", v["description"], loc) for v in rep.parity]
+        refs = lambda v: ", ".join(i["ref"] for i in v["items"] if i.get("ref"))
+        for v in rep.violations:
+            F.append(finding(f"no {kind.upper()} errors", f"{v['type']}: {v['description']}" + (f" [{refs(v)}]" if refs(v) else ""),
+                             where(v)))
+        for v in rep.warnings:          # a warning is a finding too (silk clipped by the edge, a symbol off its
+            W.append(finding(f"no {kind.upper()} warnings", f"{v['type']}: {v['description']}"   # library ...)
+                             + (f" [{refs(v)}]" if refs(v) else ""), where(v)))
+        if kind == "drc":               # an unrouted connection or a board that differs from its schematic is an
+            F += [finding("all connections routed", v["description"], loc) for v in rep.unconnected]   # error: a
+            F += [finding("schematic and board match", v["description"], loc) for v in rep.parity]     # board like
+            # that must not pass G7 (independent review 2026-11-11, F-01)
     return result("fail" if F else "warn" if W else "pass", F + W, reason=f"{len(files)} file(s)")
 
 
@@ -246,6 +257,25 @@ def c_legibility(prj, opts):
     return result("warn" if F else "pass", F, reason="; ".join(scores))
 
 
+def c_sims(prj, opts):
+    """Simulation results as data: valid, citable, the closed forms reproduced; required set is a gate (G5) item."""
+    from . import calc, results
+    docs = results.load_results(prj)
+    if not docs:
+        return result("skip", reason="no simulation results yet")
+    F = [finding(f"{d['file']}: result file valid and citable", p, d["file"], "fix the result file (forge results check)")
+         for d in docs for p in d.get("problems", [])]
+    r = calc.as_check(prj, opts)
+    F += [f for f in r["findings"] if r["status"] == "fail"]
+    W = [f for f in r["findings"] if r["status"] != "fail"]
+    return result("fail" if F else "warn" if W else "pass", F + W, reason=f"{len(docs)} result file(s); {r['reason']}")
+
+
+def c_stress(prj, opts):
+    from . import stress
+    return stress.as_check(prj, opts)
+
+
 def c_insulation(prj, opts):
     from . import insulation
     return insulation.as_check(prj, opts)
@@ -301,6 +331,21 @@ def c_parts_evidence(prj, opts):
     return evidence.as_check(prj, opts)
 
 
+def c_fp_pins(prj, opts):
+    from . import fpcheck
+    return fpcheck.as_check(prj, opts)
+
+
+def c_fab_rules(prj, opts):
+    from . import fabhouse
+    return fabhouse.as_check(prj, opts)
+
+
+def c_testpoints(prj, opts):
+    from . import fabhouse
+    return fabhouse.as_check_tp(prj, opts)
+
+
 def c_fab(prj, opts):
     try:
         from . import fab
@@ -310,9 +355,9 @@ def c_fab(prj, opts):
 
 
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
-          "drift": c_drift, "sch_lib": c_sch_lib, "insulation": c_insulation, "dru_rules": c_dru_rules,
+          "drift": c_drift, "sch_lib": c_sch_lib, "stress": c_stress, "sims": c_sims, "insulation": c_insulation, "dru_rules": c_dru_rules,
           "pcb_review": c_pcb_review, "pcb_copper": c_pcb_copper, "pcb_connectors": c_pcb_connectors, "pcb_crosstalk": c_pcb_crosstalk, "pcb_hp": c_pcb_hp, "bom_risk": c_bom_risk, "protection": c_protection, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
-          "fab": c_fab}
+          "fp_pins": c_fp_pins, "fab_rules": c_fab_rules, "testpoints": c_testpoints, "fab": c_fab}
 
 
 def run(prj, only=None, fab=False, strict=False, module=None):

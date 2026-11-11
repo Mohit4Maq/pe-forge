@@ -29,9 +29,12 @@
   forge statusline [install [--project|--user] [--uninstall]]   the pe-forge bar in Claude Code (docs/ui-layout.md)
   forge explain U1 | NET | U1.7 | U1.VCC | --pins MC_ID [--json] [--sheet PATH]   deterministic design lookup
   forge fab manifest [<kicad dir>]  release manifest (SHA-256 of sources and outputs); release.sh runs it
+  forge fab rules | panel [--rows N --cols N] | testpoints   fab-house capability check, KiKit panel, test access
   forge drift [--json] [--module M-xx]  BoM / brief / booklet against the drawn schematic {doc, claim, actual}
   forge pcb sync [--prune] [--dry-run]   update the board from the schematic headless (KiCad's F8)
   forge protection [--json]             surge clamps vs the system and every protected pin's abs max
+  forge stress [--json]                 every part's V / I / temperature rating vs the operating corners, derated
+  forge calc buck|boost ... | design | check   closed-form calculations; recompute every result's closed form
   forge hp [--all|--json|rules]         High-Power PCB Rule Book: applicable rules, auto-checked or for review
   forge insulation [--rules] [--json]   insulation from the netlist (INS-1/2/3, NET-4); --rules proves the
                                     .kicad_dru enforces [[insulation.rule]] (CLS-2)
@@ -44,6 +47,7 @@
   forge quick [dir] [--vin V] [--json] [--out F]   pe-forge's checks on any KiCad folder, no project, nothing written
   forge adopt [dir] [--apply|--undo] [--name N]   bring a half-done project under pe-forge without changing a file
                                     (starts in light mode)
+  forge review record G<n> <file> [--module M-xx]   bind an independent review to the deliverables it reviewed
   forge level [light|standard|strict]   how firmly the process is enforced (lowering: the owner, at a terminal)
   forge req infer [--apply] [--json]    draft system requirements from the existing design, for the owner to confirm
   forge guard status | accept <path>   files pe-forge generated; proposed copies beside files it would not overwrite
@@ -173,6 +177,9 @@ def _dispatch(argv):
             return learn.main_feedback(rest)
         root = config.find_root()
         return learn.main_issue(rest, config.Project().cfg if root else None)
+    if cmd == "calc":                                   # closed forms need no project; calc check does
+        from forge import calc
+        return calc.main(config.project_or_none(), rest)
     if cmd == "hp" and rest[:1] == ["rules"]:           # the rule book itself needs no project
         from forge import hp
         return hp.main(None, rest)
@@ -191,6 +198,9 @@ def _dispatch(argv):
     if cmd == "explain":
         from forge import explain
         return explain.main(config.project_or_none(), rest)
+    if cmd == "fab" and rest[:1] in (["rules"], ["panel"], ["testpoints"]):
+        from forge import fabhouse
+        return fabhouse.main(need(), rest)
     if cmd == "fab":
         from forge import fab
         return fab.main(config.project_or_none(), rest)
@@ -200,6 +210,9 @@ def _dispatch(argv):
     if cmd == "cr" and rest[:1] == ["guard"] and config.find_root() is None:
         return 0   # hooks outside a forge project: silent no-op
     prj = need()
+    if cmd == "review":
+        from forge import gates
+        return gates.main_review(prj, rest)
     if cmd == "level":
         from forge import level
         return level.main(prj, rest)
@@ -248,6 +261,9 @@ def _dispatch(argv):
     if cmd == "protection":
         from forge import protection
         return protection.main(prj, rest)
+    if cmd == "stress":
+        from forge import stress
+        return stress.main(prj, rest)
     if cmd == "insulation":
         from forge import insulation
         return insulation.main(prj, rest)

@@ -11,6 +11,37 @@
 - `forge pcb setup`: keeps an outline it did not draw, keeps the stack-up unless `copper_oz` is set (it used to reset
   a 4-layer board to 2 layers), never removes copper layers that carry copper.
 
+**No surprises when the boards arrive** (independent review 2026-11-11, F-01..F-17, all closed)
+- G7 fails on unrouted connections and schematic / board mismatches (they were warnings); ERC / DRC warnings are
+  findings (silk clipped by the edge, a symbol off its library).
+- `gate pass --override`: the owner only (`--i-am-the-owner` at a terminal), a `--note` reason required, a QC
+  register row OVERRIDE written, never at G7 / G8; strict level takes none.
+- G8: a skipped check is never a pass; insulation skip passes only below 60 V or with `[insulation] none = true`;
+  the stock snapshot must be under 14 days old; `[process] sketch = true` never releases.
+- `forge stress` (STR-1..7): every capacitor, IC pin, transistor, diode, inductor and temperature range against the
+  operating corners with derating; a switch node swings 0..Vin; a part or rail with no rating is a gap, not a pass.
+  In `forge check`, `forge quick`, G6 / G7 / G8.
+- `forge req infer`: the input limit is the lowest-rated part of any kind on the path (IC pins, diodes, caps), gate
+  Zeners and boot caps excluded; unrated parts named.
+- Simulation gate: every result needs provenance (pwrlab's block with evidence_eligible, or netlist + hash),
+  `err_pct` must be the computed error, ACCEPTED needs a closed form or an anchor; the required set per converter
+  type (ripple, peak current, output ripple, efficiency, loop stability, start-up, short / overload) must be shown;
+  `forge calc` (buck / boost closed forms, `calc design`, `calc check`) recomputes every closed form from the
+  schematic and refuses what it cannot reproduce.
+- Multi-board projects: copper, connectors, crosstalk, the rule book and the PCB review run on every board.
+- Reviews are bound to content: `forge review record G<n> <file>` hashes the review file (reviewer and verdict in
+  its frontmatter) and every deliverable; a QC row alone no longer passes a gate (standard / strict), and a changed
+  deliverable or review file fails it. Deliverables with placeholders or under 120 words are not filled in.
+- Board work (`forge pcb setup / place / zones / route / sync`) waits for G6 at standard / strict unless
+  `[process] sketch = true`; a sketch is never released.
+- `forge check fp_pins` (FP-1..4, G7 item): every symbol pin has a pad, polarized parts on polarity-marked
+  footprints, an assembly rotation source for every part (JLC_Rotation, `[fab.rotation]`, or the package table
+  `library/tools/jlc_rotations.json`, now used by the JLCPCB CPL export), land pattern vs `Verified_Pads` pad size.
+- `forge fab rules` (JLCPCB / PCBWay capability tables vs the board's design rules; G8 item), `forge fab panel`
+  (KiKit), `forge fab testpoints` (every rail and key net has test access; G8 item).
+- Rule book SW-02 counts routed copper, not via barrels; `forge quick` inside a project reads its [specs];
+  stray `* 2.py` modules removed.
+
 **Help first, process later**
 - `forge quick [dir]`: pe-forge's checks on any KiCad folder, no project, run on a copy (nothing written, verified
   by hash), findings ranked SAFETY > errors > warnings, plus what the board is (rails, limits).

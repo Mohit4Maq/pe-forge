@@ -384,12 +384,20 @@ def as_check(prj, opts):
                          f"{s['date'][:10]}" + (f" ({age} days old: rerun forge bom build)" if age > 14 else ""))
 
 
-def gate_items(prj):
+STALE_DAYS = 14
+
+
+def gate_items(prj, release=False):
     d = last(prj)
     if not d:
         return [(False, "supply-chain risk: not assessed (forge bom build)")]
     hi = [f"{r['line']['Refs']} {r['line']['MPN']}" for r in d["lines"] if r["level"] == "HIGH" and not r["waived"]]
-    return [(not hi, f"supply-chain risk ({d['summary']['date'][:10]}): {len(hi)} unwaived HIGH" + (f": {', '.join(hi[:5])}" if hi else ""))]
+    age = (dt.datetime.now() - dt.datetime.fromisoformat(d["summary"]["date"])).days
+    out = [(not hi, f"supply-chain risk ({d['summary']['date'][:10]}, {age} days old): {len(hi)} unwaived HIGH" + (f": {', '.join(hi[:5])}" if hi else ""))]
+    if release:                      # stock moves: an order on a stale snapshot is an order on a guess
+        out.append((age <= STALE_DAYS, f"stock snapshot {age} days old" + ("" if age <= STALE_DAYS else
+                    f" (> {STALE_DAYS}: rerun forge bom build before the release)")))
+    return out
 
 
 def main(prj, argv):

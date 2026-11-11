@@ -143,7 +143,7 @@ def artefacts(prj, phase, mod=None):
             out.append((False, f"missing: {pat}"))
         else:
             mw = 0 if phase == "P0" else MIN_WORDS["md"]          # P0 holds forms and the plan, not deliverables
-            empty = [f"{prj.rel(h)} ({content_problem(h, mw)})" for h in hits if not filled(h) or content_problem(h, mw)]
+            empty = [f"{prj.rel(h)} ({content_problem(h, mw) or 'template lines only'})" for h in hits if not filled(h) or content_problem(h, mw)]
             out.append((not empty, f"{pat}: {len(hits)} file(s)" + (f", not filled in: {', '.join(empty[:4])}" if empty else "")))
     return out
 
@@ -178,6 +178,16 @@ def review_ok(prj, gate, mod=None):
         ok2, why = review_record_ok(prj, gate, mod)
         return ok2, msg + "; " + why
     return ok, msg
+
+
+def record_owner_pass(prj, gate, module, comment):
+    """The owner's verification of a gate is part of the record: a QC row with their comment."""
+    import datetime as _dt
+    f = prj.p("qc_register")
+    if not os.path.exists(f):
+        return
+    open(f, "a").write(f"| {_dt.date.today().isoformat()} | {gate} | {module} | owner verification | - | OWNER OK | - | - | "
+                       f"{comment.replace('|', '/')} | ACCEPTED |\n")
 
 
 def record_override(prj, gate, module, bad, note):
@@ -263,6 +273,10 @@ def release_process_items(prj):
         p2 = state.load(prj)["phases"]["P2"]["status"]
     except Exception:
         p2 = "unknown"
+    enc = prj.cfg.get("enclosure", {})
+    if enc.get("required") or enc.get("ip"):
+        from . import enclosure
+        res += enclosure.gate_items(prj)
     if prj.process.get("sketch") is True:
         res.append((False, "[process] sketch = true: a sketch is never released; finish the phases and set sketch = false"))
     res.append((p2 == "passed", f"requirements and V-model in place before release: P2 is {p2}"
@@ -343,6 +357,8 @@ def check(prj, gate, mod=None):
                         + (f" ({first})" if first else "")))
     hits = consistency.scan(prj)
     res.append((not hits, f"consistency: {len(hits)} live mention(s) of superseded terms"))
+    from . import decisions           # a question only the owner can answer blocks its gate (forge decision)
+    res += decisions.gate_items(prj, gate, mod)
     from .phases import GATE_REVIEWERS
     if GATE_REVIEWERS.get(gate):
         res.append(review_ok(prj, gate, mod))

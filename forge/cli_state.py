@@ -90,6 +90,16 @@ def gate(prj, rest):
         print(f"{g} {'READY TO PASS' if ok else 'NOT READY'}")
         return 0 if ok else 1
     if act == "pass":
+        from . import changes
+        hitl = prj.process.get("approval", "owner")            # owner (default) | hands-free (the owner sets it)
+        if hitl != "hands-free" and changes.agent_context() and "--i-am-the-owner" not in rest:
+            print(f"{g}: the owner verifies and passes every gate (human in the loop). Show them the evidence, then they run\n"
+                  f"  ! forge gate pass {g} --comment \"<what they checked / remarks>\" --i-am-the-owner\n"
+                  "(Hands-free only when the owner sets [process] approval = \"hands-free\" themselves.)")
+            return 1
+        if hitl != "hands-free" and not (_opt(rest, "--comment") or "").strip():
+            print(f"{g}: --comment \"<what you verified, remarks>\" is required: the owner's check is part of the record")
+            return 1
         res = gates.check(prj, g, m)
         bad = [msg for ok, msg in res if not ok]
         if bad and "--override" not in rest:
@@ -118,7 +128,11 @@ def gate(prj, rest):
             tgt["override"] = _opt(rest, "--note") or "owner override"
         if m and all(m["phases"][p]["status"] in ("passed", "skipped") for p in MODULE_PHASES):
             m["status"] = "passed"
-        S.log(st, f"{mid or 'system'} {g} passed" + (" (OVERRIDE by owner)" if bad else ""))
+        cm = _opt(rest, "--comment") or ""
+        if cm:
+            tgt["owner_comment"] = cm
+            gates.record_owner_pass(prj, g, mid or "system", cm)
+        S.log(st, f"{mid or 'system'} {g} passed" + (f" by the owner: {cm[:80]}" if cm else "") + (" (OVERRIDE by owner)" if bad else ""))
         S.save(prj, st)
         print(_theme().paint("ok", f"✓ {mid or 'system'} {g} passed"))
         return 0

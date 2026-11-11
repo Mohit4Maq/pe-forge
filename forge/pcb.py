@@ -1325,6 +1325,15 @@ def main(prj, argv):
             raise SystemExit("forge pcb review-new <placement|routing|release>")
         by = argv[argv.index("--by") + 1] if "--by" in argv else "pcb-reviewer"
         print(prj.rel(review_new(prj, board, argv[1], by)))
+        if argv[1] == "placement" and prj.process.get("approval", "owner") != "hands-free":
+            from . import decisions          # the placement milestone is the owner's to approve (human in the loop)
+            have = any(d["status"] == "OPEN" and d["question"].startswith("Approve the placement") for d in decisions.load(prj))
+            if not have:
+                d = decisions.new(prj, f"Approve the placement milestone of {os.path.basename(board)} (connector positions, "
+                                  "heatsink side, board size, HF loops) after the review", "G7",
+                                  ["approved", "changes needed (say which)"], "approved", "placement is the last cheap point to change the board's shape")
+                import sys
+                print(f"  {d['id']} opened: the owner approves the placement (forge decision answer {d['id']} ...)", file=sys.stderr)
         return 0
     if argv[0] == "review-status":
         ok, probs, *where = review_status(prj, board)

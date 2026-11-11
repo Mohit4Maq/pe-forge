@@ -2,6 +2,8 @@
 
   forge level                       show the level and what it means
   forge level light|standard|strict set it (project.toml [process] level)
+  forge level owner|hands-free      who passes gates: the owner, verifying and commenting at each (default), or
+                                    hands-free (the owner sets it, at a terminal; every check still applies)
 
   light     help first. Every check still runs and is reported, as advice: nothing blocks the end of a turn,
             change requests only warn. A board is never released in light mode (G8 refuses). `forge adopt`
@@ -65,7 +67,23 @@ def what_changes(prj, new):
     return L
 
 
+def set_approval(prj, mode):
+    p = os.path.join(prj.root, "project.toml")
+    t = open(p).read()
+    if re.search(r'(?m)^approval\s*=', t):
+        t = re.sub(r'(?m)^approval\s*=.*$', f'approval = "{mode}"', t, count=1)
+    else:
+        t = re.sub(r"(?m)^\[process\][^\n]*\n", lambda m: m.group(0) + f'approval = "{mode}"\n', t, count=1)
+    open(p, "w").write(t)
+
+
 def main(prj, argv):
+    if argv[:1] == ["hands-free"] or argv[:1] == ["owner"]:
+        if argv[0] == "hands-free" and not config.interactive():
+            raise SystemExit("hands-free (no owner verification at gates) is the owner's choice: run `forge level hands-free` yourself in a terminal")
+        set_approval(prj, argv[0])
+        print(f"approval: {argv[0]}" + (" (gates pass without the owner; every check still applies)" if argv[0] == "hands-free" else " (the owner verifies and comments at every gate)"))
+        return 0
     cur = prj.level
     if not argv:
         print(f"process level: {cur} ({MEANING[cur]})")

@@ -37,6 +37,15 @@ def main(argv):
     lt = first(LTSPICE)
     ok(bool(lt), "LTspice", lt or "install LTspice (analog.com/ltspice); on Linux also wine",
        "P5: pwrlab simulations")
+    cad = first([os.path.expanduser("~/.venvs/pe-forge-cad/bin/python"), os.path.expanduser("~/.venvs/pe-forge-cad/Scripts/python.exe")])
+    ok(bool(cad) and "build123d" in run([cad, "-c", "import build123d; print('build123d')"]) if cad else False,
+       "build123d (CAD venv)", cad or "python3 -m venv ~/.venvs/pe-forge-cad && ~/.venvs/pe-forge-cad/bin/pip install build123d gmsh",
+       "enclosure: fit, build, STEP / STL / DXF")
+    ok(bool(cad) and "gmsh" in run([cad, "-c", "import gmsh; print('gmsh')"]) if cad else False, "gmsh (CAD venv)",
+       "mesher for FEA" if cad else "see build123d", "enclosure: thermal / structural meshes")
+    ccx = shutil.which("ccx") or shutil.which("ccx_2.21") or shutil.which("ccx_2.22")
+    ok(bool(ccx), "CalculiX ccx", ccx or "conda install -c conda-forge calculix, or Docker (dhondt.de)", "enclosure: thermal L2, structural")
+    ok(bool(shutil.which("simpleFoam") or shutil.which("chtMultiRegionFoam")), "OpenFOAM", "optional (Docker)", "enclosure: thermal L3 (sealed box CHT)")
     venv = os.path.join(config.FORGE_ROOT, ".venv", "bin", "python")
     pl = os.path.exists(venv) and run([venv, "-c", "import pwrlab; print('ok')"]) == "ok"
     ok(pl, "pwrlab venv", venv if pl else "run ./bootstrap.sh", "P5: pwrlab MCP server")

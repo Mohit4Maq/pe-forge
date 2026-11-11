@@ -47,6 +47,8 @@
   forge quick [dir] [--vin V] [--json] [--out F]   pe-forge's checks on any KiCad folder, no project, nothing written
   forge adopt [dir] [--apply|--undo] [--name N]   bring a half-done project under pe-forge without changing a file
                                     (starts in light mode)
+  forge decision new|list|answer|withdraw ...   questions only the owner answers; a gate waits for them
+  forge enclosure req|fit|entries|build|check|release [--json]   the enclosure chain (docs/PLAN_enclosure.md)
   forge review record G<n> <file> [--module M-xx]   bind an independent review to the deliverables it reviewed
   forge level [light|standard|strict]   how firmly the process is enforced (lowering: the owner, at a terminal)
   forge req infer [--apply] [--json]    draft system requirements from the existing design, for the owner to confirm
@@ -210,6 +212,12 @@ def _dispatch(argv):
     if cmd == "cr" and rest[:1] == ["guard"] and config.find_root() is None:
         return 0   # hooks outside a forge project: silent no-op
     prj = need()
+    if cmd == "decision":
+        from forge import decisions
+        return decisions.main(prj, rest)
+    if cmd == "enclosure":
+        from forge import enclosure
+        return enclosure.main(prj, rest)
     if cmd == "review":
         from forge import gates
         return gates.main_review(prj, rest)

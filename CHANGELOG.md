@@ -11,6 +11,20 @@
 - `forge pcb setup`: keeps an outline it did not draw, keeps the stack-up unless `copper_oz` is set (it used to reset
   a 4-layer board to 2 layers), never removes copper layers that carry copper.
 
+**Human in the loop, decisions, the enclosure chain**
+- The owner verifies and passes every gate: `forge gate pass` refuses an agent; the owner runs it with
+  `--comment` (recorded as an OWNER OK row). `forge level hands-free` (owner, at a terminal) switches it off;
+  every check still applies.
+- `forge decision new | list | answer | withdraw`: questions only the owner can answer (D-xx in the plan); a gate
+  waits for every open decision tagged to it or earlier; the placement milestone opens one automatically.
+- `forge enclosure req | fit | entries | build | check | release` (docs/PLAN_enclosure.md): requirements become
+  decisions; the envelope from the board STEP (part heights; parts without a model are a gap); the box IP is the
+  weakest entry (glands, M8 / M12, vent); build123d box (aluminium / plastic / printed rules: walls, gasket groove,
+  inserts, standoffs, cut-outs) as STEP / STL with the board assembled; closed-form thermal (convection +
+  radiation, inside-air step) against `[enclosure] max_inside_C`; gasket / flatness / vent rules; CalculiX and
+  OpenFOAM levels SKIP (never pass) until installed; GE items in G8 when `[enclosure] required`.
+- `forge doctor` rows for build123d, Gmsh, CalculiX, OpenFOAM. docs/Workflow_end_to_end.md: the stringent flow.
+
 **No surprises when the boards arrive** (independent review 2026-11-11, F-01..F-17, all closed)
 - G7 fails on unrouted connections and schematic / board mismatches (they were warnings); ERC / DRC warnings are
   findings (silk clipped by the edge, a symbol off its library).

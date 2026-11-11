@@ -68,7 +68,7 @@ class Project(unittest.TestCase):
     def test_02_gates_and_modules(self):
         out = forge("status", cwd=self.dir).stdout
         self.assertIn("Next: work P0", out)
-        forge("gate", "pass", "G0", cwd=self.dir)
+        forge("gate", "pass", "G0", "--i-am-the-owner", "--comment", "intake verified", cwd=self.dir)
         r = forge("gate", "check", "G1", cwd=self.dir, check=False)
         self.assertEqual(r.returncode, 1)
         self.assertIn("missing: 03_Foundation/Market_Survey/Market_Survey.md", r.stdout)
@@ -2656,8 +2656,8 @@ class HelpFirstLevels(unittest.TestCase):
     def test_strict_takes_no_gate_override(self):
         d = new_project("St", self.tmp)
         forge("level", "strict", cwd=d)
-        forge("gate", "pass", "G0", cwd=d, check=False)
-        r = forge("gate", "pass", "G1", "--override", "--note", "x", cwd=d, check=False)
+        forge("gate", "pass", "G0", "--i-am-the-owner", "--comment", "ok", cwd=d, check=False)
+        r = forge("gate", "pass", "G1", "--override", "--note", "x", "--i-am-the-owner", "--comment", "ok", cwd=d, check=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("no override", r.stdout)
         self.assertIn('level = "strict"', open(os.path.join(d, "project.toml")).read())
@@ -2719,18 +2719,18 @@ class GateIntegrity(unittest.TestCase):
         d = new_project("Ov", self.tmp)                                     # G0 fails: the intake is not filled in
         r = forge("gate", "pass", "G0", "--override", "--note", "x", cwd=d, check=False, stdin="")   # an agent shell
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("owner only", r.stdout)
-        r = forge("gate", "pass", "G0", "--override", "--i-am-the-owner", cwd=d, check=False)       # no reason
+        self.assertIn("the owner", r.stdout)
+        r = forge("gate", "pass", "G0", "--override", "--i-am-the-owner", "--comment", "c", cwd=d, check=False)   # no reason
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("--note", r.stdout)
         st = json.load(open(os.path.join(d, ".forge", "state.json")))
         self.assertNotEqual(st["phases"]["P0"]["status"], "passed")
-        r = forge("gate", "pass", "G0", "--override", "--i-am-the-owner", "--note", "foundation done on paper", cwd=d)
+        r = forge("gate", "pass", "G0", "--override", "--i-am-the-owner", "--comment", "c", "--note", "foundation done on paper", cwd=d)
         qc = open(os.path.join(d, "01_Program", "QC", "QC_Register.md")).read()
         self.assertIn("| OVERRIDE |", qc)
         self.assertIn("foundation done on paper", qc)
         for g in ("G7", "G8"):
-            r = forge("gate", "pass", g, "--override", "--i-am-the-owner", "--note", "x", cwd=d, check=False)
+            r = forge("gate", "pass", g, "--override", "--i-am-the-owner", "--comment", "c", "--note", "x", cwd=d, check=False)
             self.assertNotEqual(r.returncode, 0)
             self.assertIn("takes no override", r.stdout)
 
@@ -2965,6 +2965,120 @@ class BoardsArrive(unittest.TestCase):
             self.assertTrue(rows)
             self.assertTrue(any(r_["net"] == "VIN" and r_["ok"] for r_ in rows))     # VIN is on J1
             self.assertTrue(any(r_["net"] == "SW" and not r_["ok"] for r_ in rows))  # SW has no access
+
+
+class HumanInTheLoop(unittest.TestCase):
+    """The owner verifies and comments at every gate; decisions only they answer block gates; hands-free is theirs to set."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-hitl-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_gate_pass_needs_the_owner_and_a_comment(self):
+        d = new_project("Hi", self.tmp)
+        open(os.path.join(d, "03_Foundation", "Intake_Answers.md"), "a").write("".join(f"\n- answer {i}: confirmed by the owner" for i in range(12)) + "\n")
+        r = forge("gate", "pass", "G0", cwd=d, check=False, stdin="")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("human in the loop", r.stdout)
+        r = forge("gate", "pass", "G0", "--i-am-the-owner", cwd=d, check=False)
+        self.assertIn("--comment", r.stdout)
+        forge("gate", "pass", "G0", "--i-am-the-owner", "--comment", "intake read, corners confirmed", cwd=d)
+        qc = open(os.path.join(d, "01_Program", "QC", "QC_Register.md")).read()
+        self.assertIn("OWNER OK", qc)
+        self.assertIn("corners confirmed", qc)
+        r = forge("level", "hands-free", cwd=d, check=False, stdin="")           # an agent cannot go hands-free
+        self.assertNotEqual(r.returncode, 0)
+        self.assertNotIn("hands-free", open(os.path.join(d, "project.toml")).read())
+
+    def test_decisions_block_their_gate_until_the_owner_answers(self):
+        from forge import config, decisions
+        d = new_project("De", self.tmp)
+        r = forge("decision", "new", "Input connector: screw terminal or M12?", "--gate", "G3", "--options", "terminal | M12",
+                  "--recommend", "M12", cwd=d)
+        self.assertIn("D-01 opened", r.stdout)
+        plan = open(os.path.join(d, "01_Program", "Master_Plan.md")).read()
+        self.assertIn("| D-01 |", plan)
+        prj = config.Project(d)
+        self.assertFalse(decisions.gate_items(prj, "G3")[0][0])
+        self.assertFalse(decisions.gate_items(prj, "G7")[0][0])                  # a later gate waits too
+        self.assertTrue(decisions.gate_items(prj, "G1")[0][0])                   # an earlier one does not
+        r = forge("decision", "answer", "D-01", "M12", cwd=d, check=False, stdin="")
+        self.assertNotEqual(r.returncode, 0)                                     # the owner's, not an agent's
+        with mock.patch("forge.changes.agent_context", return_value=False):
+            decisions.answer(prj, "D-01", "M12", "IP67 needed")
+        self.assertTrue(decisions.gate_items(prj, "G3")[0][0])
+        self.assertIn("ANSWERED: M12", open(os.path.join(d, "01_Program", "Master_Plan.md")).read())
+
+
+class Enclosure(unittest.TestCase):
+    """The enclosure chain: requirements become decisions, the envelope comes from the board, the box IP is the
+    weakest entry, the closed-form thermal is computed and anchored, the gate reports every level honestly."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-enc-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_requirements_entries_and_thermal(self):
+        from forge import config, decisions, enclosure
+        d = new_project("En", self.tmp, corners={"ambient_C": [-20, 60]})
+        prj = config.Project(d)
+        ok, missing = enclosure.req(prj, out=lambda *_: None)
+        self.assertFalse(ok)
+        made = enclosure.open_decisions(prj)
+        self.assertEqual(len(made), len(missing))
+        self.assertFalse(decisions.gate_items(prj, "GE")[0][0])
+        open(os.path.join(d, "project.toml"), "a").write('\n[enclosure]\nip = "IP65"\nmaterial = "aluminium"\nprocess = "machined"\n'
+                                                           'mounting = "wall"\nik = "IK08"\nloss_W = 1.5\n[enclosure.entries]\n'
+                                                           'J1 = {part = "gland-M12", a_net = 1, v_net = 63}\nJ2 = {part = "open"}\n')
+        prj = config.Project(d)
+        self.assertTrue(enclosure.req(prj, out=lambda *_: None)[0])
+        env = {"connectors": [{"ref": "J1"}, {"ref": "J2"}]}
+        ent = enclosure.entries(prj, env)
+        self.assertEqual(ent["box_ip"], "IP20")                               # J2 is open: the weakest entry wins
+        self.assertFalse(ent["ok"])
+        pt = os.path.join(d, "project.toml")
+        _t = open(pt).read()
+        open(pt, "w").write(_t.replace('J2 = {part = "open"}', 'J2 = {part = "M12-T-4", a_net = 3, v_net = 12}\nV1 = {part = "vent-M12"}'))
+        prj = config.Project(d)
+        ent = enclosure.entries(prj, {"connectors": [{"ref": "J1"}, {"ref": "J2"}]})
+        self.assertEqual(ent["box_ip"], "IP67")
+        self.assertTrue(ent["ok"])
+        t1 = enclosure.thermal_l1([80, 80, 40], 1.5, 60)
+        self.assertTrue(5 < t1["dT_K"] < 40, t1)                              # 1.5 W in a small aluminium box: tens of K
+        t2 = enclosure.thermal_l1([160, 160, 80], 1.5, 60)
+        self.assertLess(t2["dT_K"], t1["dT_K"])                               # a bigger box runs cooler
+        t3 = enclosure.thermal_l1([80, 80, 40], 1.5, 60, inner_h_W_m2K=6.0)
+        self.assertGreater(t3["dT_K"], t1["dT_K"])                            # trapped inside air adds a step
+        self.assertAlmostEqual(enclosure.thermal_l1([80, 80, 40], 0.0, 60)["dT_K"], 0.0, places=2)
+
+    def test_fit_and_build_from_the_board(self):
+        from forge import config, enclosure, kicad
+        if not kicad.find_cli():
+            self.skipTest("kicad-cli not found")
+        d = sketch(new_project("Eb", self.tmp, corners={"ambient_C": [-20, 60]}))
+        shutil.copy(os.path.join(KFIX, "hv_buck.kicad_sch"), os.path.join(d, "08_PCB/eb/eb.kicad_sch"))
+        pt = os.path.join(d, "project.toml")
+        open(pt, "a").write("\n[pcb]\noutline_mm = [40, 30]\n[enclosure]\nip = \"IP54\"\nmaterial = \"aluminium\"\nprocess = \"machined\"\n"
+                            "mounting = \"wall\"\nik = \"IK08\"\nloss_W = 0.5\n")
+        forge("pcb", "sync", cwd=d)
+        forge("pcb", "setup", cwd=d)
+        prj = config.Project(d)
+        env, why = enclosure.fit(prj)
+        self.assertIsNotNone(env, why)
+        self.assertEqual(env["outline_mm"], [40.0, 30.0])
+        self.assertTrue(os.path.exists(os.path.join(d, env["step"])))
+        if not enclosure.cad_python():
+            self.skipTest("no CAD venv (build123d)")
+        self.assertTrue(env["parts"], env)                                     # heights read from the STEP
+        rep, spec = enclosure.build(prj)
+        self.assertTrue(os.path.exists(os.path.join(d, "07_Mechanical", "enclosure", "assembly.step")))
+        self.assertGreater(rep["outer_mm"][0], 40 + 2 * 3)                    # board + clearance + walls
+        self.assertGreater(rep["mass_g"], 10)
+        items = enclosure.check(prj)
+        texts = [m for _, m in items]
+        self.assertTrue(any(m.startswith("thermal L1") for m in texts))
 
 
 if __name__ == "__main__":

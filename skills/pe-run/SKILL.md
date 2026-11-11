@@ -22,6 +22,14 @@ independent reviewer.
 > owner's question first; mention open findings briefly; do not push phases. Release (G8) is refused until the
 > level is raised: `forge req infer` + the owner's confirmation, then `forge level standard`.
 
+> **Human in the loop (default).** The owner verifies and comments at every critical step: every gate pass
+> (`forge gate pass` refuses an agent; show them the evidence, they run it with `--comment`), the placement
+> milestone (a D-xx opened by `forge pcb review-new placement`), every open `forge decision` (connector family, IP
+> code, material, part swaps, waivers). Present each as: what was checked, the numbers and their anchors, what
+> is open, your recommendation; then **stop and wait**. Never answer a decision or pass a gate for them. Only
+> when the owner has set `[process] approval = "hands-free"` themselves (`forge level hands-free` at their
+> terminal) do you pass gates; every check still applies.
+
 ## 1. Orient (every time)
 1. `forge status`: phases, modules, next action. `forge watch --show`: the owner's manual edits (Rule 5).
 2. Read `CLAUDE.md`, `project.toml` and the open rows of `01_Program/Master_Plan.md` (D / E / S / V).

@@ -30,6 +30,12 @@ import sys
 from . import config, state
 
 PROFILES = {"full", "lite"}
+# project types the tool is ready for (intake, required simulations, closed forms, stress, enclosure entries);
+# [specs] keys each one expects (both corners in [corners]):
+TYPES = {"dc-dc": "vin_V, vout_V, iout_A or power_W, f_sw_kHz", "dc-dc-isolated": "vin_V, vout_V, power_W, isolation, f_sw_kHz, n (turns ratio)",
+         "ac-dc": "vac_V, f_line_Hz, vout_V, power_W, pfc (true/false), isolation", "pfc": "vac_V, f_line_Hz, vdc_link_V, power_W",
+         "dc-ac": "vdc_link_V, vac_out_V, phases (1/3), f_line_Hz, power_W, grid (tied/off)", "motor-drive": "vdc_link_V, phases, i_phase_A, power_W, motor (bldc/pmsm/induction)",
+         "charger": "vin_V or vac_V, vbat_V, i_charge_A, chemistry", "other": "what applies"}
 MODES = {"user", "agent", "ask"}
 
 

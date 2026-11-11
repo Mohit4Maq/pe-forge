@@ -67,15 +67,28 @@ def net_voltages(parts, nets, specs, overrides=None):
     a = reqinfer.analyse(parts, nets, None)
     vin = specs.get("vin_V")
     vmax = max(vin) if isinstance(vin, list) and vin else vin
+    vac = specs.get("vac_V")
+    vac = max(vac) if isinstance(vac, list) and vac else vac
+    vdc = specs.get("vdc_link_V")
+    vdc = max(vdc) if isinstance(vdc, list) and vdc else vdc
     V = {}
     for n in nets:
         if reqinfer.GND.match(reqinfer.short(n)):
             V[n] = (0.0, 0.0)
     for n, r in a["rails"].items():
-        if r["role"] in ("input", "input path") and vmax:
+        if r.get("ac") and vac:                        # a mains / AC net swings +- Vac,rms x sqrt2 (peak counts)
+            pk = float(vac) * 2 ** 0.5
+            V[n] = (-pk, pk)
+        elif r["role"] in ("input", "input path") and vmax:
             V[n] = (float(vmax), float(vmax))
         elif r["nominal_V"] is not None:
             V[n] = (float(r["nominal_V"]), float(r["nominal_V"]))
+    for n in nets:
+        s = reqinfer.short(n)
+        if vdc and re.match(r"^(V?DC_?LINK|V?BUS|HV_?DC|DC\+|DC_?P|VDC)$", s, re.I):
+            V[n] = (float(vdc), float(vdc))
+        if vdc and re.match(r"^(DC-|DC_?N|HV_?DC_?N|VDC_?N|NEG)$", s, re.I):
+            V[n] = (0.0, 0.0)
     for n in nets:
         if SW.match(reqinfer.short(n)) and vmax:
             V[n] = (0.0, float(vmax))
@@ -310,9 +323,9 @@ def as_check(prj, opts):
     W = [finding(f"{x['rule']}: {x['claim']}", x["actual"], loc, x["fix"]) for x in r["warn"]]
     W += [finding("STR-7: every part on a known-voltage net has a rating", u, loc,
                   "fill Voltage_Rating / Abs_Max_V / Current_Rating in MC_Parts from the datasheet") for u in r["unchecked"]]
-    if not specs.get("vin_V"):
-        W.append(finding("STR-7: the input voltage is known", "no [specs] vin_V: input-path parts not checked", "project.toml",
-                         "set [specs] vin_V = [min, max]"))
+    if not (specs.get("vin_V") or specs.get("vac_V") or specs.get("vdc_link_V")):
+        W.append(finding("STR-7: the input voltage is known", "no [specs] vin_V / vac_V / vdc_link_V: input-path parts not checked", "project.toml",
+                         "set [specs] vin_V = [min, max] (DC), vac_V = [min, max] (mains), vdc_link_V (an inverter's bus)"))
     reason = f"{r['checked']} rating(s) checked, {len(r['unchecked'])} not checked"
     if r.get("i_pk_A"):
         reason += (f"; inductors sized against {r['i_pk_A']:g} A peak ("

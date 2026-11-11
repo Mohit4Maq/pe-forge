@@ -1,6 +1,7 @@
 """pe-forge command line.
 
-  forge new <dir> --name NAME [--answers intake.json]   scaffold a project (P0)
+  forge new <dir> --name NAME [--answers intake.json]   scaffold a project (P0); types: dc-dc, dc-dc-isolated, ac-dc,
+                                    pfc, dc-ac, motor-drive, charger, other (forge new --types for the [specs] each needs)
   forge status                                          phases, modules, next action
   forge gate check|pass|fail G<n> [--module M-xx] [--note TEXT]
   forge phase start P<n> [--module M-xx]
@@ -138,6 +139,10 @@ def _dispatch(argv):
     cmd, rest = argv[0], argv[1:]
     if cmd == "new":
         from forge import scaffold
+        if rest[:1] == ["--types"]:
+            for k, v in scaffold.TYPES.items():
+                print(f"  {k:16s} [specs] {v}")
+            return 0
         return scaffold.main(rest)
     if cmd == "vault":
         from forge import vault

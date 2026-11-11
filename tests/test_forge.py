@@ -3126,5 +3126,91 @@ class Models3D(unittest.TestCase):
             self.assertTrue(models.gate_items(prj)[0][0])         # the owner's waiver is recorded and honoured
 
 
+class GenericProjects(unittest.TestCase):
+    """The tool is ready for any power-electronics request, not the pilot's buck: topology inferred, the right
+    required-simulation set, AC / isolated / three-phase nets understood, closed forms for every class."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-gen-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    INTENTS = [
+        ("Buck", "dc-dc", {"vin_V": [36, 63], "vout_V": 12, "iout_A": 1}, "buck", "dc-dc"),
+        ("Fly", "dc-dc-isolated", {"vin_V": [20, 60], "vout_V": 24, "power_W": 60, "isolation": "isolated"}, "flyback", "dc-dc isolated"),
+        ("Psu", "ac-dc", {"vac_V": [85, 265], "vout_V": 48, "power_W": 500, "isolation": "isolated"}, "pfc", "ac-dc"),
+        ("Inv", "dc-ac", {"vdc_link_V": 800, "vac_out_V": 400, "phases": 3, "power_W": 11000}, "inverter", "inverter"),
+        ("Drv", "motor-drive", {"vdc_link_V": 48, "phases": 3, "i_phase_A": 30}, "inverter", "motor"),   # the drive stage
+        ("Chg", "charger", {"vin_V": [40, 60], "vbat_V": 14.4, "i_charge_A": 10}, None, "charger"),
+    ]
+
+    def test_every_project_class_is_understood(self):
+        from forge import calc, config, results
+        for name, typ, specs, topo, family in self.INTENTS:
+            d = new_project(name, self.tmp, type=typ, specs=specs, corners={"ambient_C": [-20, 60]})
+            prj = config.Project(d)
+            self.assertEqual(calc.design(prj)["topology"], topo, name)
+            req = results.required_metrics(prj)
+            self.assertEqual(req, results.REQUIRED[family], name)
+            self.assertTrue(any("short" in n or "fault" in n for n, _ in req), name)       # every class needs a fault case
+
+    def test_closed_forms_for_every_class(self):
+        from forge import calc
+        b = calc.buck(48, 12, 1, 400e3, 33e-6, 44e-6)
+        self.assertAlmostEqual(b["D"], 0.25)
+        bb = calc.buck_boost(12, 24, 1, 200e3, 10e-6, 100e-6)
+        self.assertAlmostEqual(bb["D"], 24 / 36)
+        f = calc.flyback(325, 24, 2, 100e3, 500e-6, 470e-6, n=6)
+        self.assertGreater(f["V_ds_off"], 325)                       # Vin + reflected
+        self.assertAlmostEqual(f["I_sec_pk"], f["I_pri_pk"] * 6)
+        fw = calc.forward(48, 5, 10, 200e3, 10e-6, 220e-6, n=4)
+        self.assertTrue(fw["reset_ok"])
+        self.assertAlmostEqual(fw["V_ds_off"], 96)
+        p = calc.pfc(230, 3300, 50, 1e-3, 400)
+        self.assertAlmostEqual(p["I_ac_rms"], 3300 / 0.97 / 230, places=3)
+        self.assertAlmostEqual(p["V_ripple_2f"], 3300 / (2 * 3.14159265 * 50 * 1e-3 * 400), places=2)
+        dab = calc.dab(400, 48, 100e3, 20e-6, 30, n=8)
+        self.assertGreater(dab["P"], 0)
+        inv = calc.inverter(800, 0.9, 50, 11000, 0.95)
+        self.assertAlmostEqual(inv["V_1"], 720)
+        tl = calc.threelevel(800, 0.9, 50, 11000)
+        self.assertAlmostEqual(tl["V_1"], 360)
+
+    def test_ac_isolated_and_three_phase_nets(self):
+        from forge import reqinfer, stress
+        parts = {"J1": {"value": "AC", "mc_id": "", "mpn": "", "nets": ["/L", "/N", "/PE"], "dup": 1, "values": []},
+                 "C1": {"value": "0.1uF 275V", "mc_id": "", "mpn": "", "nets": ["/L", "/N"], "dup": 1, "values": []},
+                 "C2": {"value": "22uF 25V", "mc_id": "", "mpn": "", "nets": ["/VOUT", "/GND_SEC"], "dup": 1, "values": []},
+                 "C3": {"value": "100uF 450V", "mc_id": "", "mpn": "", "nets": ["/DC_LINK", "/GND"], "dup": 1, "values": []},
+                 "J2": {"value": "OUT", "mc_id": "", "mpn": "", "nets": ["/VOUT", "/GND_SEC"], "dup": 1, "values": []},
+                 "J3": {"value": "MOTOR", "mc_id": "", "mpn": "", "nets": ["/U", "/V", "/W"], "dup": 1, "values": []}}
+        nets = {n: {"classes": [], "pins": [(r, "1", "") for r, p in parts.items() if n in p["nets"]]}
+                for n in ["/L", "/N", "/PE", "/VOUT", "/GND_SEC", "/DC_LINK", "/GND", "/U", "/V", "/W"]}
+        a = reqinfer.analyse(parts, nets, {})
+        self.assertTrue(a["rails"]["/L"]["ac"])
+        self.assertIn("/L", a["inputs"] + [n for n in a["rails"] if a["rails"][n]["role"] == "input path"])
+        self.assertTrue(reqinfer.GND.match("GND_SEC"))                  # an isolated secondary ground is a ground
+        V, _ = stress.net_voltages(parts, nets, {"vac_V": [85, 265], "vdc_link_V": 400, "vout_V": 24})
+        self.assertAlmostEqual(V["/L"][1], 265 * 2 ** 0.5, places=1)    # mains: the peak counts
+        self.assertAlmostEqual(V["/L"][0], -265 * 2 ** 0.5, places=1)
+        self.assertEqual(V["/DC_LINK"], (400.0, 400.0))
+        r = stress.analyse(parts, nets, {}, {}, {"vac_V": [85, 265], "vdc_link_V": 400, "vout_V": 24}, {})
+        rules = {(f["rule"], f["claim"].split(":")[0]) for f in r["fail"]}
+        self.assertIn(("STR-1", "C1 0.1uF 275V"), rules)                  # 375 V peak across a 275 V (rms-rated X cap, derated) part
+        self.assertIn(("STR-1", "C3 100uF 450V"), rules)                  # 400 V on a 450 V cap: over 0.8 derating
+
+    def test_hazardous_entries_need_pe(self):
+        from forge import config, enclosure
+        d = new_project("Pe", self.tmp, type="ac-dc", specs={"vac_V": [85, 265], "vout_V": 48, "power_W": 500}, corners={"ambient_C": [-20, 60]})
+        open(os.path.join(d, "project.toml"), "a").write('\n[enclosure]\nip = "IP65"\nmaterial = "aluminium"\nprocess = "machined"\nmounting = "wall"\nik = "IK08"\nloss_W = 20\n'
+                                                           '[enclosure.entries]\nJ1 = {part = "gland-M12", v_net = 265, a_net = 3, ac = true}\n')
+        prj = config.Project(d)
+        ent = enclosure.entries(prj, {"connectors": [{"ref": "J1"}]})
+        self.assertFalse(ent["ok"])
+        self.assertIn("protective-earth", ent["rows"][0]["why"])
+        items = enclosure.check(prj)
+        self.assertTrue(any("earthing" in m and not ok for ok, m in items))     # metal box at mains needs a PE stud
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

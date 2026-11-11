@@ -22,9 +22,10 @@ import json
 import os
 import re
 
-GND = re.compile(r"^(A|P|D|S|C)?GND\w*$|^0V$|^VSS\w*$|^EARTH$|^PE$|^CHASSIS$", re.I)
-INPUT = re.compile(r"V_?IN|VBAT|VBUS|DC_?IN|VSUP|VSUPPLY|VDC_?IN|HV_?DC|^PV|VMAINS|^IN\b", re.I)
-OUTPUT = re.compile(r"V_?OUT|OUT\b", re.I)
+GND = re.compile(r"^(A|P|D|S|C|HV|LV|ISO|SEC|PRI)?_?GND\w*$|^0V$|^VSS\w*$|^EARTH$|^PE$|^CHASSIS$|^GND_?(SEC|PRI|ISO|2|B)$", re.I)
+INPUT = re.compile(r"V_?IN|VBAT|VBUS|DC_?IN|VSUP|VSUPPLY|VDC_?IN|HV_?DC|^PV|VMAINS|^IN\b|^AC_?L\b|^LINE\b|^L\b|^L1\b|^L2\b|^L3\b|^N\b|^NEUT|^AC_?N\b|^AC_?IN|^MAINS", re.I)
+AC = re.compile(r"^AC_?L\b|^LINE\b|^L\b|^L[123]\b|^N\b|^NEUT|^AC_?N\b|^AC_?IN|^MAINS|^U\b|^V\b|^W\b|^PH_?[ABC]\b|^AC_?OUT", re.I)
+OUTPUT = re.compile(r"V_?OUT|OUT\b|^AC_?OUT|^U\b|^V\b|^W\b|^PH_?[ABC]\b", re.I)
 VOLT = re.compile(r"(?<![\w.])\+?(\d{1,4})V(\d{1,2})?(?![\w])|(?<![\w.])\+?(\d{1,4}(?:\.\d+)?)_?V(?![\w])", re.I)
 NUM_V = re.compile(r"(\d+(?:\.\d+)?)\s*V(?!A)\b", re.I)
 NUM_A = re.compile(r"(\d+(?:\.\d+)?)\s*A\b")
@@ -100,7 +101,7 @@ def analyse(parts, nets, db):
     from . import stress
     for n in sorted(power | external):
         lim, by, unrated = stress.net_limit(P, nets, n)     # the lowest-rated part of any kind (IC pins, diodes, caps)
-        rails[n] = {"net": short(n), "nominal_V": nominal(n), "external": n in external,
+        rails[n] = {"net": short(n), "nominal_V": nominal(n), "external": n in external, "ac": bool(AC.match(short(n))),
                     "limit_V": lim, "limit_by": by, "unrated": [P.label(r) for r in unrated],
                     "pins": len(nets[n]["pins"])}
     path = [n for n in rails if INPUT.search(short(n))]       # the input and the nets behind its fuse / filter

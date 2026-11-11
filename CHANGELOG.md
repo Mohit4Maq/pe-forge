@@ -11,6 +11,15 @@
 - `forge pcb setup`: keeps an outline it did not draw, keeps the stack-up unless `copper_oz` is set (it used to reset
   a 4-layer board to 2 layers), never removes copper layers that carry copper.
 
+**Ready for any project class** (docs/Generic_readiness.md)
+- Project types dc-dc, dc-dc-isolated, ac-dc, pfc, dc-ac, motor-drive, charger, other (`forge new --types`): each
+  drives the required simulation set, the closed forms and the stress model.
+- `forge calc`: buck-boost, flyback, forward, DAB, PFC, H-bridge inverter, three-level added; `calc design` infers
+  the topology from the words and specs.
+- Mains nets (L, N, LINE, AC_*, three-phase U / V / W) swing ±Vac·√2 in `forge stress`; DC link from
+  `vdc_link_V`; isolated secondary grounds recognised; a hazardous-voltage entry needs a protective-earth path;
+  a metal box above 60 V needs a PE stud; AC / PV / Han entry parts.
+
 **Human in the loop, decisions, the enclosure chain**
 - The owner verifies and passes every gate: `forge gate pass` refuses an agent; the owner runs it with
   `--comment` (recorded as an OWNER OK row). `forge level hands-free` (owner, at a terminal) switches it off;

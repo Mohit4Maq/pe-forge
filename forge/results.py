@@ -50,8 +50,25 @@ REQUIRED = {
                  ("start-up / precharge", r"start-?up|precharge|inrush"), ("fault / short", r"short|fault|overload")],
     "pfc": [("THD / power factor", r"\bthd\b|power factor|\bpf\b"), ("efficiency", r"efficien"),
             ("inductor ripple", r"ripple"), ("start-up / inrush", r"start-?up|inrush"), ("fault / short", r"short|fault|overload")],
+    "dc-dc isolated": [("magnetising / inductor current ripple", r"ripple|dI_?L|magneti"), ("primary / secondary peak current", r"peak.*current|I_?pk"),
+                       ("transformer flux / Bmax", r"flux|B_?max|saturat"), ("switch voltage stress (leakage spike / clamp)", r"V_?ds|stress|spike|clamp"),
+                       ("output voltage ripple", r"output.*ripple|ΔV"), ("efficiency", r"efficien"),
+                       ("loop stability", r"phase margin|gain margin|crossover|loop"), ("start-up / soft-start", r"start-?up|soft-?start|inrush"),
+                       ("output short / overload", r"short|overload|current limit|fault")],
+    "ac-dc": [("THD / power factor", r"\bthd\b|power factor|\bpf\b"), ("inrush", r"inrush|start-?up"), ("hold-up", r"hold-?up"),
+              ("bus / output ripple", r"ripple"), ("efficiency", r"efficien"), ("loop stability", r"phase margin|gain margin|crossover|loop"),
+              ("output short / overload", r"short|overload|fault|current limit"), ("surge / line transient", r"surge|transient")],
+    "motor": [("phase current ripple / THD", r"ripple|thd"), ("DC-link ripple", r"dc.?link|bus"), ("device losses / junction temperature", r"loss|T_?j|junction"),
+              ("start / stall / locked rotor current", r"stall|locked|start"), ("braking / regeneration bus rise", r"brak|regen"),
+              ("short / fault / desaturation", r"short|fault|desat")],
+    "charger": [("charge current regulation", r"current.*regul|CC\b|constant current"), ("voltage regulation / CV", r"CV\b|constant voltage|regulat"),
+                ("ripple", r"ripple"), ("efficiency", r"efficien"), ("loop stability", r"phase margin|gain margin|crossover|loop"),
+                ("reverse / battery fault", r"reverse|fault|short"), ("start-up / pre-charge", r"start-?up|pre-?charge|inrush")],
     "other": [("efficiency", r"efficien"), ("start-up / inrush", r"start-?up|inrush"), ("fault / short / overload", r"short|fault|overload")],
 }
+TYPE_KEYS = [("dc-dc isolated", ("isolated", "flyback", "forward", "llc", "dab", "phase-shift")), ("ac-dc", ("ac-dc", "ac/dc", "psu", "pfc")),
+             ("inverter", ("inverter", "dc-ac", "dc/ac", "three-level", "t-type", "npc", "grid")), ("pfc", ("pfc", "totem")),
+             ("motor", ("motor", "drive", "bldc", "pmsm", "foc")), ("charger", ("charger", "bms", "battery")), ("dc-dc", ("dc-dc", "dc/dc", "buck", "boost", "converter"))]
 PROVENANCE_TOOLS = ("pwrlab", "ltspice", "ngspice", "spice", "plecs", "simetrix", "psim")
 
 
@@ -87,8 +104,15 @@ def required_metrics(prj):
     sims = prj.cfg.get("sims", {})
     if sims.get("required"):
         return [(x, re.escape(x)) if isinstance(x, str) else tuple(x) for x in sims["required"]]
-    typ = (prj.cfg.get("project", {}).get("type") or "other").lower()
-    key = next((k for k in REQUIRED if k in typ), "other")
+    typ = (prj.cfg.get("project", {}).get("type") or "").lower()
+    specs = prj.cfg.get("specs", {})
+    wide = (typ + " " + str(specs.get("isolation", "")) + " " + str(specs.get("topology", ""))).lower()
+    # the declared type first (an isolated AC-DC is an AC-DC); the isolation / topology words only when it is vague
+    key = next((k for k, words in TYPE_KEYS if any(w in typ for w in words)), None)
+    if key == "dc-dc" and "iso" in wide:
+        key = "dc-dc isolated"
+    if key is None:
+        key = next((k for k, words in TYPE_KEYS if any(w in wide for w in words)), "other")
     return REQUIRED[key]
 
 

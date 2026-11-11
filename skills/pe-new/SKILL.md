@@ -47,7 +47,10 @@ answered or that has an obvious default (state the default instead). Pick from t
   stale superseded term or a broken trace link is refused) · no hook. Answer key `precommit_hook`.
 
 ## 3. Create the project
-1. Write the answers to `<scratch>/intake.json` (schema in `forge new --help`: name, summary, owner, type,
+1. Write the answers to `<scratch>/intake.json` (schema in `forge new --help`; `forge new --types` lists the
+   project types and the `[specs]` keys each needs: dc-dc, dc-dc-isolated, ac-dc, pfc, dc-ac, motor-drive,
+   charger, other; the type drives the required simulations, the closed forms and the stress model, so set it
+   and its specs exactly: name, summary, owner, type,
    specs, corners, standards, volume, target_cost_usd, profile, schematic_mode, reviews, region, distributors,
    precommit_hook, statusline (default true: the pe-forge bar for this project), answers{question: answer}). **Corners must hold both ends of every range** (input, output, load, f_sw,
    ambient): every design is verified at both ends.

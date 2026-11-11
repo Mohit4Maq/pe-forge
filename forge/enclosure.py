@@ -61,6 +61,13 @@ ENTRY_PARTS = {
     "M12-S-4": {"ip": "IP67", "a": 12, "v": 630, "cutout": ("round", 12.2), "wall_mm": [1, 8], "cost_usd": 9.0},
     "M12-T-4": {"ip": "IP67", "a": 12, "v": 63, "cutout": ("round", 12.2), "wall_mm": [1, 8], "cost_usd": 9.0},
     "vent-M12": {"ip": "IP68", "a": 0, "v": 0, "cutout": ("round", 12.2), "wall_mm": [1, 6], "cost_usd": 2.0},
+    "gland-M20-PE": {"ip": "IP68", "a": 32, "v": 450, "cutout": ("round", 20.5), "wall_mm": [1, 12], "cable_mm": [6, 12], "cost_usd": 1.5, "pe": True},
+    "gland-M25-PE": {"ip": "IP68", "a": 63, "v": 450, "cutout": ("round", 25.5), "wall_mm": [1, 14], "cable_mm": [9, 17], "cost_usd": 2.0, "pe": True},
+    "IEC-C14-sealed": {"ip": "IP54", "a": 10, "v": 250, "cutout": ("rect", 27.5, 19.5), "wall_mm": [1, 3], "cost_usd": 4.0, "pe": True},
+    "M12-K-4": {"ip": "IP67", "a": 12, "v": 630, "cutout": ("round", 12.2), "wall_mm": [1, 8], "cost_usd": 10.0, "pe": True},   # AC power, 4-pin + PE
+    "M12-L-5": {"ip": "IP67", "a": 16, "v": 63, "cutout": ("round", 12.2), "wall_mm": [1, 8], "cost_usd": 10.0},
+    "MC4": {"ip": "IP68", "a": 30, "v": 1500, "cutout": ("round", 16.0), "wall_mm": [1, 6], "cost_usd": 3.0},             # PV
+    "Harting-Han-3A": {"ip": "IP65", "a": 10, "v": 400, "cutout": ("rect", 22.0, 16.0), "wall_mm": [1, 4], "cost_usd": 12.0, "pe": True},
     "open": {"ip": "IP20", "a": 0, "v": 0, "cutout": None, "wall_mm": [0, 99], "cost_usd": 0},
 }
 
@@ -311,6 +318,8 @@ def entries(prj, env=None):
         wall = e.get("wall_mm")
         if part and wall and not (part["wall_mm"][0] <= wall <= part["wall_mm"][1]):
             probs.append(f"wall {wall} mm outside the part's {part['wall_mm']} mm range")
+        if (v_need or 0) > 60 and spec.get("ac", v_need and v_need > 100) and part and not part.get("pe") and not spec.get("pe"):
+            probs.append("a hazardous-voltage entry without a protective-earth path (choose a -PE part or set pe = true with the PE route)")
         rows.append({"ref": ref, "part": spec.get("part"), "ip": ipc, "a": a_rat, "v": v_rat, "cutout": (part or {}).get("cutout"),
                      "ok": not probs, "why": "; ".join(probs)})
     has_vent = any((v or {}).get("part", "").startswith("vent") for v in table.values())
@@ -350,6 +359,8 @@ def spec_for(prj, env):
         hgt = c["height_mm"] if c["height_mm"] is not None else 10.0
         if co and co[0] == "round":
             cut.append({"ref": c["ref"], "wall": wall, "u": round(u, 2), "z": round(max(co[1] / 2 + 1.0, hgt / 2), 2), "w": co[1], "h": co[1]})
+        elif co and co[0] == "rect":
+            cut.append({"ref": c["ref"], "wall": wall, "u": round(u, 2), "z": round(max(co[2] / 2 + 1.0, hgt / 2), 2), "w": co[1], "h": co[2]})
         else:
             cut.append({"ref": c["ref"], "wall": wall, "u": round(u, 2), "z": round(hgt / 2 + 0.8, 2),
                         "w": round(c["size_mm"][1 if wall in ("left", "right") else 0] + 1.0, 2), "h": round(hgt + 1.0, 2)})
@@ -486,6 +497,10 @@ def check(prj, out_dir=None):
                   + "".join(f"; {r['ref']}: {r['why']}" for r in ent["rows"] if not r["ok"])
                   + ("" if ent["vent"] or (ip_digits(e.get("ip")) or (0, 0))[1] < 5 or e.get("sealed_no_vent") else
                      "; no vent membrane on a sealed box (pressure cycling lifts the gasket): add vent-M12 or set sealed_no_vent = true with the reason")))
+    specs = prj.cfg.get("specs", {})
+    hv = max([float(max(v) if isinstance(v, list) else v) for k, v in specs.items() if k in ("vin_V", "vac_V", "vdc_link_V", "vout_V") and v] or [0])
+    if e.get("material", "aluminium") in ("aluminium", "vendor") and hv > 60:
+        items.append((bool(e.get("pe_stud")), f"earthing: a metal box with {hv:g} V inside needs a protective-earth stud (set [enclosure] pe_stud = \"M4\" and route PE to it)"))
     rep = os.path.join(out_dir, "cad_report.json")
     cadr = json.load(open(rep)) if os.path.exists(rep) else None
     items.append((cadr is not None, "build: CAD package exists" + ("" if cadr else " (forge enclosure build)")))

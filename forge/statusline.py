@@ -127,6 +127,22 @@ def minimal(data):
     return f"{name} · {os.path.basename(d.rstrip('/')) or d}"
 
 
+def outside(data, cwd=None):
+    """The bar outside a pe-forge project when pe-forge is installed for the user: the tool is here, and how to
+    start. None when the bar was installed per project only (then it stays out of other folders)."""
+    if not (_json(prev_file(), {}) or {}).get("user_install"):
+        return None
+    T = ui.Theme({})
+    d = (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or cwd or os.getcwd()
+    try:
+        kicad = any(f.endswith((".kicad_pro", ".kicad_sch", ".kicad_pcb")) for f in os.listdir(d))
+    except OSError:
+        kicad = False
+    hint = ("/pe-adopt: check this KiCad folder without changing a file" if kicad
+            else "/pe-new to start a project · /pe-adopt for a KiCad folder")
+    return ui.brand(T) + T.paint("dim", f"no pe-forge project in {os.path.basename(d.rstrip('/')) or d} · {hint}")
+
+
 def render(data, cwd=None):
     """The bar's text (one or two lines), or None when outside a pe-forge project."""
     ws = data.get("workspace") or {}
@@ -164,12 +180,18 @@ def run(stdin_text):
     if out is not None:
         return out
     prev = (_json(prev_file(), {}) or {}).get("command")
-    if prev:
+    if prev:                                         # the user's own status line, kept, outside pe-forge projects
         try:
             r = subprocess.run(prev, shell=True, input=stdin_text, capture_output=True, text=True, timeout=5)
             return r.stdout.rstrip("\n")
         except Exception as e:
             log(None, e)
+    try:
+        o = outside(data)
+        if o:
+            return o
+    except Exception as e:
+        log(None, e)
     return minimal(data)
 
 
@@ -220,6 +242,9 @@ def install(path, uninstall=False, chain=False):
     if (d.get("statusLine") or {}).get("command", "").endswith(" statusline") and "forge" in d["statusLine"]["command"]:
         d["statusLine"] = ours
         _write(path, d)
+        if chain:
+            prevs["user_install"] = path
+            _save_prev(prevs)
         return f"pe-forge status line already installed in {path} (command refreshed)"
     prev = d.get("statusLine")
     rec = {"created": not exists, "original": raw.decode() if raw is not None else None, "previous": prev,
@@ -228,6 +253,8 @@ def install(path, uninstall=False, chain=False):
         open(path + ".bak", "wb").write(raw)
     if rec["chained"]:
         prevs["command"] = prev["command"]
+    if chain:
+        prevs["user_install"] = path                 # outside a project the bar still says pe-forge is here
     prevs.setdefault("installs", {})[key] = rec
     _save_prev(prevs)
     d["statusLine"] = ours

@@ -1,6 +1,6 @@
 ---
 name: pe-new
-description: Start a new power-electronics project with pe-forge (phase P0). Asks the user targeted multiple-choice questions about the product, builds the standard folder structure, project.toml, CLAUDE.md rules and a KiCad project, then hands over to the supervisor. Use when the user says /pe-new, "start a new project", "I want to build a <converter / inverter / charger / motor drive>", or describes a power-electronics product to develop.
+description: Start a new hardware project with pe-forge (phase P0): any electronics product, board or device (a converter, inverter, charger, motor drive, LED driver, blinker, sensor node, battery-powered gadget, anything with a PCB). Asks targeted multiple-choice questions, builds the project (folders, project.toml, CLAUDE.md rules, KiCad project), then hands over to the supervisor. ALWAYS use this, never the plain kicad skill, when the user says /pe-new, "let's build a project", "start a new project", "I want to build / make / design a <thing>", or describes a product to develop from scratch.
 ---
 
 # pe-new: intake and project set-up (P0)

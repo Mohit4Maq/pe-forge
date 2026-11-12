@@ -1,6 +1,6 @@
 ---
 name: kicad
-description: Work on the user's KiCad 10 PCB projects and the MC_Lib component library (SQLite database library + git symbol/footprint libs). Use for anything KiCad: adding or importing parts (Ultra Librarian, SnapEDA, Altium SchLib/PcbLib/IntLib), finding parts, ERC/DRC, BOM, Gerbers/release outputs, footprint checks, new projects, or Altium-to-KiCad questions.
+description: Work on the user's KiCad 10 PCB projects and the MC_Lib component library (SQLite database library + git symbol/footprint libs). Use for KiCad mechanics inside an existing project: adding or importing parts (Ultra Librarian, SnapEDA, Altium SchLib/PcbLib/IntLib), finding parts, ERC/DRC, BOM, Gerbers/release outputs, footprint checks, or Altium-to-KiCad questions. NOT for starting a product or project ("let's build / design a ..."): that is pe-new (the pe-forge process, with its questions, gates and reviews); an existing KiCad folder without project.toml goes through pe-adopt.
 ---
 
 # KiCad + MC_Lib

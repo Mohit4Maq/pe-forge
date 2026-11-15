@@ -88,6 +88,7 @@ def project_toml(a):
     proc = {"profile": a.get("profile", "full"), "schematic_mode": a.get("schematic_mode", "ask"),
             "reviews": a.get("reviews", "gate"), "parallel_modules": False,
             "level": a.get("level", "standard"),
+            "agents": a.get("agents", "minimal" if a.get("profile", "full") == "lite" else "full"),
             "change_control": a.get("change_control", "warn" if a.get("profile") == "lite" else "enforce"),
             "region": a.get("region", ""), "fab_house": a.get("fab_house", ""), "distributors": a.get("distributors", ["mouser", "digikey"])}
     if proc["profile"] not in PROFILES or proc["schematic_mode"] not in MODES:

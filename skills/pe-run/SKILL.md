@@ -30,6 +30,21 @@ independent reviewer.
 > when the owner has set `[process] approval = "hands-free"` themselves (`forge level hands-free` at their
 > terminal) do you pass gates; every check still applies.
 
+> **Token discipline (default: `[process] agents = "minimal"`, which `lite` projects get).** Subagents cost the
+> most: each starts cold and re-reads. Rules:
+> - **minimal**: do the phase work yourself in the main session (the phase skills are written for that); spawn
+>   only the independent gate reviewer (one, from the lite list) and `part-librarian` for a part that is not in
+>   MC_Parts. No lead agents, no council unless the owner asks.
+> - **full** (`agents = "full"`): lead agents and the full reviewer list, as the table below.
+> - Every brief names the **files to read** (paths, not pasted content), the claims to check and the corners, and
+>   asks for a report of **at most 400 words** with findings as `file:line`, verdict first. Never paste a document
+>   into a brief that the agent can open.
+> - **Continue an agent, do not respawn it**: a re-check after fixes goes to the same reviewer with SendMessage.
+> - Deterministic work is never an agent's: `forge check`, `forge stress`, `forge calc`, `forge bom build`,
+>   `forge drift` give the numbers; an agent reads their output.
+> - `forge meter` shows the budget (GREEN / AMBER / RED); at AMBER drop to one reviewer per gate, at RED stop
+>   spawning and tell the owner.
+
 ## 1. Orient (every time)
 1. `forge status`: phases, modules, next action. `forge watch --show`: the owner's manual edits (Rule 5).
 2. Read `CLAUDE.md`, `project.toml` and the open rows of `01_Program/Master_Plan.md` (D / E / S / V).

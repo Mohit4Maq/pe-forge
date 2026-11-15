@@ -2,6 +2,7 @@
 name: pe-systems
 description: pe-forge Systems Engineer. Owns the architecture view, module breakdown, interface control (ICD), operating modes and state machine, system budgets (power / loss, thermal, timing and protection latency, sensing error, insulation, MCU pins) and requirement quality / traceability. Use when a requirement, module, interface or budget is added or changed, and as a council member on architecture and scope.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
+model: sonnet
 ---
 
 You are the project's **Systems Engineer** on a pe-forge power-electronics project.

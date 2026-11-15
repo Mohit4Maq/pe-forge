@@ -2,6 +2,7 @@
 name: part-librarian
 description: Find, source and add components to the user's MC_Lib KiCad library (SQLite DB + git). Use when the user needs a part ("find a 100 V 3 A synchronous buck", "add this Ultra Librarian zip", "fill DigiKey numbers for the caps") or when a schematic uses a part that is not in MC_Parts.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, mcp__mfcli-mcp__query_local_rag
+model: sonnet
 ---
 
 You maintain MC_Lib ($MC_LIB). Read its `CLAUDE.md` first and follow it exactly.

@@ -3126,6 +3126,83 @@ class Models3D(unittest.TestCase):
             self.assertTrue(models.gate_items(prj)[0][0])         # the owner's waiver is recorded and honoured
 
 
+class Objectives(unittest.TestCase):
+    """Rule 16: efficiency and cost first; a deviation stands only when the owner accepted it."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-obj-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def _trade(self, d, choice, a=("96.1", "38"), b=("97.0", "44")):
+        p = os.path.join(d, "04_Hardware", "Architecture", "Topology_Trade.md")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "w").write("# Topology trade\n\n| Criterion (weight) | Buck A | Buck B | Source |\n|---|---|---|---|\n"
+                           f"| Efficiency at rated load, % | {a[0]} % | {b[0]} % | forge calc |\n"
+                           f"| BoM cost estimate, USD | {a[1]} | {b[1]} | priced list |\n"
+                           f"| Control complexity | low | low | - |\n\n**Owner's choice:** {choice}\n")
+
+    def test_trade_choice_vs_best_and_the_owner_deviation(self):
+        from forge import config, objectives
+        d = new_project("Ob", self.tmp, target_cost_usd=40, efficiency_pct=95)
+        self.assertIn("efficiency_pct = 95", open(os.path.join(d, "project.toml")).read())
+        self._trade(d, "")
+        prj = config.Project(d)
+        ok, msg, _ = objectives.trade_status(prj)
+        self.assertFalse(ok); self.assertIn("owner's choice", msg)
+        self._trade(d, "Buck B")                      # best efficiency, not the lowest cost
+        prj = config.Project(d)
+        ok, msg, _ = objectives.trade_status(prj)
+        self.assertFalse(ok); self.assertIn("deviates on cost", msg)
+        r = forge("gate", "check", "G3", cwd=d, check=False)
+        self.assertIn("FAIL", r.stdout); self.assertIn("Rule 16", r.stdout)
+        forge("objectives", "deviate", "Buck B: 0.9 points more efficient for 6 USD", "--gate", "G3", "--axis", "cost", cwd=d)
+        r = forge("objectives", cwd=d, check=False)
+        self.assertIn("D-01 OPEN", r.stdout)
+        objectives.deviate(prj, "Buck B: 0.9 points more efficient for 6 USD", "G3", "cost")   # no duplicate
+        self.assertEqual(len(objectives.deviations(prj)), 1)
+        from forge import decisions
+        with mock.patch("forge.changes.agent_context", return_value=False):
+            decisions.answer(prj, "D-01", "accept: the customer pays for efficiency", "")
+        ok, msg, _ = objectives.trade_status(config.Project(d))
+        self.assertTrue(ok); self.assertIn("D-01 accepted", msg)
+        self._trade(d, "Buck A")                      # cheapest but not the most efficient: a different axis
+        ok, msg, _ = objectives.trade_status(config.Project(d))
+        self.assertFalse(ok); self.assertIn("deviates on efficiency", msg)
+
+    def test_bom_rollup_and_measured_efficiency(self):
+        from forge import config, objectives, decisions
+        d = new_project("Oc", self.tmp, target_cost_usd=10, efficiency_pct=95)
+        bom = os.path.join(d, "04_Hardware", "BOM", "WIP_BOM.csv")
+        head = open(bom).readline().strip()
+        open(bom, "a").write("U1,1,,LM1,TI,ic,,,,8.0,6.0,100,,1,mouser,x,y,z,EXACT,,,\n"
+                             "C1,4,,C1,M,cap,,,,2.0,1.5,100,,1,mouser,x,y,z,EXACT,,,\n"
+                             "C9,1,,C9,M,cap,,,,99,99,100,,1,mouser,x,y,z,EXACT,,yes,\n")
+        self.assertIn("Price_100", head)
+        prj = config.Project(d)
+        ok, msg, dat = objectives.bom_status(prj)
+        self.assertFalse(ok); self.assertAlmostEqual(dat["total"], 12.0)   # 6 + 4 x 1.5; the DNP line not counted
+        self.assertIn("over the target 10", msg)
+        objectives.deviate(prj, "shielded inductor", "G4", "cost")
+        with mock.patch("forge.changes.agent_context", return_value=False):
+            decisions.answer(prj, "D-01", "accept", "")
+        self.assertTrue(objectives.bom_status(config.Project(d))[0])
+        # efficiency: no result yet -> nothing to judge; a result below target fails; above passes
+        self.assertIsNone(objectives.efficiency_status(prj)[0])
+        res = os.path.join(d, "06_Simulations", "Results"); os.makedirs(res, exist_ok=True)
+        doc = {"id": "eff", "title": "t", "tool": "pwrlab", "date": "2026-11-15", "grade": "ACCEPTED", "corners": ["nom"],
+               "metrics": [{"name": "efficiency", "unit": "%", "values": [93.5]}]}
+        json.dump(doc, open(os.path.join(res, "eff.result.json"), "w"))
+        ok, msg, _ = objectives.efficiency_status(config.Project(d))
+        self.assertFalse(ok); self.assertIn("93.50 % below the target 95", msg)
+        doc["metrics"][0]["values"] = [0.962]
+        json.dump(doc, open(os.path.join(res, "eff.result.json"), "w"))
+        ok, msg, _ = objectives.efficiency_status(config.Project(d))
+        self.assertTrue(ok); self.assertIn("96.20 % meets", msg)
+        r = forge("check", "--only", "objectives", cwd=d, check=False)
+        self.assertIn("objectives", r.stdout)
+
+
 class GenericProjects(unittest.TestCase):
     """The tool is ready for any power-electronics request, not the pilot's buck: topology inferred, the right
     required-simulation set, AC / isolated / three-phase nets understood, closed forms for every class."""

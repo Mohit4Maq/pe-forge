@@ -191,6 +191,23 @@ SNS, FLT, TH, TX, HC, HV) graded Must / Should / Prefer. On every board at >= 50
 - **First article:** the bring-up checklist (loop inductance from ringing, overshoot, LISN, thermal map, mΩ drop,
   hipot / PD) goes into the validation plan.
 
+## Rule 16: system efficiency and cost come first
+Every design decision, at system level and in every module, **maximises efficiency and minimises cost**. Among the
+options that meet the requirements, the standards and the safety margins, the recommended one is the most
+efficient at the lowest cost; a choice that is not the best on either axis is a **deviation**, and a deviation
+stands only when the owner has accepted it as a recorded decision (`forge objectives deviate "<what>" --gate G<n>
+--axis efficiency|cost|both`, answered by the owner with `forge decision answer D-xx "accept ..."`). An agent
+never accepts a deviation, never trades efficiency or cost away silently, and never hides the better option.
+- Targets live in `project.toml`: `[objectives] efficiency_pct` (minimum at rated load) and `[market]
+  target_cost_usd` (BoM per unit at the volume). `forge objectives` shows the status.
+- P3: the topology trade carries a Rule-1-anchored efficiency and cost number for **every** option; the
+  weights put efficiency and cost first; the owner's choice is named; G3 checks the choice against the best.
+- P4: each part option shows its loss (W, efficiency points) and price; the BoM roll-up is checked against the
+  target at G4. A margin that costs money is stated as a number, not assumed.
+- P5 / G8: the measured efficiency (ACCEPTED result) is checked against the target.
+- Reviews (Rule 2) grade whether the preference was honoured and every deviation is recorded.
+- Safety, insulation, compliance and the derating rules are not tradeable for either axis; they bound the options.
+
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |
 |---|---|

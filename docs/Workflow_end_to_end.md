@@ -39,7 +39,10 @@ adopted board `forge req infer` drafts from the design and the owner confirms ev
 
 Topology trade (sync buck vs controller + FETs, frequency, device technology) with closed-form losses per option
 (`forge calc`), an ADR per decision, a council (`/council`) for anything irreversible. Open choices the owner
-should make (controller family, cost vs efficiency) are decisions, not assumptions.
+should make (controller family, cost vs efficiency) are decisions, not assumptions. **Rule 16 (efficiency and
+cost first):** every option carries an efficiency and a cost number; G3 checks that the owner's choice is the
+most efficient at the lowest cost, G4 the BoM roll-up against the cost target, G5 / G8 the measured efficiency
+against `[objectives] efficiency_pct`; anything else needs an owner-accepted deviation (`forge objectives deviate`).
 
 ## 4. Parts and sizing (P4, G4): every line sourced, every rating checked
 

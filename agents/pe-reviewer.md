@@ -70,7 +70,12 @@ A simulation result may be used as a design value only if it passes all of these
    - **Every part must have at least one alternate**, preferably an exact drop-in from a different manufacturer, with price and stock recorded.
    - Verify the alternate really matches (footprint, pinout, ratings, approvals). If it is only functional, check that the difference is stated.
    - Flag single-source parts and any line missing an alternate.
-7. **Completeness and documentation.**
+7. **Efficiency and cost first (Rule 16).** Was the recommended / chosen option the most efficient at the lowest
+   cost among those with margin? Compute the alternative yourself when the trade or BoM does not show it. Any
+   option that loses on either axis without an owner-accepted deviation (`forge objectives`, D-xx "accept") is a
+   **Major**; a hidden better option is a Critical. Safety, insulation and derating bound the options and are never
+   traded for either axis.
+8. **Completeness and documentation.**
    - Missing items, unstated assumptions, open items honestly listed.
    - Revision history and BoM consistency with the design note.
    - Figures legible.

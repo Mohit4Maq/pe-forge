@@ -57,7 +57,7 @@ from . import config, consistency, gates, kicad, vmodel
 
 ALL = ["erc", "drc", "consistency", "vmodel", "bom", "drift", "sch_lib", "stress", "sims", "insulation", "dru_rules", "pcb_extra",
        "pcb_review", "pcb_copper", "pcb_connectors", "pcb_crosstalk", "pcb_hp", "bom_risk", "protection",
-       "legibility", "spice", "parts_evidence", "fp_pins", "models", "fab_rules", "testpoints"]
+       "legibility", "spice", "parts_evidence", "fp_pins", "models", "fab_rules", "testpoints", "objectives"]
 PRECOMMIT = "erc,consistency,vmodel,bom,drift"
 HOOK_MARK = "# pe-forge pre-commit hook"
 
@@ -352,6 +352,11 @@ def c_testpoints(prj, opts):
     return fabhouse.as_check_tp(prj, opts)
 
 
+def c_objectives(prj, opts):
+    from . import objectives
+    return objectives.as_check(prj, opts)
+
+
 def c_fab(prj, opts):
     try:
         from . import fab
@@ -363,7 +368,7 @@ def c_fab(prj, opts):
 CHECKS = {"erc": c_erc, "drc": c_drc, "consistency": c_consistency, "vmodel": c_vmodel, "bom": c_bom,
           "drift": c_drift, "sch_lib": c_sch_lib, "stress": c_stress, "sims": c_sims, "insulation": c_insulation, "dru_rules": c_dru_rules,
           "pcb_review": c_pcb_review, "pcb_copper": c_pcb_copper, "pcb_connectors": c_pcb_connectors, "pcb_crosstalk": c_pcb_crosstalk, "pcb_hp": c_pcb_hp, "bom_risk": c_bom_risk, "protection": c_protection, "pcb_extra": c_pcb_extra, "legibility": c_legibility, "spice": c_spice, "parts_evidence": c_parts_evidence,
-          "fp_pins": c_fp_pins, "models": c_models, "fab_rules": c_fab_rules, "testpoints": c_testpoints, "fab": c_fab}
+          "fp_pins": c_fp_pins, "models": c_models, "fab_rules": c_fab_rules, "testpoints": c_testpoints, "objectives": c_objectives, "fab": c_fab}
 
 
 def run(prj, only=None, fab=False, strict=False, module=None):

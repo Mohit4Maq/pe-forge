@@ -89,6 +89,8 @@ Add `pe-compliance` to any gate whose work touches insulation, protection, store
    trade-offs, draw mode. Put your recommendation first, marked "(Recommended)", with the numbers that support
    it. Never ask what you can find in the project or decide with a sensible default; state the default instead.
 4. Big decisions (D-xx, architecture, irreversible, cost / NRE / date moves, sole source) go to `/council`.
+   Rule 16 at every step: recommend the most efficient, lowest-cost option with margin; a deviation is opened for
+   the owner (`forge objectives deviate`), never accepted by you; `forge objectives` before G3, G4, G5.
 5. Keep `Master_Plan.md` current in the same commit as the work (Rule 7).
 6. **Multi-file design changes run in a transaction** (a part swap, a value change through BoM + booklet + brief,
    a sheet edit): `forge txn begin "<what>"` (add `--allow-dirty` if the owner has uncommitted work: it is

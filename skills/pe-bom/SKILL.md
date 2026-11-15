@@ -16,8 +16,12 @@ description: Phase P4 of a pe-forge project - size every component from the chos
    at the volume break, MOQ, lead time, lifecycle. Zero stock at one distributor is never the answer: check the
    others before rejecting.
 3. **Owner picks by multiple choice** for the key parts (switches, controller / driver, magnetics, bulk caps,
-   connectors, MCU): each option shows margin at the worst corner, loss, price, stock; recommended first.
-   Passives and routine parts: pick yourself and state the choice.
+   connectors, MCU): each option shows margin at the worst corner, loss (W and efficiency points at rated load),
+   price at the volume, stock; recommended first. **Rule 16:** the recommended option is the lowest loss at the
+   lowest price among those with margin; a dearer or lossier recommendation names the axis, the delta and the
+   reason, and opens the deviation (`forge objectives deviate "<what>" --gate G4 --axis ...`). Passives and
+   routine parts: pick yourself, cheapest adequate part, and state the choice. `forge objectives` shows the BoM
+   roll-up against `[market] target_cost_usd`; G4 fails over target without an accepted deviation.
 4. **Alternate for every line** (prefer an exact drop-in from another manufacturer); write `Alt match` as
    EXACT or FUNCTIONAL + what differs. Custom magnetics: performance spec + a second vendor or core source.
 5. **Build it from the schematic once parts are drawn**: `forge bom build --boards N [--spares N] [--jlcpcb]` groups the

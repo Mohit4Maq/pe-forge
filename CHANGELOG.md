@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+**Rule 16: system efficiency and cost first**
+- Every decision maximises efficiency and minimises cost; a choice that loses on either axis is a deviation the
+  owner accepts as a D-xx (`forge objectives deviate`), never an agent. New `forge objectives` (targets, status).
+- Gates: G3 reads the topology trade (efficiency and cost numbers per option, the owner's choice vs the best),
+  G4 the BoM roll-up vs `[market] target_cost_usd`, G5 / G8 the measured efficiency vs `[objectives]
+  efficiency_pct`. `forge check objectives`. Intake asks for both targets; the trade template puts them first;
+  the reviewer grades it (unrecorded deviation = Major, hidden better option = Critical).
+
 **Half-done projects and the write guard**
 - `forge adopt`: survey, then add pe-forge around an existing project without changing a file (verified by hash),
   KiCad files mapped in place, phase from the work done, `--undo`.

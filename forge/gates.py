@@ -293,6 +293,9 @@ def check(prj, gate, mod=None):
             res.append((vmodel.check(vmodel.Model(prj), quiet=True) == 0, "V-model check (trace / verification links)"))
         except Exception as e:  # malformed sources count as a failure, not a crash
             res.append((False, f"V-model check could not run: {e}"))
+    if gate in ("G3", "G4", "G5", "G8"):
+        from . import objectives       # Rule 16: efficiency and cost first; deviations only with the owner's acceptance
+        res += objectives.gate_items(prj, gate, mod)
     if gate == "G4":
         res += bom_ok(os.path.join(prj.root, mod["dir"], "BOM.csv") if mod else prj.p("bom_csv"))
         from . import supply              # supply-chain risk: an unwaived HIGH (can't build, single-source IC, EOL) fails

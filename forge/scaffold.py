@@ -97,6 +97,9 @@ def project_toml(a):
              toml_table("project", proj), toml_table("process", proc),
              toml_table("specs", a.get("specs", {})), toml_table("corners", a.get("corners", {})),
              toml_table("market", {k: a[k] for k in ("volume", "target_cost_usd", "region") if k in a}),
+             "# Rule 16: efficiency and cost first. The gates measure the design against these; a deviation needs\n"
+             "# the owner's accepted decision (forge objectives deviate ...)\n"
+             + toml_table("objectives", {k: v for k, v in (("efficiency_pct", a.get("efficiency_pct")),) if v is not None}),
              '[standards]\nlist = ' + toml_value(a.get("standards", [])) + "\n",
              "[budget]\ndaily_cap_units = 20000000\nwindow_5h_cap_units = 8000000\namber_fraction = 0.7\nred_fraction = 0.9\n",
              "[vmodel]\nl0_all = []\nl0_cert = []\ncompliance_sections = []\n",
@@ -211,7 +214,7 @@ def create(dst, a, paths=None, kicad=True, out=print):
               f"**Summary:** {a.get('summary', '')}\n\n| Question | Answer |\n|---|---|\n")
     for q, ans in (a.get("answers") or {}).items():
         intake += f"| {q} | {ans} |\n"
-    for k in ("type", "specs", "corners", "standards", "volume", "target_cost_usd", "profile", "schematic_mode",
+    for k in ("type", "specs", "corners", "standards", "volume", "target_cost_usd", "efficiency_pct", "profile", "schematic_mode",
               "reviews", "region", "distributors"):
         if k in a:
             intake += f"| {k} | {json.dumps(a[k], ensure_ascii=False)} |\n"

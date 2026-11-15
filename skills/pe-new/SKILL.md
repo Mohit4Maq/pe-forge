@@ -34,6 +34,9 @@ answered or that has an obvious default (state the default instead). Pick from t
 - Market and certification: region (IN / EU / US / global), standards family (IEC 62368-1, IEC 62109, IEC
   61851, IEC 60335, automotive AEC / ISO 26262, none yet).
 - Efficiency / density priority: max efficiency · lowest cost · smallest size · fastest time to prototype.
+- Targets (Rule 16, measured by the gates): minimum efficiency at rated load, % (`efficiency_pct`); BoM cost per
+  unit at the volume, USD (`target_cost_usd`). Suggest a number from the class (a sync buck 94–97 %, a PFC +
+  LLC adapter 92–95 %, a SiC inverter 97–98.5 %) and the market survey; the owner sets it.
 
 **Batch 3: how we work**
 - Switching device and control preference: Si MOSFET · SiC · GaN · IGBT · "recommend in P3"; MCU family or

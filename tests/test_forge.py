@@ -1700,7 +1700,16 @@ class ResultsPanel(unittest.TestCase):
         self.assertNotIn("http://", page.replace("http://www.w3.org", ""))      # offline: nothing fetched
         self.assertIn("Now: Concept & needs", forge("vcycle", cwd=self.dir).stdout)
         empty = tempfile.mkdtemp()
-        self.assertFalse(json.loads(forge("panel", "--json", cwd=empty).stdout)["ok"])
+        # outside a project the panel falls back to the most recent project forge ran in (/maq from anywhere)
+        d2 = json.loads(forge("panel", "--json", cwd=empty).stdout)
+        self.assertTrue(d2["ok"]); self.assertEqual(os.path.realpath(d2["root"]), os.path.realpath(self.dir))
+        self.assertIn(os.path.realpath(self.dir), [os.path.realpath(x) for x in json.loads(forge("projects", "--json", cwd=empty).stdout)])
+        d3 = json.loads(forge("panel", "--project", self.dir, "--json", cwd=empty).stdout)
+        self.assertTrue(d3["ok"])
+        with mock.patch.dict(os.environ, {"PE_FORGE_CONFIG_DIR": tempfile.mkdtemp()}):          # no project ever used
+            r = subprocess.run(FORGE + ["panel", "--json"], cwd=empty, capture_output=True, text=True,
+                               env=dict(ENV, PE_FORGE_CONFIG_DIR=os.environ["PE_FORGE_CONFIG_DIR"]))
+        self.assertFalse(json.loads(r.stdout)["ok"])
         shutil.rmtree(empty)
 
 

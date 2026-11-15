@@ -11,6 +11,16 @@
 - `forge pcb setup`: keeps an outline it did not draw, keeps the stack-up unless `copper_oz` is set (it used to reset
   a 4-layer board to 2 layers), never removes copper layers that carry copper.
 
+**Token discipline**
+- Role agents with well-defined work (PM, finance, supply, researcher, software, systems, validation,
+  part-librarian) run on Sonnet; Opus stays for design, safety / compliance / reliability, the schematic drafter
+  and every independent reviewer.
+- `[process] agents = "minimal"` (the default for `lite` projects): the supervisor does the phase work in the
+  main session and spawns only one cold reviewer per gate (+ part-librarian when a part is missing); `"full"`
+  restores lead agents and the full reviewer list. Briefs name files, not content, and ask for ≤ 400-word
+  reports; re-checks continue the same reviewer; deterministic work is never an agent's; `forge meter` gates
+  spawning at AMBER / RED.
+
 **Ready for any project class** (docs/Generic_readiness.md)
 - Project types dc-dc, dc-dc-isolated, ac-dc, pfc, dc-ac, motor-drive, charger, other (`forge new --types`): each
   drives the required simulation set, the closed forms and the stress model.

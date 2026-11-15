@@ -83,6 +83,9 @@ parts on request with `kicad-place`, checks and reviews), `agent` (the `pe-schem
   orthogonal wires, left-to-right flow, ground down, supplies up, T-junctions only, no text overlaps. `forge
   schdraw check` must be clean and its netlist must match the brief exactly; the rendered sheet is inspected.
 - The KiCad schematic is the master; block diagrams in docs are concept figures only.
+- **The design booklet's circuit figures are always drawn with schemdraw** (`forge fig new | render`, the script
+  beside the booklet in `figures/`, embedded as SVG): regenerable, in one style, never a pasted image or a hand
+  sketch. `forge fig check` and G6 refuse a booklet without a current one.
 
 ## Rule 7: the plan is the single source of truth
 `01_Program/Master_Plan.md` holds open work, decisions (D-xx), engineering items (E-xx), sheets (S-xx) and
@@ -207,6 +210,13 @@ never accepts a deviation, never trades efficiency or cost away silently, and ne
 - P5 / G8: the measured efficiency (ACCEPTED result) is checked against the target.
 - Reviews (Rule 2) grade whether the preference was honoured and every deviation is recorded.
 - Safety, insulation, compliance and the derating rules are not tradeable for either axis; they bound the options.
+
+## Rule 17: write for the reader
+Every document follows `90_Templates/Doc_Style.md`: a summary of under 90 words first, one idea per paragraph,
+tables that fit the page, a schemdraw figure for every circuit and a plot for every sweep, sources cited by number
+from one table, a word budget per document type, subheadings every 600 words, units and anchors on every number.
+`forge docs lint` measures it (D1 to D8, score per document); a document under 70 is not handed to a gate review,
+and the reviewer grades readability as part of every review (Rule 2).
 
 ## Decided architecture (do not re-litigate without a reason)
 | Item | Decision |

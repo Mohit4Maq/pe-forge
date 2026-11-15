@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+**Readable documents (Rule 17)**
+- `90_Templates/Doc_Style.md` (summary first, short paragraphs, tables that fit, a figure for every circuit and
+  every sweep, sources by number, word budgets); `forge docs lint` measures D1..D8 with a score per document;
+  `forge check doc_style` warns; the reviewer grades documentation quality in every review (Critical / Major /
+  Minor rules, a Readability row per document) and names the better-documentation change even when nothing is wrong.
+
+**Booklet circuit figures with schemdraw (owner's rule)**
+- `forge fig new <name>` (house-style script beside the booklet), `forge fig render` (SVG + PNG, source hash
+  recorded), `forge fig check`: every design booklet embeds at least one schemdraw figure that is current; a pasted
+  image, a hand sketch or ASCII art is refused. G6 item, `forge check booklet_figs`, reviewer Major, doctor row.
+
 **`/maq` from anywhere**
 - The panel plugin registers `/maq`: the maq panel on the status view, from any folder (the project here, else the
   most recent pe-forge project on this machine; `/maq <folder>` picks one). `forge projects` lists the projects forge

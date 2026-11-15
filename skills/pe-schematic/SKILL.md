@@ -11,6 +11,13 @@ One module = one sheet (large modules may use 2–3 sheets under one hierarchica
 Everything is decided here, **before anyone draws**: function and allocated requirements, circuit description,
 part decisions (from P4), values with calculations and benchmarks, stress vs rating at the worst corner,
 protection and single-fault behaviour, layout notes, bench tests.
+**Circuit figures are drawn with schemdraw, always** (owner's rule): `forge fig new <name>` writes
+`figures/<name>.py` beside the booklet from the house template (flow left to right, supplies up, ground down,
+labels = the booklet's refs and net names); edit it, `forge fig render <name>`, embed `![..](figures/<name>.svg)`
+in §2 (one figure per stage: power stage, gate drive, sensing, protection). Look at the rendered SVG / PNG before
+you move on. The booklet itself follows `90_Templates/Doc_Style.md` (`forge docs lint` >= 70): summary first, prose
+for the circuit description with the figure, tables that fit the page, sources by number. No pasted images, hand sketches or ASCII circuits: `forge fig check` and G6 refuse a booklet without
+a current schemdraw figure. The KiCad sheet is still the master; the figure explains the design.
 
 ## Step 2: symbols and footprints, verified independently against the datasheet
 For every part on the sheet (`part-librarian` does the library work, `pe-hw` checks):

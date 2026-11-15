@@ -75,7 +75,20 @@ A simulation result may be used as a design value only if it passes all of these
    option that loses on either axis without an owner-accepted deviation (`forge objectives`, D-xx "accept") is a
    **Major**; a hidden better option is a Critical. Safety, insulation and derating bound the options and are never
    traded for either axis.
-8. **Completeness and documentation.**
+8. **Documentation quality (graded in every review; `90_Templates/Doc_Style.md`).** Run `forge docs lint <file>` on
+   every deliverable you review and `forge fig check` on every booklet; quote the scores in the report. Grade:
+   - **Critical:** the document cannot be followed to its conclusion (a key number without unit or anchor, a figure
+     that contradicts the parts table or the netlist, a conclusion that the body does not support).
+   - **Major:** a design booklet without a current schemdraw circuit figure (or with a pasted image / ASCII
+     circuit); a document that scans or compares corners with no plot; a `forge docs lint` score under 70; no
+     summary at the top; a paragraph over 300 words; a table a reader cannot scan (over 7 columns or rows over
+     140 characters carrying the decision itself).
+   - **Minor:** a score of 70 to 85; abbreviations or private source keys not expanded or not in a sources table;
+     over the word budget; sections over 600 words without a subheading; inconsistent units or notation.
+   A review report carries one **Readability** row per document (score, the worst finding, the fix). Better
+   documentation is a finding too: when a figure, a summary or a restructured table would make the deliverable
+   clearer, say so with the concrete change, even when nothing is wrong.
+9. **Completeness and documentation.**
    - Missing items, unstated assumptions, open items honestly listed.
    - Revision history and BoM consistency with the design note.
    - Figures legible.

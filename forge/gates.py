@@ -317,6 +317,9 @@ def check(prj, gate, mod=None):
             res.append((r["status"] != "fail", f"{kind} ({r['reason']}): {len(bad)} error(s)"
                         + (" (unrouted / parity count as errors)" if gate == "G7" else "") + f", {warn} warning(s)"
                         + "".join(f"; {f['location']}: {f['actual']}" for f in bad[:3])))
+        if gate == "G6":
+            from . import circuitfig         # the booklet shows its circuit: schemdraw figures, current, regenerable
+            res += circuitfig.gate_items(prj, mod)
         from . import protection          # surge clamps vs the system and every protected pin (PROT-1..3)
         pr = protection.as_check(prj, {})
         res.append((pr["status"] != "fail", f"protection ({pr['reason'] or pr['status']}): {pr['status']}"

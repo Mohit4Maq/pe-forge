@@ -10,7 +10,11 @@ status: draft
 > the sheet brief; nothing on the sheet may be decided at drawing time.
 
 ## 1. Function and requirements allocated (HWR / CTL ids)
-## 2. Circuit description (block figure, signal flow left to right)
+## 2. Circuit description (signal flow left to right)
+<!-- Every circuit figure is drawn with schemdraw from a script beside this booklet: `forge fig new <name>` writes
+figures/<name>.py, `forge fig render <name>` makes figures/<name>.svg; embed it as ![<caption>](figures/<name>.svg).
+A pasted image, a hand sketch or ASCII art is not accepted (G6 checks the figure, its source and that it is current). -->
+![<module> power stage](figures/<name>.svg)
 ## 3. Part decisions
 | Ref | Function | MPN (primary) | Alternate | Why this part | Datasheet rev / page |
 |---|---|---|---|---|---|

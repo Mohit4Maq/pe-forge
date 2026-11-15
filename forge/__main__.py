@@ -52,6 +52,8 @@
   forge models check|find [--apply]|ask    every placed part has a 3D model; search the libraries, else ask the owner
   forge projects [--json]                  pe-forge projects used on this machine, most recent first (/maq opens them)
   forge panel [--project DIR] --json       the panel's data (the project here, else the most recent one)
+  forge docs lint [file ...] [--json]      readable documents (Doc_Style.md D1..D8): summary first, short paragraphs, figures
+  forge fig new <name>|render|check         the booklet's circuit figures, drawn with schemdraw from figures/<name>.py
   forge objectives [deviate ...]           efficiency and cost first (Rule 16): targets, status, owner-accepted deviations
   forge enclosure req|fit|entries|build|check|release [--json]   the enclosure chain (docs/PLAN_enclosure.md)
   forge review record G<n> <file> [--module M-xx]   bind an independent review to the deliverables it reviewed
@@ -241,6 +243,12 @@ def _dispatch(argv):
     if cmd == "objectives":
         from forge import objectives
         return objectives.main(prj, rest)
+    if cmd == "docs":
+        from forge import doclint
+        return doclint.main(prj, rest)
+    if cmd == "fig":
+        from forge import circuitfig
+        return circuitfig.main(prj, rest)
     if cmd == "enclosure":
         from forge import enclosure
         return enclosure.main(prj, rest)

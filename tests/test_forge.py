@@ -3212,6 +3212,72 @@ class Objectives(unittest.TestCase):
         self.assertIn("objectives", r.stdout)
 
 
+class BookletFiguresAndDocStyle(unittest.TestCase):
+    """The booklet's circuit figures come from schemdraw scripts (forge fig); documents are measured for readability."""
+
+    def setUp(self):
+        sys.path.insert(0, REPO)
+        self.tmp = tempfile.mkdtemp(prefix="pe-forge-fig-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_fig_new_render_check_and_g6_item(self):
+        from forge import config, circuitfig
+        d = new_project("Fg", self.tmp)
+        bk = os.path.join(d, "04_Hardware", "Design_Booklets", "M-01_Design_Booklet.md")
+        os.makedirs(os.path.dirname(bk), exist_ok=True)
+        body = "# M-01: design booklet\n\n## 2. Circuit description\n" + "The buck stage feeds the load. " * 30 + "\n"
+        open(bk, "w").write(body)
+        prj = config.Project(d)
+        ok, probs, _ = circuitfig.status(prj, bk)
+        self.assertFalse(ok); self.assertIn("no figure", probs[0])
+        r = forge("fig", "new", "buck", cwd=d)
+        self.assertIn("figures/buck.py", r.stdout)
+        src = os.path.join(d, "04_Hardware", "Design_Booklets", "figures", "buck.py")
+        self.assertIn("schemdraw", open(src).read())
+        r = forge("fig", "render", "buck", cwd=d)
+        self.assertIn("OK", r.stdout)
+        self.assertTrue(os.path.exists(src[:-3] + ".svg"))
+        open(bk, "a").write("\n![buck stage](figures/buck.svg)\n")
+        ok, probs, figs = circuitfig.status(prj, bk)
+        self.assertTrue(ok, probs); self.assertEqual(figs, ["buck"])
+        items = circuitfig.gate_items(prj)
+        self.assertTrue(items[0][0]); self.assertIn("1/1", items[0][1])
+        open(src, "a").write("\n# edited\n")                       # source changed: the picture is stale
+        ok, probs, _ = circuitfig.status(prj, bk)
+        self.assertFalse(ok); self.assertIn("stale", probs[0])
+        open(bk, "a").write("\n![pasted](../photo.png)\n")        # a pasted image is not a circuit figure
+        forge("fig", "render", cwd=d)
+        ok, probs, _ = circuitfig.status(prj, bk)
+        self.assertFalse(ok); self.assertTrue(any("pasted" in p for p in probs), probs)
+        r = forge("check", "--only", "booklet_figs", cwd=d, check=False)
+        self.assertIn("booklet_figs", r.stdout)
+
+    def test_docs_lint_measures_readability(self):
+        from forge import config, doclint
+        d = new_project("Dl", self.tmp)
+        bad = os.path.join(d, "04_Hardware", "Design_Calculations.md")
+        wall = " ".join(f"word{i}" for i in range(200))
+        open(bad, "w").write("# Calculations\n\n" + wall + "\n\n## 1. Sweep\nA sweep from 2.0 to 3.3 V. `R1 -> R2 -> R3 -> R4 -> R5 -> R6 -> R7 -> R8 -> R9 -> R10 -> R11 -> R12 -> R13 -> R14 -> R15 -> R16 -> R17 -> R18 -> R19 -> R20 -> R21 -> R22 -> R23 -> R24 -> R25` as text.\n\n"
+                             + "| a | b | c | d | e | f | g | h |\n|---|---|---|---|---|---|---|---|\n| " + " | ".join(["x" * 30] * 8) + " |\n\n"
+                             + "See R5 p.6, TT §4, DC §8.1, R5 p.2, SB §1.1, TT §2, DC §1, R4 p.1.\n\n" * 3 + " ".join(f"w{i}" for i in range(120)) + "\n")
+        r = doclint.lint(bad, "lite")
+        codes = {f.split(":")[0] for f in r["findings"]}
+        for c in ("D1", "D2", "D3", "D4", "D5", "D7"):
+            self.assertIn(c, codes, r["findings"])
+        self.assertLess(r["score"], 70)
+        good = os.path.join(d, "04_Hardware", "Design_Booklets", "M-01_Design_Booklet.md")
+        os.makedirs(os.path.dirname(good), exist_ok=True)
+        open(good, "w").write("# Booklet\n\nA 2 W buck, 96 % measured, reviewed.\n\n## 1. Circuit\n![stage](figures/s.svg)\n\n"
+                              + "\n\n".join(" ".join(f"t{i}" for i in range(60)) for _ in range(6)) + "\n\n| # | Source |\n|---|---|\n| 1 | datasheet |\n")
+        r = doclint.lint(good, "lite")
+        self.assertEqual(r["findings"], [], r["findings"])
+        self.assertEqual(r["score"], 100)
+        out = forge("docs", "lint", cwd=d, check=False).stdout
+        self.assertIn("Design_Calculations.md", out); self.assertIn("D7:", out)
+        r = forge("check", "--only", "doc_style", cwd=d, check=False)
+        self.assertIn("doc_style", r.stdout)
+
+
 class GenericProjects(unittest.TestCase):
     """The tool is ready for any power-electronics request, not the pilot's buck: topology inferred, the right
     required-simulation set, AC / isolated / three-phase nets understood, closed forms for every class."""

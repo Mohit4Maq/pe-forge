@@ -34,11 +34,11 @@ if [[ ! -x "$HERE/.venv/bin/pwrlab-mcp" ]]; then
   say "building .venv with pwrlab"
   "$PY" -m venv "$HERE/.venv"
   "$HERE/.venv/bin/python" -m pip install -q --upgrade pip
-  "$HERE/.venv/bin/python" -m pip install -q -e "$HERE/vendor/pwrlab" pymupdf pytest
+  "$HERE/.venv/bin/python" -m pip install -q -e "$HERE/vendor/pwrlab" pymupdf pytest schemdraw matplotlib
 elif (( UPDATE )); then
   say "refreshing the .venv packages"
   "$HERE/.venv/bin/python" -m pip install -q --upgrade pip
-  "$HERE/.venv/bin/python" -m pip install -q --upgrade -e "$HERE/vendor/pwrlab" pymupdf pytest
+  "$HERE/.venv/bin/python" -m pip install -q --upgrade -e "$HERE/vendor/pwrlab" pymupdf pytest schemdraw matplotlib
 fi
 "$HERE/.venv/bin/python" -c "import fitz" 2>/dev/null || warn "PyMuPDF missing in .venv: schematic renders and text checks need it"
 

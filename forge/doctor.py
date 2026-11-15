@@ -59,6 +59,12 @@ def main(argv):
     except Exception:
         fz = False
     ok(fz, "PyMuPDF (optional)", "" if fz else "pip install pymupdf", "rendering sheets to PNG, text-overlap checks")
+    try:
+        import schemdraw  # noqa: F401
+        sd = True
+    except ImportError:
+        sd = False
+    ok(sd, "schemdraw", "" if sd else "pip install schemdraw matplotlib (pe-forge venv)", "booklet circuit figures (forge fig)")
     db = os.path.join(config.LIBRARY, "database", "mc_parts.sqlite")
     try:
         n = sum(sqlite3.connect(db).execute(f"select count(*) from {t}").fetchone()[0]

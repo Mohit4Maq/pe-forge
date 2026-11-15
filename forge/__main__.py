@@ -50,6 +50,8 @@
                                     (starts in light mode)
   forge decision new|list|answer|withdraw ...   questions only the owner answers; a gate waits for them
   forge models check|find [--apply]|ask    every placed part has a 3D model; search the libraries, else ask the owner
+  forge projects [--json]                  pe-forge projects used on this machine, most recent first (/maq opens them)
+  forge panel [--project DIR] --json       the panel's data (the project here, else the most recent one)
   forge objectives [deviate ...]           efficiency and cost first (Rule 16): targets, status, owner-accepted deviations
   forge enclosure req|fit|entries|build|check|release [--json]   the enclosure chain (docs/PLAN_enclosure.md)
   forge review record G<n> <file> [--module M-xx]   bind an independent review to the deliverables it reviewed
@@ -192,9 +194,20 @@ def _dispatch(argv):
     if cmd == "hp" and rest[:1] == ["rules"]:           # the rule book itself needs no project
         from forge import hp
         return hp.main(None, rest)
-    if cmd == "panel" and config.find_root() is None:
-        print('{"ok": false, "error": "not inside a pe-forge project"}')
+    if cmd == "projects":                                   # the projects forge ran in on this machine
+        import json as _json
+        lst = config.recent()
+        print(_json.dumps(lst) if "--json" in rest else ("\n".join(lst) or "no pe-forge project used on this machine yet"))
         return 0
+    if cmd == "panel":                                      # --project DIR, else here, else the most recent project
+        root = rest[rest.index("--project") + 1] if "--project" in rest else config.find_root()
+        if root is None and config.recent():
+            root = config.recent()[0]
+        if root is None or not os.path.isfile(os.path.join(root, "project.toml")):
+            print('{"ok": false, "error": "not inside a pe-forge project (and none used on this machine yet): /maq <project folder>"}')
+            return 0
+        from forge import results
+        return results.main_panel(config.Project(root), [a for a in rest if a != "--project" and a != root])
     if cmd == "vcycle":
         from forge import vcycle
         return vcycle.main(need(), rest)

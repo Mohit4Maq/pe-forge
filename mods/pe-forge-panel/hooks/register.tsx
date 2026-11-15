@@ -120,6 +120,11 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     cwd = e.cwd
     await $.command.register({
+      name: 'maq',
+      description: 'Show the maq panel: project status (V-cycle), gates, checks, simulations, parts. Works from any folder: the project here, else the last one used',
+      argumentHint: '[pe-forge project folder]',
+    })
+    await $.command.register({
       name: 'results',
       description: 'Show the pe-forge results panel (simulations, checks, gates, parts)',
       argumentHint: '[pe-forge project folder]',
@@ -133,6 +138,36 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('command.run', { command: 'maq' }, async ($, e) => {
+    const arg = e.args.trim().replace(/^~(?=\/)/, (await $.env.get('HOME')) ?? '~')
+    if (arg) {
+      cwd = arg
+      seenResults = undefined
+      seenCheck = undefined
+    }
+    let d = await refresh($)
+    if (!d?.ok && !arg) {
+      // not inside a project: forge panel falls back to the most recent one; follow it so the buttons run there
+      const r = await forge($, ['projects', '--json'], 15000)
+      try {
+        const lst = JSON.parse(r.stdout) as string[]
+        if (lst.length) {
+          cwd = lst[0] ?? cwd
+          d = await refresh($)
+        }
+      } catch {
+        // no list: keep the error below
+      }
+    }
+    if (!d?.ok) return { text: `maq panel: ${d?.error ?? 'not inside a pe-forge project'} (try /maq <project folder>)` }
+    if (d.root) cwd = d.root
+    await update($, tab, () => 'vcycle')
+    await $.ui.open({ id: PANE, title: 'pe-forge results' })
+    seenResults = d.results_stamp
+    seenCheck = d.check_stamp
+    return { text: `maq panel opened for ${d.project} (${cwd}): keys 1-5 switch tabs, ctrl+x then Tab moves the keyboard into it.` }
+  })
+
   on('command.run', { command: 'results' }, async ($, e) => {
     const arg = e.args.trim().replace(/^~(?=\/)/, (await $.env.get('HOME')) ?? '~')
     if (arg) {
@@ -142,6 +177,7 @@ export const register: Register = on => {
     }
     const d = await refresh($)
     if (!d?.ok) return { text: `pe-forge panel: ${d?.error ?? 'not inside a pe-forge project'}` }
+    if (d.root) cwd = d.root
     await $.ui.open({ id: PANE, title: 'pe-forge results' })
     seenResults = d.results_stamp
     seenCheck = d.check_stamp

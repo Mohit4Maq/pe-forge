@@ -200,7 +200,8 @@ A second plugin, `pe-forge-panel` (`mods/pe-forge-panel`), puts a panel beside t
 **V-cycle** (every stage of the V, where the project is now, what needs attention; pick a stage to see its facts,
 items and documents, and press `a` to ask Claude about it), **Simulations** (grade, key numbers per corner against
 the hand calculation, charts), **Checks**, **Gates** and **Parts**. It opens by itself when a simulation result or a
-full check lands; `/results [project folder]` opens it at any time. `forge report --open` shows the same as an
+full check lands; **`/maq`** opens it at any time on the status view, from any folder (the project here, else the
+last one used; `/maq <folder>` picks one), `/results` on the simulations. `forge report --open` shows the same as an
 interactive page in the browser, offline. Install: `/plugin install pe-forge-panel@pe-forge`.
 
 Keys: ctrl+x then Tab moves the keyboard into the panel; 1-5 switch tabs, the letter on a button presses it, Esc

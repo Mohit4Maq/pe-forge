@@ -11,8 +11,9 @@ logo with the project, phase and next step. Five tabs:
 - **Gates**: phases and modules, and a button that checks the next gate.
 - **Parts**: the datasheet work list for the board.
 
-It opens by itself when a new simulation result or a new full check lands. Open it at any time with `/results`, or
-`/results <project folder>` to look at another pe-forge project. Press ctrl+x then Tab to move the keyboard into
+It opens by itself when a new simulation result or a new full check lands. **`/maq`** opens it at any time on the
+status view, from any folder: the project you are in, else the last pe-forge project used on this machine
+(`forge projects` lists them); `/maq <project folder>` picks one. `/results` opens it on the simulations. Press ctrl+x then Tab to move the keyboard into
 the panel; keys 1 to 5 switch tabs, the letter on a button presses it, Esc returns to the prompt.
 
 Install: `/plugin install pe-forge-panel --marketplace Mohit4Maq/pe-forge` (or `/plugin install pe-forge-panel@pe-forge`

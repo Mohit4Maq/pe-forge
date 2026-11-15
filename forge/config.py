@@ -1,4 +1,5 @@
 """Project discovery and configuration (project.toml at the project root). Standard library only."""
+import json
 import os
 import subprocess
 import sys
@@ -110,6 +111,7 @@ class Project:
         with open(os.path.join(self.root, "project.toml"), "rb") as fh:
             self.cfg = tomllib.load(fh)
         self.paths = dict(DEFAULT_PATHS, **self.cfg.get("paths", {}))
+        remember(self.root)
 
     def p(self, key, *more):
         return os.path.join(self.root, self.paths[key], *more)
@@ -135,6 +137,32 @@ class Project:
 
     def git(self, *a):
         return subprocess.run(["git", "-C", self.root, *a], capture_output=True, text=True).stdout
+
+
+def config_dir():
+    return os.environ.get("PE_FORGE_CONFIG_DIR") or os.path.expanduser("~/.config/pe-forge")
+
+
+def recent():
+    """pe-forge projects a forge command ran in on this machine, most recent first (only those still there)."""
+    try:
+        with open(os.path.join(config_dir(), "recent.json")) as fh:
+            lst = json.load(fh)
+    except (OSError, ValueError):
+        return []
+    return [p for p in lst if isinstance(p, str) and os.path.isfile(os.path.join(p, "project.toml"))]
+
+
+def remember(root):
+    """Keep this project at the head of the recent list (so /maq can open the panel from any folder)."""
+    try:
+        root = os.path.realpath(root)
+        lst = [p for p in recent() if os.path.realpath(p) != root]
+        os.makedirs(config_dir(), exist_ok=True)
+        with open(os.path.join(config_dir(), "recent.json"), "w") as fh:
+            json.dump([root] + lst[:9], fh)
+    except OSError:
+        pass
 
 
 def project_or_none():

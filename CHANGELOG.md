@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+**`/maq` from anywhere**
+- The panel plugin registers `/maq`: the maq panel on the status view, from any folder (the project here, else the
+  most recent pe-forge project on this machine; `/maq <folder>` picks one). `forge projects` lists the projects forge
+  ran in; `forge panel --project DIR`.
+
 **Rule 16: system efficiency and cost first**
 - Every decision maximises efficiency and minimises cost; a choice that loses on either axis is a deviation the
   owner accepts as a D-xx (`forge objectives deviate`), never an agent. New `forge objectives` (targets, status).
